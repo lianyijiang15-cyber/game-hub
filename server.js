@@ -21,7 +21,7 @@ function notice(r,s){for(const p of r.players.filter(p=>p.bot))agent.remember(p,
 function player(r,id){return r.players.find(p=>p.id===id);}
 function actorRoom(socket){const r=rooms.get(socket.data.room);return r&&player(r,socket.id)?r:null;}
 function revealRoles(r){if(r.revealed)return;r.revealed=true;io.to(r.id).emit('rolesRevealed',r.players.map(p=>({name:p.name,role:p.role,alive:p.alive})));notice(r,'🏁 遊戲結束，所有玩家身分已公開。');}
-function winner(r){const live=r.players.filter(p=>p.alive),wolves=live.filter(isWolf);if(!wolves.length||wolves.length>=live.length-wolves.length){r.phase='ended';notice(r,!wolves.length?'好人陣營獲勝！':'狼人陣營獲勝！');notice(r,'本局結束：所有玩家角色身分已公開。');publish(r);return true;}return false;}
+function winner(r){const live=r.players.filter(p=>p.alive),wolves=live.filter(isWolf);if(!wolves.length||wolves.length>=live.length-wolves.length){r.phase='ended';notice(r,!wolves.length?'好人陣營獲勝！':'狼人陣營獲勝！');revealRoles(r);publish(r);return true;}return false;}
 function wolfPhase(r,phase){r.phase=phase;r.votes={};if(phase==='day'){r.day++;notice(r,'第 '+r.day+' 天：所有存活玩家投票放逐。');}else notice(r,'黑夜降臨：狼人投票選擇目標。');publish(r);scheduleBots(r);}
 function resolveVotes(r){if(r.phase!=='day'&&r.phase!=='night')return;
  const eligible=r.players.filter(p=>p.alive&&(r.phase==='day'||isWolf(p)));
@@ -44,7 +44,7 @@ async function runWolfAgents(r,phase){
     const decision=await agent.infer(state);
     if(!rooms.has(r.id)||r.phase!==phase||!bot.alive)break;
     agent.saveNote(bot,decision.note);
-    if(decision.say&&phase==='day'){io.to(r.id).emit('chat',{name:bot.name,text:decision.say,team:null});for(const p of r.players.filter(p=>p.bot))agent.remember(p,bot.name+'：'+decision.say);}
+    if(decision.say&&phase==='day'){io.to(r.id).emit('chat',{name:bot.name,text:decision.say,team:null});for(const p of r.players.filter(p=>p.bot&&p.alive))agent.remember(p,bot.name+'：'+decision.say);}
     r.votes[bot.id]=decision.target;
     resolveVotes(r);publish(r);
    }catch(err){notice(r,'⚠️ '+bot.name+' AI 無法決策：'+err.message+'。請檢查 Ollama；系統不會以隨機投票代替。');break;}
@@ -103,7 +103,7 @@ io.on('connection',socket=>{
  socket.on('leave',()=>leave(socket));
  socket.on('addBot',(ack=()=>{})=>{const r=actorRoom(socket);if(!r||r.host!==socket.id||r.started)return ack({error:'只有等待中的房主能加入 AI'});
  if(r.players.length>=r.size)return ack({error:'房間已滿'});let n=1;while(r.players.some(p=>p.name==='AI '+n))n++;
- r.players.push({id:'bot-'+crypto.randomUUID(),name:'AI '+n,bot:true,ready:true,alive:true,memory:{events:[],notes:[]}});notice(r,'AI '+n+' 加入房間');publish(r);ack({ok:true});});
+ r.players.push({id:'bot-'+crypto.randomUUID(),name:'AI '+n,bot:true,ready:true,alive:true,persona:['懷疑派：對證據要求嚴格，經常質疑其他人的推論','直覺派：敢提出不同猜測，但願意修正','調停派：擅長整合各方說法，不盲目跟票','強勢派：主動追問矛盾，會公開挑戰觀點','保守派：先觀察再表態，重視前後一致性','冒險派：偏好提出大膽假設並驗證'][((n-1)%6)],memory:{events:[],notes:[]}});notice(r,'AI '+n+' 加入房間');publish(r);ack({ok:true});});
  socket.on('removeBot',(id,ack=()=>{})=>{const r=actorRoom(socket);if(!r||r.host!==socket.id||r.started)return ack({error:'只有等待中的房主能移除 AI'});const p=player(r,id);if(!p?.bot)return ack({error:'找不到 AI'});r.players=r.players.filter(p=>p.id!==id);publish(r);ack({ok:true});});
  socket.on('ready',()=>{const r=actorRoom(socket);if(!r||r.started)return;const p=player(r,socket.id);p.ready=!p.ready;publish(r);});
  socket.on('start',()=>{const r=actorRoom(socket);if(!r||r.host!==socket.id||r.started||r.players.length!==r.size||!r.players.every(p=>p.ready))return;
