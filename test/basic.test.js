@@ -1,0 +1,4 @@
+const test=require('node:test');const assert=require('node:assert/strict');const {roles,sizes,server}=require('../server');const http=require('node:http');
+test('角色數量符合房間人數',()=>{for(const [size,list] of Object.entries(roles))assert.equal(list.length,Number(size));});
+test('房間規格符合企劃',()=>{assert.deepEqual(sizes.wolf,[8,9,10,12]);assert.deepEqual(sizes.arena,[10,12,14]);});
+test('首頁可由伺服器提供',async()=>{await new Promise(resolve=>server.listen(0,resolve));try{const port=server.address().port;const result=await new Promise((resolve,reject)=>http.get('http://127.0.0.1:'+port+'/',res=>{let body='';res.on('data',c=>body+=c);res.on('end',()=>resolve({status:res.statusCode,body}));}).on('error',reject));assert.equal(result.status,200);assert.match(result.body,/GAME/);}finally{await new Promise(resolve=>server.close(resolve));}});
