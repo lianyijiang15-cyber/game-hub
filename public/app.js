@@ -4,6 +4,7 @@ const stories=[
  {title:'餐廳裡的海龜湯',intro:'一名男子在餐廳喝了一口海龜湯，回家後卻做出了令人震驚的決定。為什麼？',clues:['他以前曾遭遇船難。','他當年吃過一碗被稱作海龜湯的湯。','餐廳的味道與記憶不同，讓他發現當年吃的不是海龜。'],hints:['想想男子過去的經歷。','關鍵在於兩次湯的味道。','當年的湯其實不是海龜肉。'],keys:['船','海龜','味道'],answer:'經典版本中，男子曾在船難後喝下被謊稱為海龜湯的湯。多年後嚐到真正的海龜湯，才察覺當年的真相。'},
  {title:'關燈的人',intro:'一個人晚上關燈睡覺，隔天得知許多人因此喪命。為什麼？',clues:['他住在靠海的地方。','這盞燈不是普通房間的照明。','他是燈塔管理員，關燈導致船隻迷航。'],hints:['注意這盞燈的位置。','燈光可能是給別人看的。','想想燈塔。'],keys:['海','燈','船'],answer:'他是燈塔管理員，誤關了指引船隻的燈，造成船難。'}
 ];
+if(typeof extraStories!=='undefined')stories.push(...extraStories);
 function show(id){['home','soup','lobby','game'].forEach(x=>$(x).hidden=x!==id);}function home(){if(room){socket.emit('leave');room=null;}show('home');socket.emit('list');}
 function openSoup(){show('soup');newSoup();}function newSoup(){soup=stories[Math.floor(Math.random()*stories.length)];hintCount=0;progress=0;$('soup-title').textContent=soup.title;$('soup-story').textContent=soup.intro;$('soup-end').textContent='';$('answer').textContent='';updateSoup();}
 function updateSoup(){$('hints').textContent=3-hintCount;$('soup-progress').textContent=`已解鎖線索：${progress}/${soup.clues.length}`;}
