@@ -77,3 +77,42 @@ socket.on('room',r=>{
   }
  }
 });
+
+let wolfIntel={teammates:[],votes:[]};
+socket.on('wolfIntel',data=>{wolfIntel=data;if(window.lastWolfRoom)renderWolfBoard(window.lastWolfRoom);});
+function renderWolfBoard(r){
+ if(r.id!==room||r.type!=='wolf')return;
+ const me=r.players.find(p=>p.id===socket.id);
+ const active=r.started&&r.phase!=='ended'&&me?.alive;
+ const canVote=active&&(r.phase==='day'||(r.phase==='night'&&role.includes('狼')));
+ $('votes').replaceChildren();
+ const status=document.createElement('p');
+ status.className='vote-help';
+ status.textContent=r.phase==='discussion'?'🗣️ 討論進行中：發言會影響 AI 的判斷，房主結束討論後才開始投票。':r.phase==='night'?(role.includes('狼')?'🐺 點選非狼人玩家頭像，與隊友協調夜間目標。':'🌙 黑夜中，等待狼人行動。'):r.phase==='day'?'☀️ 點選頭像進行放逐投票。':'🏁 身分已公開';
+ $('votes').append(status);
+ $('end-discussion').hidden=!(r.phase==='discussion'&&r.host===socket.id);
+ $('debate-hint').textContent=r.phase==='discussion'?'真人與 AI 自由辯論；AI 會閱讀公開發言並回應。':r.phase==='night'?'狼人使用秘密頻道；其他玩家不會看見。':'所有玩家可查看公開討論紀錄。';
+ $('players').replaceChildren();
+ r.players.forEach((p,i)=>{
+  const seat=document.createElement('button');
+  seat.type='button';seat.className='player-seat'+(!p.alive?' eliminated':'')+(p.id===socket.id?' self-seat':'');
+  const ally=role.includes('狼')&&wolfIntel.teammates.some(t=>t.id===p.id);
+  const eligible=canVote&&p.alive&&p.id!==socket.id&&!(r.phase==='night'&&ally);
+  seat.disabled=!eligible;
+  const avatar=document.createElement('span');avatar.className='player-avatar';avatar.textContent=p.bot?'🤖':(p.alive?'👤':'👻');
+  const label=document.createElement('strong');label.textContent=p.name;
+  const tag=document.createElement('small');tag.textContent=!p.alive?'已淘汰':ally?'🐺 狼人隊友':p.id===socket.id?'你自己':p.bot?'AI 玩家':'真人玩家';
+  seat.append(avatar,label,tag);
+  if(r.phase==='ended'&&r.revealedRoles){const info=r.revealedRoles.find(q=>q.id===p.id);if(info){const roleTag=document.createElement('small');roleTag.textContent='🎭 '+info.role;seat.append(roleTag);}}
+  if(eligible)seat.onclick=()=>{socket.emit('vote',p.id);seat.classList.add('voted-seat');};
+  $('players').append(seat);
+ });
+ const intel=$('wolf-intel');intel.replaceChildren();
+ intel.hidden=!(r.started&&r.phase==='night'&&role.includes('狼'));
+ if(!intel.hidden){
+  const title=document.createElement('h4');title.textContent='🐺 狼人秘密作戰室';intel.append(title);
+  const team=document.createElement('p');team.textContent='隊友：'+wolfIntel.teammates.map(p=>p.name+(p.alive?'':'（淘汰）')).join('、');intel.append(team);
+  const votes=document.createElement('p');votes.textContent='夜間投票：'+(wolfIntel.votes.length?wolfIntel.votes.map(v=>v.voter+' → '+v.target).join('；'):'尚無隊友投票');intel.append(votes);
+ }
+}
+socket.on('room',r=>{if(r.id!==room)return;window.lastWolfRoom=r;if(r.type==='wolf')renderWolfBoard(r);else{$('end-discussion').hidden=true;$('wolf-intel').hidden=true;}});
