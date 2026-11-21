@@ -9,7 +9,7 @@ function view(room,bot){
   ?room.players.filter(p=>p.alive&&p.id!==bot.id&&(room.phase!=='night'||!p.role?.includes('狼'))).map(p=>p.id)
   :players.filter(p=>p.id!==bot.id&&p.team!==bot.team).map(p=>p.id);
  const friends=room.type==='arena'?players.filter(p=>p.team===bot.team).map(p=>p.id):[];
- return {game:room.type,phase:room.phase,day:room.day||0,mode:room.mode||null,self:{id:bot.id,name:bot.name,role:bot.role||null,team:bot.team||null,job:bot.job||null,hp:bot.hp??null},players,allowedTargets:allowed,healable:friends,history:(bot.memory?.events||[]).slice(-24),notes:(bot.memory?.notes||[]).slice(-8),wolfTeammates:room.type==='wolf'&&bot.role?.includes('狼')?room.players.filter(p=>p.id!==bot.id&&p.role?.includes('狼')).map(p=>({id:p.id,name:p.name})):[]};
+ return {game:room.type,phase:room.phase,day:room.day||0,mode:room.mode||null,self:{id:bot.id,name:bot.name,role:bot.role||null,team:bot.team||null,job:bot.job||null,hp:bot.hp??null,persona:bot.persona||'理性觀察派'},players,allowedTargets:allowed,healable:friends,history:(bot.memory?.events||[]).slice(-24),notes:(bot.memory?.notes||[]).slice(-8),wolfTeammates:room.type==='wolf'&&bot.role?.includes('狼')?room.players.filter(p=>p.id!==bot.id&&p.role?.includes('狼')).map(p=>({id:p.id,name:p.name})):[]};
 }
 function normalize(decision,state){
  if(!decision||typeof decision!=='object')throw Error('AI response is not JSON object');
@@ -26,7 +26,7 @@ function normalize(decision,state){
 }
 async function infer(state,{fetchImpl=fetch,model=MODEL,endpoint=ENDPOINT,timeout=TIMEOUT}={}){
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);
- const system='你是一名遊戲內的自主 AI 玩家。請根據自己的身分、可見事件、歷史記憶推理和採取有目的的行動。絕不可假設知道其他玩家隱藏角色。狼人可以說謊，村民必須推理。團隊戰須考慮血量、職業、保護隊友與集火。只能輸出 JSON，格式 {"action":"vote|attack|heal","target":"玩家 id","say":"公開發言（繁體中文）","note":"私有策略記憶（繁體中文）"}。請先分析事件，再選擇合法目標。不得暴露自己的秘密推理筆記。';
+ const system='你是一名遊戲內的自主 AI 玩家。請根據自己的身分、可見事件、歷史記憶推理和採取有目的的行動。絕不可假設知道其他玩家隱藏角色。狼人可以說謊，村民必須推理。團隊戰須考慮血量、職業、保護隊友與集火。只能輸出 JSON，格式 {"action":"vote|attack|heal","target":"玩家 id","say":"公開發言（繁體中文）","note":"私有策略記憶（繁體中文）"}。每個玩家的立場不同，禁止無證據跟票或重複他人說法。必須參考自身 persona、已知事件與玩家言論，提出具體可檢驗的理由；可以反對其他 AI，且不需要達成共識。say 應是符合自己性格的自然對話，不要模板化或每次都說「我懷疑」。只在白天發表公開發言；私有 note 記錄可更新的懷疑和下一步計畫。請先分析事件，再選擇合法目標。不得暴露自己的秘密推理筆記。';
  try{
   const response=await fetchImpl(endpoint.replace(/\/$/,'')+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({model,stream:false,format:'json',messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(state)}],options:{temperature:0.45,num_predict:220}})});
   if(!response.ok)throw Error('Ollama HTTP '+response.status);
