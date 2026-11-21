@@ -19,3 +19,36 @@ socket.on('room',r=>{if(r.id!==room)return;$('game-status').textContent=`${r.typ
 socket.on('role',value=>{role=value;$('role').textContent='你的秘密身分：'+role;});socket.on('notice',v=>appendMessage('📢 '+v));socket.on('chat',v=>appendMessage(`${v.name}：${v.text}`));function appendMessage(v){const p=document.createElement('p');p.textContent=v;$('messages').append(p);$('messages').scrollTop=$('messages').scrollHeight;}
 socket.emit('list');
 socket.on('connect',()=>{socket.emit('list');if(room)appendMessage('連線恢復，正在同步房間狀態。');});socket.on('disconnect',()=>{if(room)appendMessage('連線中斷，請等待重新連線。');});
+
+
+// v0.2: AI seats, arena controls and explicit room lifecycle.
+const originalHome=home;
+home=function(){if(room){socket.emit('leave');room=null;role='';}originalHome();};
+function gameButton(label,fn){const b=document.createElement('button');b.className='secondary';b.textContent=label;b.onclick=fn;return b;}
+function extraControls(r){
+ if(r.id!==room)return;
+ let hostPanel=document.getElementById('bot-panel');
+ if(!hostPanel){hostPanel=document.createElement('div');hostPanel.id='bot-panel';$('players').after(hostPanel);}
+ hostPanel.replaceChildren();
+ const me=r.players.find(p=>p.id===socket.id);
+ if(!r.started&&r.host===socket.id){
+  const count=r.players.filter(p=>p.bot).length;
+  const p=document.createElement('p');p.textContent='🤖 AI 機器人：'+count+' 人（房主可補滿空位）';hostPanel.append(p);
+  if(r.players.length<r.size)hostPanel.append(gameButton('＋ 加入一名 AI',()=>socket.emit('addBot',result=>{if(result?.error)alert(result.error);})));
+  for(const bot of r.players.filter(p=>p.bot))hostPanel.append(gameButton('移除 '+bot.name,()=>socket.emit('removeBot',bot.id,result=>{if(result?.error)alert(result.error);})));
+ }
+ if(r.type==='arena'&&r.started){
+  $('role').textContent=me?'所屬隊伍：'+me.team+'｜職業：'+me.job+'｜HP：'+me.hp:'';
+  if(r.phase==='playing'&&me?.alive){
+   const h=document.createElement('h3');h.textContent='⚔️ 回合戰鬥原型（每 1.8 秒可行動一次）';hostPanel.append(h);
+   for(const target of r.players.filter(p=>p.alive&&p.team!==me.team))hostPanel.append(gameButton('攻擊 '+target.name+' ('+target.hp+' HP)',()=>socket.emit('arenaAction',{action:'attack',target:target.id})));
+   if(me.job==='輔助')for(const target of r.players.filter(p=>p.alive&&p.team===me.team))hostPanel.append(gameButton('治療 '+target.name,()=>socket.emit('arenaAction',{action:'heal',target:target.id})));
+  }
+ }
+ if(r.type==='wolf'&&r.started&&r.phase==='night'&&!role.includes('狼')){
+  const p=document.createElement('p');p.textContent='🌙 夜晚請等待狼人行動。';hostPanel.append(p);
+ }
+}
+socket.on('room',extraControls);
+socket.on('connect',()=>{socket.emit('list');if(room){$('game-status').textContent='連線已恢復，但先前房間可能已離開；請返回首頁重新加入。';}});
+socket.on('disconnect',()=>{if(room)$('game-status').textContent='網路中斷，正在嘗試重新連線…';});
