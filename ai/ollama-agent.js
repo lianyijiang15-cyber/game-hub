@@ -6,7 +6,7 @@ const TIMEOUT=Number(process.env.OLLAMA_TIMEOUT_MS||60000);
 function view(room,bot){
  const players=room.players.filter(p=>p.alive).map(p=>({id:p.id,name:p.name,team:room.type==='arena'?p.team:undefined,hp:room.type==='arena'?p.hp:undefined,job:room.type==='arena'?p.job:undefined}));
  const allowed=room.type==='wolf'
-  ?players.filter(p=>p.id!==bot.id&&(room.phase!=='night'||!p.team)).map(p=>p.id)
+  ?room.players.filter(p=>p.alive&&p.id!==bot.id&&(room.phase!=='night'||!p.role?.includes('狼'))).map(p=>p.id)
   :players.filter(p=>p.id!==bot.id&&p.team!==bot.team).map(p=>p.id);
  const friends=room.type==='arena'?players.filter(p=>p.team===bot.team).map(p=>p.id):[];
  return {game:room.type,phase:room.phase,day:room.day||0,mode:room.mode||null,self:{id:bot.id,name:bot.name,role:bot.role||null,team:bot.team||null,job:bot.job||null,hp:bot.hp??null},players,allowedTargets:allowed,healable:friends,history:(bot.memory?.events||[]).slice(-24),notes:(bot.memory?.notes||[]).slice(-8),wolfTeammates:room.type==='wolf'&&bot.role?.includes('狼')?room.players.filter(p=>p.id!==bot.id&&p.role?.includes('狼')).map(p=>({id:p.id,name:p.name})):[]};
