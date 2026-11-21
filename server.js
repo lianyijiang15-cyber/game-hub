@@ -14,13 +14,13 @@ const roles={
 const rand=a=>a[Math.floor(Math.random()*a.length)];
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 const isWolf=p=>p.role==='狼人'||p.role==='狼王';
-function publicRoom(r){return {id:r.id,type:r.type,size:r.size,host:r.host,started:r.started,phase:r.phase,day:r.day,mode:r.mode||null,players:r.players.map(p=>({id:p.id,name:p.name,ready:p.ready,alive:p.alive,bot:!!p.bot,team:p.team||null,hp:p.hp??null,job:p.job||null})),logs:r.logs.slice(-35)};}
+function publicRoom(r){return {id:r.id,type:r.type,size:r.size,host:r.host,started:r.started,phase:r.phase,day:r.day,mode:r.mode||null,players:r.players.map(p=>({id:p.id,name:p.name,ready:p.ready,alive:p.alive,bot:!!p.bot,team:p.team||null,hp:p.hp??null,job:p.job||null})),logs:r.logs.slice(-35),revealedRoles:r.type==='wolf'&&r.phase==='ended'?r.players.map(p=>({id:p.id,name:p.name,role:p.role})):null};}
 function list(){io.emit('rooms',Array.from(rooms.values()).map(publicRoom));}
 function publish(r){io.to(r.id).emit('room',publicRoom(r));list();}
 function notice(r,s){for(const p of r.players.filter(p=>p.bot))agent.remember(p,s);r.logs.push(s);if(r.logs.length>100)r.logs.shift();io.to(r.id).emit('notice',s);}
 function player(r,id){return r.players.find(p=>p.id===id);}
 function actorRoom(socket){const r=rooms.get(socket.data.room);return r&&player(r,socket.id)?r:null;}
-function winner(r){const live=r.players.filter(p=>p.alive),wolves=live.filter(isWolf);if(!wolves.length||wolves.length>=live.length-wolves.length){r.phase='ended';notice(r,!wolves.length?'好人陣營獲勝！':'狼人陣營獲勝！');publish(r);return true;}return false;}
+function winner(r){const live=r.players.filter(p=>p.alive),wolves=live.filter(isWolf);if(!wolves.length||wolves.length>=live.length-wolves.length){r.phase='ended';notice(r,!wolves.length?'好人陣營獲勝！':'狼人陣營獲勝！');notice(r,'本局結束：所有玩家角色身分已公開。');publish(r);return true;}return false;}
 function wolfPhase(r,phase){r.phase=phase;r.votes={};if(phase==='day'){r.day++;notice(r,'第 '+r.day+' 天：所有存活玩家投票放逐。');}else notice(r,'黑夜降臨：狼人投票選擇目標。');publish(r);scheduleBots(r);}
 function resolveVotes(r){if(r.phase!=='day'&&r.phase!=='night')return;
  const eligible=r.players.filter(p=>p.alive&&(r.phase==='day'||isWolf(p)));
@@ -112,7 +112,8 @@ io.on('connection',socket=>{
  if(r.phase==='night'&&isWolf(target))return;r.votes[actor.id]=target.id;resolveVotes(r);publish(r);});
  socket.on('arenaAction',(data={})=>{const r=actorRoom(socket);if(!r||r.type!=='arena')return;const p=player(r,socket.id),target=player(r,data.target);if(!target||!['attack','heal'].includes(data.action))return;
  const now=Date.now();if(p.lastAction&&now-p.lastAction<1800)return;if(arenaAttack(r,p,target,data.action==='heal'))p.lastAction=now;});
- socket.on('chat',message=>{const r=actorRoom(socket);if(!r||typeof message!=='string')return;const text=message.trim().slice(0,300);if(!text)return;const p=player(r,socket.id);if(r.started&&!p.alive)return;if(r.type==='wolf'&&r.phase==='night'&&!isWolf(p))return;
+ socket.on('chat',message=>{const r=actorRoom(socket);if(!r||typeof message!=='string')return;const text=message.trim().slice(0,300);if(!text)return;const p=player(r,socket.id);if(r.type!=='wolf'&&r.started&&!p.alive)return;if(r.type==='wolf'&&r.phase==='night'&&!isWolf(p))return;
+ if(r.type==='wolf'&&r.started&&!p.alive){const payload={name:p.name,text,dead:true};for(const ghost of r.players.filter(q=>!q.bot&&!q.alive))io.to(ghost.id).emit('deadChat',payload);return;}
  const payload={name:p.name,text,team:p.team||null};for(const bot of r.players.filter(q=>q.bot&&(r.type!=='arena'||!r.started||q.team===p.team)&&(r.type!=='wolf'||r.phase!=='night'||isWolf(q))))agent.remember(bot,p.name+'：'+text);if(r.type==='arena'&&r.started)for(const teammate of r.players.filter(q=>!q.bot&&q.team===p.team))io.to(teammate.id).emit('chat',payload);else if(r.type==='wolf'&&r.phase==='night'){for(const wolf of r.players.filter(q=>!q.bot&&isWolf(q)))io.to(wolf.id).emit('chat',payload);}else if(r.type!=='arena'||!r.started)io.to(r.id).emit('chat',payload);
  });
  socket.on('disconnect',()=>leave(socket));
