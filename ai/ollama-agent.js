@@ -38,7 +38,7 @@ async function infer(state,{fetchImpl=fetch,model=MODEL,endpoint=ENDPOINT,timeou
   let correction='';
   for(let attempt=0;attempt<3;attempt++){
    const userMessage=JSON.stringify(state)+(correction?'\\n'+correction:'')+'\\n合法投票目標 id：'+JSON.stringify(allowed);
-   const response=await fetchImpl(endpoint.replace(/\\/$/,'')+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({model,stream:false,format:schema,messages:[{role:'system',content:system},{role:'user',content:userMessage}],options:{temperature:0.35,num_predict:300}})});
+   const response=await fetchImpl(endpoint.replace(/\/$/,'')+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({model,stream:false,format:schema,messages:[{role:'system',content:system},{role:'user',content:userMessage}],options:{temperature:0.35,num_predict:300}})});
    if(!response.ok)throw Error('Ollama HTTP '+response.status);
    const data=await response.json(),raw=data?.message?.content;
    if(typeof raw!=='string')throw Error('Ollama returned no message');
