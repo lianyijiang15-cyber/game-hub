@@ -16,7 +16,7 @@ function joinRoom(id){socket.emit('join',{id:id||$('room-code').value,name:$('ni
 function enter(id){room=id;role='';$('role').textContent='';$('messages').replaceChildren();$('room-id').textContent=id;show('game');}
 function sendChat(){const v=$('chat-input').value;socket.emit('chat',v);$('chat-input').value='';}
 socket.on('rooms',rooms=>{$('room-list').replaceChildren();rooms.filter(r=>r.type===mode).forEach(r=>{const p=document.createElement('p');p.textContent=`${r.id} · ${r.players.length}/${r.size} 人 · ${r.started?'遊戲中':'招募中'} `;if(!r.started&&r.players.length<r.size){const b=document.createElement('button');b.textContent='加入';b.onclick=()=>joinRoom(r.id);p.append(b);}$('room-list').append(p);});});
-socket.on('room',r=>{if(r.id!==room)return;$('game-status').textContent=`${r.type==='wolf'?'狼人殺':'團隊對抗'} · ${r.players.length}/${r.size} · ${r.phase} · 第 ${r.day} 天`;$('players').replaceChildren();r.players.forEach(p=>{const d=document.createElement('div');d.textContent=`${p.name} ${p.ready?'✓ 已準備':'○ 未準備'} ${p.alive?'':'（已淘汰）'} ${(p.team||'')+(p.hp!==undefined?' · HP '+p.hp+' · ('+p.x+','+p.y+')':'')}`;$('players').append(d);});$('ready').hidden=r.started;$('start').hidden=r.started||r.host!==socket.id;$('start').disabled=r.players.length!==r.size||!r.players.every(p=>p.ready);$('votes').replaceChildren();if(r.type==='arena'&&r.started){const h=document.createElement('h3');h.textContent='⚔️ '+r.mode+' · 中央據點 (4,3) · '+JSON.stringify(r.points);$('votes').append(h);const me=r.players.find(p=>p.id===socket.id);if(me&&me.hp>0&&r.phase==='playing'){for(const [label,dx,dy] of [['↑',0,-1],['←',-1,0],['↓',0,1],['→',1,0]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>socket.emit('move',{dx,dy});$('votes').append(b);}const list=document.createElement('div');for(const p of r.players.filter(p=>p.team!==me.team&&p.hp>0&&Math.abs(p.x-me.x)+Math.abs(p.y-me.y)<=1)){const b=document.createElement('button');b.textContent='攻擊 '+p.name;b.onclick=()=>socket.emit('attack',p.id);list.append(b);}$('votes').append(list);}}if(r.type==='wolf'&&r.started&&r.phase!=='ended'){const h=document.createElement('h3');h.textContent=r.phase==='night'?'黑夜行動（僅狼人可投票）':'白天放逐投票';$('votes').append(h);if(r.phase==='day'||role.includes('狼'))r.players.filter(p=>p.alive&&p.id!==socket.id).forEach(p=>{const b=document.createElement('button');b.className='secondary';b.textContent='選擇 '+p.name;b.onclick=()=>socket.emit('vote',p.id);$('votes').append(b);});}});
+socket.on('room',r=>{if(r.id!==room)return;$('game-status').textContent=`${r.type==='wolf'?'狼人殺':'團隊對抗'} · ${r.players.length}/${r.size} · ${r.phase} · 第 ${r.day} 天`;$('players').replaceChildren();r.players.forEach(p=>{const d=document.createElement('div');d.textContent=`${p.name} ${p.ready?'✓ 已準備':'○ 未準備'} ${p.alive?'':'（已淘汰）'} ${(p.team||'')+(p.hp!==undefined?' · HP '+p.hp+' · ('+p.x+','+p.y+')':'')}`;$('players').append(d);});$('ready').hidden=r.started;$('start').hidden=r.started||r.host!==socket.id;$('start').disabled=r.players.length!==r.size||!r.players.every(p=>p.ready);$('votes').replaceChildren();if(r.type==='arena'&&r.started){const h=document.createElement('h3');h.textContent='⚔️ '+r.mode+' · 中央據點 (4,3) · '+JSON.stringify(r.points);$('votes').append(h);const me=r.players.find(p=>p.id===socket.id);if(me&&me.hp>0&&r.phase==='playing'){for(const [label,dx,dy] of [['↑',0,-1],['←',-1,0],['↓',0,1],['→',1,0]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>socket.emit('move',{dx,dy});$('votes').append(b);}const list=document.createElement('div');for(const p of r.players.filter(p=>p.team!==me.team&&p.hp>0&&Math.abs(p.x-me.x)+Math.abs(p.y-me.y)<=1)){const b=document.createElement('button');b.textContent='攻擊 '+p.name;b.onclick=()=>socket.emit('attack',p.id);list.append(b);}$('votes').append(list);}}if(r.type==='wolf'&&r.started&&r.phase!=='ended'&&r.players.find(p=>p.id===socket.id)?.alive){const h=document.createElement('h3');h.textContent=r.phase==='night'?'黑夜行動（僅狼人可投票）':'白天放逐投票';$('votes').append(h);if(r.phase==='day'||role.includes('狼'))r.players.filter(p=>p.alive&&p.id!==socket.id).forEach(p=>{const b=document.createElement('button');b.className='secondary';b.textContent='選擇 '+p.name;b.onclick=()=>socket.emit('vote',p.id);$('votes').append(b);});}});
 socket.on('role',value=>{role=value;$('role').textContent='你的秘密身分：'+role;});socket.on('notice',v=>appendMessage('📢 '+v));socket.on('chat',v=>appendMessage(`${v.name}：${v.text}`));function appendMessage(v){const p=document.createElement('p');p.textContent=v;$('messages').append(p);$('messages').scrollTop=$('messages').scrollHeight;}
 socket.emit('list');
 socket.on('connect',()=>{socket.emit('list');if(room)appendMessage('連線恢復，正在同步房間狀態。');});socket.on('disconnect',()=>{if(room)appendMessage('連線中斷，請等待重新連線。');});
@@ -58,4 +58,22 @@ socket.on('deadChat',v=>appendMessage('👻 淘汰者頻道｜'+v.name+'：'+v.t
 socket.on('rolesRevealed',list=>{
  appendMessage('🏁 本局身分揭曉：');
  for(const p of list)appendMessage((p.alive?'🟢 ':'💀 ')+p.name+' — '+p.role);
+});
+
+let revealedNames=new Set();
+socket.on('room',r=>{
+ if(r.id!==room||r.type!=='wolf')return;
+ const me=r.players.find(p=>p.id===socket.id);
+ const ghost=!!(r.started&&!me?.alive&&r.phase!=='ended');
+ $('votes').hidden=ghost;
+ $('role').textContent=ghost?'👻 旁觀模式｜你已淘汰，無法投票或操作；可與其他淘汰玩家討論。':r.phase==='ended'?'🏁 本局已結束，所有角色已公開。':'你的秘密身分：'+(role||'等待分配');
+ $('chat-input').placeholder=ghost?'👻 傳送至淘汰者專屬聊天':'輸入訊息';
+ if(r.phase==='ended'&&Array.isArray(r.revealedRoles)){
+  const signature=r.id+':'+r.day+':'+r.revealedRoles.map(p=>p.id+':'+p.role).join('|');
+  if(!revealedNames.has(signature)){
+   revealedNames.add(signature);
+   appendMessage('🏁 本局完整身分表');
+   for(const p of r.revealedRoles)appendMessage(p.name+'：'+p.role);
+  }
+ }
 });
