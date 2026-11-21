@@ -17,7 +17,7 @@ function normalize(decision,state){
  const say=typeof decision.say==='string'?decision.say.slice(0,180):'';
  const note=typeof decision.note==='string'?decision.note.slice(0,240):'';
  if(state.game==='wolf'){if(state.phase==='discussion')return {action:'discuss',target:state.allowedTargets.includes(target)?target:null,say,note};
-  if(!state.allowedTargets.includes(target))throw Error('AI chose illegal vote target');
+  if(!state.allowedTargets.includes(target))throw Error('AI chose illegal vote target: '+JSON.stringify(target)+'; allowed='+JSON.stringify(state.allowedTargets));
   return {action:'vote',target,say,note};
  }
  if(decision.action==='heal'&&state.self.job==='輔助'&&state.healable.includes(target))return {action:'heal',target,say,note};
@@ -25,15 +25,32 @@ function normalize(decision,state){
  throw Error('AI chose illegal arena action');
 }
 async function infer(state,{fetchImpl=fetch,model=MODEL,endpoint=ENDPOINT,timeout=TIMEOUT}={}){
- const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);
- const system='你是一名遊戲內的自主 AI 玩家。請根據自己的身分、可見事件、歷史記憶推理和採取有目的的行動。絕不可假設知道其他玩家隱藏角色。狼人可以說謊，村民必須推理。夜間狼人必須參考 wolfVotes 及 wolfTeammates 協調擊殺目標；有隊友已投票時優先選擇相同目標以避免平票，但若有更充分證據可提出不同方案。討論階段 action 應為 discuss，target 可留空，重點是回應最新真人發言、提出具體問題、反駁或修正立場，不能提前投票。團隊戰須考慮血量、職業、保護隊友與集火。只能輸出 JSON，格式 {"action":"vote|attack|heal","target":"玩家 id","say":"公開發言（繁體中文）","note":"私有策略記憶（繁體中文）"}。每個玩家的立場不同，禁止無證據跟票或重複他人說法。必須參考自身 persona、已知事件與玩家言論，提出具體可檢驗的理由；可以反對其他 AI，且不需要達成共識。say 應是符合自己性格的自然對話，不要模板化或每次都說「我懷疑」。只在白天發表公開發言；私有 note 記錄可更新的懷疑和下一步計畫。請先分析事件，再選擇合法目標。不得暴露自己的秘密推理筆記。';
+ const allowed=state.allowedTargets||[];
+ if(state.game==='wolf'&&state.phase!=='discussion'&&!allowed.length)throw Error('No legal vote targets');
+ const schema={type:'object',properties:{
+  action:{type:'string',enum:state.game==='wolf'?[state.phase==='discussion'?'discuss':'vote']:['attack','heal']},
+  target:state.game==='wolf'&&state.phase==='discussion'?{type:'string'}:{type:'string',enum:[...new Set([...allowed,...(state.game==='arena'?state.healable||[]:[])])]},
+  say:{type:'string'},note:{type:'string'}
+ },required:['action','target','say','note']};
+ const system='你是一名狼人殺／團隊對抗的自主 AI 玩家。請依照自己的身分、persona、事件記憶和玩家發言做出獨立推理。不可得知未公開的他人角色。狼人可說謊，但必須知道狼隊友。夜間狼隊要參考 wolfVotes 來協調擊殺目標，避免平票。討論階段只進行辯論，不得投票，應直接回應最新真人發言、提出問題與反駁。白天投票應根據討論推理，禁止無理由跟票。輸出 JSON 的 action、target、say、note。target 必須是 allowedTargets 中的完整 id，絕對不可填玩家名稱、座號、索引或其他文字；討論階段 target 可以是空字串。say 是自然繁體中文發言，note 是私有策略記憶。';
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
  try{
-  const response=await fetchImpl(endpoint.replace(/\/$/,'')+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({model,stream:false,format:'json',messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(state)}],options:{temperature:0.45,num_predict:220}})});
-  if(!response.ok)throw Error('Ollama HTTP '+response.status);
-  const data=await response.json();const raw=data?.message?.content;if(typeof raw!=='string')throw Error('Ollama returned no message');
-  return normalize(JSON.parse(raw),state);
+  let correction='';
+  for(let attempt=0;attempt<3;attempt++){
+   const userMessage=JSON.stringify(state)+(correction?'\\n'+correction:'')+'\\n合法投票目標 id：'+JSON.stringify(allowed);
+   const response=await fetchImpl(endpoint.replace(/\\/$/,'')+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({model,stream:false,format:schema,messages:[{role:'system',content:system},{role:'user',content:userMessage}],options:{temperature:0.35,num_predict:300}})});
+   if(!response.ok)throw Error('Ollama HTTP '+response.status);
+   const data=await response.json(),raw=data?.message?.content;
+   if(typeof raw!=='string')throw Error('Ollama returned no message');
+   try{return normalize(JSON.parse(raw),state);}
+   catch(err){
+    if(attempt===2)throw Error('AI failed to produce legal decision after 3 attempts: '+err.message);
+    correction='上次輸出不合法：'+err.message+'。請重新獨立判斷，target 僅能使用列出的合法 id；不可使用名稱。';
+   }
+  }
  }finally{clearTimeout(timer);}
 }
+
 function remember(bot,event){bot.memory??={events:[],notes:[]};bot.memory.events.push(String(event).slice(0,350));if(bot.memory.events.length>48)bot.memory.events.shift();}
 function saveNote(bot,note){bot.memory??={events:[],notes:[]};if(note){bot.memory.notes.push(note);if(bot.memory.notes.length>16)bot.memory.notes.shift();}}
 module.exports={view,normalize,infer,remember,saveNote};
