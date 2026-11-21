@@ -20,6 +20,7 @@ function publish(r){io.to(r.id).emit('room',publicRoom(r));list();}
 function notice(r,s){for(const p of r.players.filter(p=>p.bot))agent.remember(p,s);r.logs.push(s);if(r.logs.length>100)r.logs.shift();io.to(r.id).emit('notice',s);}
 function player(r,id){return r.players.find(p=>p.id===id);}
 function actorRoom(socket){const r=rooms.get(socket.data.room);return r&&player(r,socket.id)?r:null;}
+function revealRoles(r){if(r.revealed)return;r.revealed=true;io.to(r.id).emit('rolesRevealed',r.players.map(p=>({name:p.name,role:p.role,alive:p.alive})));notice(r,'🏁 遊戲結束，所有玩家身分已公開。');}
 function winner(r){const live=r.players.filter(p=>p.alive),wolves=live.filter(isWolf);if(!wolves.length||wolves.length>=live.length-wolves.length){r.phase='ended';notice(r,!wolves.length?'好人陣營獲勝！':'狼人陣營獲勝！');notice(r,'本局結束：所有玩家角色身分已公開。');publish(r);return true;}return false;}
 function wolfPhase(r,phase){r.phase=phase;r.votes={};if(phase==='day'){r.day++;notice(r,'第 '+r.day+' 天：所有存活玩家投票放逐。');}else notice(r,'黑夜降臨：狼人投票選擇目標。');publish(r);scheduleBots(r);}
 function resolveVotes(r){if(r.phase!=='day'&&r.phase!=='night')return;
@@ -106,7 +107,7 @@ io.on('connection',socket=>{
  socket.on('removeBot',(id,ack=()=>{})=>{const r=actorRoom(socket);if(!r||r.host!==socket.id||r.started)return ack({error:'只有等待中的房主能移除 AI'});const p=player(r,id);if(!p?.bot)return ack({error:'找不到 AI'});r.players=r.players.filter(p=>p.id!==id);publish(r);ack({ok:true});});
  socket.on('ready',()=>{const r=actorRoom(socket);if(!r||r.started)return;const p=player(r,socket.id);p.ready=!p.ready;publish(r);});
  socket.on('start',()=>{const r=actorRoom(socket);if(!r||r.host!==socket.id||r.started||r.players.length!==r.size||!r.players.every(p=>p.ready))return;
- r.started=true;if(r.type==='wolf'){const deck=shuffle([...roles[r.size]]);r.players.forEach((p,i)=>{p.role=deck[i];if(!p.bot)io.to(p.id).emit('role',p.role);});wolfPhase(r,'night');}else startArena(r);});
+ r.started=true;r.revealed=false;if(r.type==='wolf'){const deck=shuffle([...roles[r.size]]);r.players.forEach((p,i)=>{p.role=deck[i];if(!p.bot)io.to(p.id).emit('role',p.role);});wolfPhase(r,'night');}else startArena(r);});
  socket.on('vote',id=>{const r=actorRoom(socket);if(!r||r.type!=='wolf'||!['night','day'].includes(r.phase))return;const actor=player(r,socket.id),target=player(r,id);
  if(!actor.alive||!target?.alive||actor.id===target.id||r.votes[actor.id]||(r.phase==='night'&&!isWolf(actor)))return;
  if(r.phase==='night'&&isWolf(target))return;r.votes[actor.id]=target.id;resolveVotes(r);publish(r);});
