@@ -52,3 +52,9 @@ function extraControls(r){
 socket.on('room',extraControls);
 socket.on('connect',()=>{socket.emit('list');if(room){$('game-status').textContent='連線已恢復，但先前房間可能已離開；請返回首頁重新加入。';}});
 socket.on('disconnect',()=>{if(room)$('game-status').textContent='網路中斷，正在嘗試重新連線…';});
+
+socket.on('deadChat',v=>appendMessage('👻 淘汰者頻道｜'+v.name+'：'+v.text));
+socket.on('rolesRevealed',list=>{
+ appendMessage('🏁 本局身分揭曉：');
+ for(const p of list)appendMessage((p.alive?'🟢 ':'💀 ')+p.name+' — '+p.role);
+});
