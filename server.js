@@ -1,6 +1,7 @@
 'use strict';
 const express=require('express'),http=require('http'),path=require('path'),crypto=require('crypto');
 const {Server}=require('socket.io');
+const agent=require('./ai/ollama-agent');
 const app=express(),server=http.createServer(app),io=new Server(server);
 app.use(express.static(path.join(__dirname,'public')));
 const rooms=new Map(),sizes={wolf:[8,9,10,12],arena:[10,12,14]};
@@ -16,7 +17,7 @@ const isWolf=p=>p.role==='狼人'||p.role==='狼王';
 function publicRoom(r){return {id:r.id,type:r.type,size:r.size,host:r.host,started:r.started,phase:r.phase,day:r.day,mode:r.mode||null,players:r.players.map(p=>({id:p.id,name:p.name,ready:p.ready,alive:p.alive,bot:!!p.bot,team:p.team||null,hp:p.hp??null,job:p.job||null})),logs:r.logs.slice(-35)};}
 function list(){io.emit('rooms',Array.from(rooms.values()).map(publicRoom));}
 function publish(r){io.to(r.id).emit('room',publicRoom(r));list();}
-function notice(r,s){r.logs.push(s);if(r.logs.length>100)r.logs.shift();io.to(r.id).emit('notice',s);}
+function notice(r,s){for(const p of r.players.filter(p=>p.bot))agent.remember(p,s);r.logs.push(s);if(r.logs.length>100)r.logs.shift();io.to(r.id).emit('notice',s);}
 function player(r,id){return r.players.find(p=>p.id===id);}
 function actorRoom(socket){const r=rooms.get(socket.data.room);return r&&player(r,socket.id)?r:null;}
 function winner(r){const live=r.players.filter(p=>p.alive),wolves=live.filter(isWolf);if(!wolves.length||wolves.length>=live.length-wolves.length){r.phase='ended';notice(r,!wolves.length?'好人陣營獲勝！':'狼人陣營獲勝！');publish(r);return true;}return false;}
@@ -30,15 +31,33 @@ function resolveVotes(r){if(r.phase!=='day'&&r.phase!=='night')return;
  else notice(r,'本回合平票，無人淘汰。');
  if(!winner(r))wolfPhase(r,r.phase==='night'?'day':'night');
 }
-function scheduleBots(r){if(r.botTimer)clearTimeout(r.botTimer);if(r.phase!=='day'&&r.phase!=='night')return;
- r.botTimer=setTimeout(()=>{if(!rooms.has(r.id)||r.phase==='ended')return;
- const eligible=r.players.filter(p=>p.bot&&p.alive&&(r.phase==='day'||isWolf(p)));
- for(const bot of eligible){if(r.votes[bot.id])continue;const targets=r.players.filter(p=>p.alive&&p.id!==bot.id&&(r.phase!=='night'||!isWolf(p)));if(targets.length)r.votes[bot.id]=rand(targets).id;}
- resolveVotes(r);publish(r);
- },1200);r.botTimer.unref?.();
+async function runWolfAgents(r,phase){
+ if(r.aiRunning)return;r.aiRunning=true;
+ try{
+  const bots=r.players.filter(p=>p.bot&&p.alive&&(phase==='day'||isWolf(p)));
+  for(const bot of bots){
+   if(!rooms.has(r.id)||r.phase!==phase||!bot.alive)break;
+   if(r.votes[bot.id])continue;
+   try{
+    const state=agent.view(r,bot);
+    const decision=await agent.infer(state);
+    if(!rooms.has(r.id)||r.phase!==phase||!bot.alive)break;
+    agent.saveNote(bot,decision.note);
+    if(decision.say&&phase==='day'){io.to(r.id).emit('chat',{name:bot.name,text:decision.say,team:null});for(const p of r.players.filter(p=>p.bot))agent.remember(p,bot.name+'：'+decision.say);}
+    r.votes[bot.id]=decision.target;
+    resolveVotes(r);publish(r);
+   }catch(err){notice(r,'⚠️ '+bot.name+' AI 無法決策：'+err.message+'。請檢查 Ollama；系統不會以隨機投票代替。');break;}
+  }
+ }finally{r.aiRunning=false;if(r.aiPending){const next=r.aiPending;r.aiPending=null;scheduleBots(r);}}
+}
+function scheduleBots(r){
+ if(!['day','night'].includes(r.phase))return;
+ if(r.aiRunning){r.aiPending=r.phase;return;}
+ const phase=r.phase;
+ setImmediate(()=>runWolfAgents(r,phase));
 }
 function leave(socket){const r=actorRoom(socket);if(!r)return;socket.leave(r.id);socket.data.room=null;r.players=r.players.filter(p=>p.id!==socket.id);
- if(!r.players.some(p=>!p.bot)){clearTimeout(r.botTimer);rooms.delete(r.id);list();return;}
+ if(!r.players.some(p=>!p.bot)){clearTimeout(r.botTimer);clearInterval(r.arenaTimer);rooms.delete(r.id);list();return;}
  if(r.host===socket.id)r.host=r.players.find(p=>!p.bot).id;
  notice(r,'玩家離開房間');if(r.started&&r.type==='wolf'&&r.phase!=='ended'){if(!winner(r))resolveVotes(r);}publish(r);
 }
@@ -49,9 +68,26 @@ function arenaAttack(r,attacker,target,heal=false){if(r.phase!=='playing'||!atta
  const red=r.players.some(p=>p.alive&&p.team==='紅隊'),blue=r.players.some(p=>p.alive&&p.team==='藍隊');
  if(!red||!blue){r.phase='ended';notice(r,(red?'紅隊':'藍隊')+' 勝利！');}publish(r);return true;
 }
-function scheduleArenaBots(r){if(r.arenaTimer)clearInterval(r.arenaTimer);r.arenaTimer=setInterval(()=>{if(!rooms.has(r.id)||r.phase!=='playing'){clearInterval(r.arenaTimer);return;}
- for(const bot of r.players.filter(p=>p.bot&&p.alive)){const enemies=r.players.filter(p=>p.alive&&p.team!==bot.team);if(enemies.length)arenaAttack(r,bot,rand(enemies));if(r.phase!=='playing')break;}
- },2500);r.arenaTimer.unref?.();}
+function scheduleArenaBots(r){
+ if(r.arenaTimer)clearInterval(r.arenaTimer);
+ r.arenaTimer=setInterval(async()=>{
+  if(!rooms.has(r.id)||r.phase!=='playing'){clearInterval(r.arenaTimer);return;}
+  if(r.arenaBusy)return;r.arenaBusy=true;
+  try{
+   for(const bot of r.players.filter(p=>p.bot&&p.alive)){
+    if(r.phase!=='playing')break;
+    try{
+     const decision=await agent.infer(agent.view(r,bot));
+     if(!rooms.has(r.id)||r.phase!=='playing'||!bot.alive)break;
+     agent.saveNote(bot,decision.note);
+     if(decision.say){for(const teammate of r.players.filter(p=>!p.bot&&p.team===bot.team))io.to(teammate.id).emit('chat',{name:bot.name,text:decision.say,team:bot.team});}
+     const target=player(r,decision.target);
+     if(target)arenaAttack(r,bot,target,decision.action==='heal');
+    }catch(err){notice(r,'⚠️ '+bot.name+' AI 無法決策：'+err.message+'。未執行替代攻擊。');break;}
+   }
+  }finally{r.arenaBusy=false;}
+ },Number(process.env.AI_ARENA_INTERVAL_MS||12000));r.arenaTimer.unref?.();
+}
 io.on('connection',socket=>{
  socket.on('list',()=>socket.emit('rooms',Array.from(rooms.values()).map(publicRoom)));
  socket.on('create',(data={},ack=()=>{})=>{if(actorRoom(socket))return ack({error:'請先離開目前房間'});const {type,name}=data,size=Number(data.size);
@@ -66,7 +102,7 @@ io.on('connection',socket=>{
  socket.on('leave',()=>leave(socket));
  socket.on('addBot',(ack=()=>{})=>{const r=actorRoom(socket);if(!r||r.host!==socket.id||r.started)return ack({error:'只有等待中的房主能加入 AI'});
  if(r.players.length>=r.size)return ack({error:'房間已滿'});let n=1;while(r.players.some(p=>p.name==='AI '+n))n++;
- r.players.push({id:'bot-'+crypto.randomUUID(),name:'AI '+n,bot:true,ready:true,alive:true});notice(r,'AI '+n+' 加入房間');publish(r);ack({ok:true});});
+ r.players.push({id:'bot-'+crypto.randomUUID(),name:'AI '+n,bot:true,ready:true,alive:true,memory:{events:[],notes:[]}});notice(r,'AI '+n+' 加入房間');publish(r);ack({ok:true});});
  socket.on('removeBot',(id,ack=()=>{})=>{const r=actorRoom(socket);if(!r||r.host!==socket.id||r.started)return ack({error:'只有等待中的房主能移除 AI'});const p=player(r,id);if(!p?.bot)return ack({error:'找不到 AI'});r.players=r.players.filter(p=>p.id!==id);publish(r);ack({ok:true});});
  socket.on('ready',()=>{const r=actorRoom(socket);if(!r||r.started)return;const p=player(r,socket.id);p.ready=!p.ready;publish(r);});
  socket.on('start',()=>{const r=actorRoom(socket);if(!r||r.host!==socket.id||r.started||r.players.length!==r.size||!r.players.every(p=>p.ready))return;
@@ -77,7 +113,7 @@ io.on('connection',socket=>{
  socket.on('arenaAction',(data={})=>{const r=actorRoom(socket);if(!r||r.type!=='arena')return;const p=player(r,socket.id),target=player(r,data.target);if(!target||!['attack','heal'].includes(data.action))return;
  const now=Date.now();if(p.lastAction&&now-p.lastAction<1800)return;if(arenaAttack(r,p,target,data.action==='heal'))p.lastAction=now;});
  socket.on('chat',message=>{const r=actorRoom(socket);if(!r||typeof message!=='string')return;const text=message.trim().slice(0,300);if(!text)return;const p=player(r,socket.id);if(r.type==='wolf'&&r.phase==='night'&&!isWolf(p))return;
- const payload={name:p.name,text,team:p.team||null};if(r.type==='arena'&&r.started)for(const teammate of r.players.filter(q=>!q.bot&&q.team===p.team))io.to(teammate.id).emit('chat',payload);else if(r.type!=='arena'||!r.started)io.to(r.id).emit('chat',payload);
+ const payload={name:p.name,text,team:p.team||null};for(const bot of r.players.filter(q=>q.bot&&(r.type!=='arena'||!r.started||q.team===p.team)))agent.remember(bot,p.name+'：'+text);if(r.type==='arena'&&r.started)for(const teammate of r.players.filter(q=>!q.bot&&q.team===p.team))io.to(teammate.id).emit('chat',payload);else if(r.type!=='arena'||!r.started)io.to(r.id).emit('chat',payload);
  });
  socket.on('disconnect',()=>leave(socket));
 });
