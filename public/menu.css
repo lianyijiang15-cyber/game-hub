@@ -270,3 +270,68 @@
   .menu-soup-word { font-size: clamp(1.6rem, 7.6vw, 3rem); }
   #menu-mystery-art { width: min(32%, 176px); }
 }
+
+#home, #modes { isolation: isolate; }
+#modes {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  overflow: auto;
+  color: #faf1d9;
+  background: #162723;
+}
+.menu-map-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+#home::before, #modes::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(135deg, #121d21e8, #1d3324a8 55%, #12131fed);
+}
+.mode-frame { grid-template-rows: auto 1fr auto; }
+#modes-heading { margin: 0; font-size: clamp(1.25rem, 3vw, 2.2rem); letter-spacing: .15em; }
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 2vw, 28px);
+  align-items: stretch;
+}
+.mode-card {
+  min-height: clamp(220px, 50dvh, 540px);
+  justify-items: start;
+  align-content: end;
+  gap: clamp(8px, 2vh, 22px);
+  background: radial-gradient(ellipse at 50% 16%, var(--glow), transparent 68%), #101a1eea;
+}
+.mode-flag { --trim: #e9bd76; --glow: #7b5235; }
+.mode-survival { --trim: #9dc3b3; --glow: #39695e; }
+.mode-control { --trim: #c9adf0; --glow: #5e497b; }
+.mode-card strong { font-size: clamp(1.45rem, 3vw, 3.3rem); color: var(--trim); }
+.mode-card > span:last-child { line-height: 1.55; text-wrap: pretty; }
+.mode-classic { justify-self: end; padding: 10px 22px; }
+.mode-emblem {
+  justify-self: center;
+  width: clamp(60px, 13vw, 150px);
+  aspect-ratio: 1;
+  background: var(--trim);
+  clip-path: polygon(12% 12%, 92% 12%, 81% 32%, 92% 55%, 25% 55%, 25% 92%, 12% 92%);
+}
+.mode-survival .mode-emblem {
+  clip-path: polygon(33% 13%, 67% 13%, 67% 33%, 87% 33%, 87% 67%, 67% 67%, 67% 87%, 33% 87%, 33% 67%, 13% 67%, 13% 33%, 33% 33%);
+}
+.mode-control .mode-emblem {
+  clip-path: polygon(12% 17%, 33% 17%, 33% 31%, 44% 31%, 44% 17%, 56% 17%, 56% 31%, 68% 31%, 68% 17%, 88% 17%, 88% 45%, 75% 58%, 75% 87%, 25% 87%, 25% 58%, 12% 45%);
+}
+@media (max-width: 700px) {
+  .mode-grid { grid-template-columns: 1fr; }
+  .mode-card { min-height: 215px; }
+}

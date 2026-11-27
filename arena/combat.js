@@ -3,6 +3,7 @@
 const { generateWorld, solid, impassable, campOffset } = require('./world');
 const { terrainBlocked, playerBlocked, movePlayer } = require('./collision');
 const loot = require('./loot');
+const modes = require('./modes');
 const map = generateWorld();
 const visionRadius = 360;
 const grassRevealRadius = 80;
@@ -78,8 +79,11 @@ function canSee(observer, target, world) {
 function spawn(room, player, now) {
   const { width, height } = room.map;
   const side = player.team === teams[0] ? 1 : -1;
-  for (const offset of [0, -28, 28, -56, 56]) {
-    const position = { x: width / 2 - side * campOffset, y: height / 2 + side * ((player.slot - 2) * 72 + offset) };
+  const positions = room.scenario ? room.scenario.spawns[teams.indexOf(player.team)] :
+    [0, -28, 28, -56, 56].map(offset => ({
+      x: width / 2 - side * campOffset, y: height / 2 + side * ((player.slot - 2) * 72 + offset)
+    }));
+  for (const position of positions) {
     if (terrainBlocked(room.map, position.x, position.y) ||
         playerBlocked(room.players, player, position.x, position.y)) continue;
     Object.assign(player, position, {
@@ -104,28 +108,53 @@ function start(room, now, seed) {
   if (room.phase !== 'selection') assignTeams(room.players);
   Object.assign(room, {
     phase: 'playing', map: seed === undefined ? map : generateWorld(seed), score: { [teams[0]]: 0, [teams[1]]: 0 }, effects: [],
-    projectiles: [], kills: [], sequence: 0, endsAt: now + 300000, winner: null
+    projectiles: [], kills: [], sequence: 0, endsAt: now + modes.durations[modes.modeOf(room)], winner: null
   });
-  room.chests = loot.generateChests(room.map);
+  modes.setup(room, room.map.seed);
+  room.chests = ['flag', 'survival'].includes(modes.modeOf(room)) ? [] : loot.generateChests(room.map);
   room.roster = [...room.players];
   room.roster.forEach(player => {
     Object.assign(player, {
       alive: false,
       inventory: Array(loot.inventorySize).fill(null),
-      kills: 0, deaths: 0, assists: 0, damage: 0, route: null, routeAt: 0, lastSeen: null, patrolHome: false
+      kills: 0, deaths: 0, assists: 0, damage: 0, drainAt: 0, role: null, route: null, routeAt: 0, lastSeen: null, patrolHome: false
     });
   });
   room.roster.forEach(player => spawn(room, player, now));
 }
 
-function finish(room) {
-  const [red, blue] = teams.map(team => room.score[team]);
-  room.winner = red === blue ? null : teams[red > blue ? 0 : 1];
-  room.phase = 'ended';
+function defeat(room, target, source, now, attackerName) {
+  target.alive = false;
+  target.buffs.clear();
+  target.moving = false;
+  target.input = { x: 0, y: 0 };
+  target.respawnAt = now + 3000;
+  target.deaths++;
+  if (source) {
+    source.kills++;
+    for (const [teammate, hitAt] of target.contributors) {
+      if (teammate !== source && teammate.team === source.team && now - hitAt <= 8000) teammate.assists++;
+    }
+    if (modes.modeOf(room) === 'deathmatch') room.score[source.team]++;
+  }
+  target.contributors.clear();
+  modes.eliminate(room, target, source, now);
+  room.kills.push({ id: ++room.sequence, attacker: attackerName, victim: target.name, team: source?.team ?? null });
+  if (room.kills.length > 5) room.kills.shift();
+  if (source && modes.modeOf(room) === 'deathmatch' && room.score[source.team] >= 20) modes.finish(room, now);
 }
+
+function environmentHit(room, player, damage, now, cause) {
+  player.hp = Math.max(0, player.hp - damage);
+  player.hurtAt = now;
+  if (!player.hp) defeat(room, player, null, now, cause);
+}
+
+function attackTargets(room) { return room.players.concat(room.scenario?.beasts ?? []); }
 
 function hit(room, source, target, damage, now) {
   if (room.phase !== 'playing' || !target.alive || source.team === target.team) return;
+  if (!target.team) return modes.hitBeast(room, source, target, damage);
   const defense = loot.modifiers(target, now);
   if (defense.immune) return;
   const actual = Math.min(target.hp, Math.round(damage * 100 / (100 + classes[target.job].defense + defense.defense)));
@@ -133,23 +162,10 @@ function hit(room, source, target, damage, now) {
   target.hp -= actual;
   source.damage += actual;
   target.hurtAt = now;
-  if (target.hp > 0) return;
-  target.alive = false;
-  target.buffs.clear();
-  target.moving = false;
-  target.input = { x: 0, y: 0 };
-  target.respawnAt = now + 3000;
-  source.kills++;
-  for (const [teammate, hitAt] of target.contributors) {
-    if (teammate !== source && teammate.team === source.team && now - hitAt <= 8000) teammate.assists++;
-  }
-  target.contributors.clear();
-  target.deaths++;
-  room.score[source.team]++;
-  room.kills.push({ id: ++room.sequence, attacker: source.name, victim: target.name, team: source.team });
-  if (room.kills.length > 5) room.kills.shift();
-  if (room.score[source.team] >= 20) finish(room);
+  if (target.hp <= 0) defeat(room, target, source, now, source.name);
 }
+
+const scenarioHooks = { clearLine, classes, environmentHit, movePlayer };
 
 function effect(room, type, position, angle, range, team, now) {
   room.effects.push({ type, x: position.x, y: position.y, angle, range, team, until: now + 240 });
@@ -178,7 +194,7 @@ function attack(room, player, x, y, skill, now) {
   }
 
   const range = skill ? 90 : job.range;
-  const enemies = room.players.filter(other => other.alive && other.team !== player.team &&
+  const enemies = attackTargets(room).filter(other => other.alive && other.team !== player.team &&
     distance(player, other) <= range && clearLine(player, other, 0, room.map) &&
     (skill || Math.cos(Math.atan2(other.y - player.y, other.x - player.x) - angle) >= Math.cos(0.30)));
   enemies.sort((a, b) => distance(player, a) - distance(player, b));
@@ -199,7 +215,7 @@ function advanceProjectile(room, projectile, dt, now) {
       break;
     }
     Object.assign(projectile, { x, y });
-    const target = room.players.find(player => player.alive && player.team !== projectile.source.team &&
+    const target = attackTargets(room).find(player => player.alive && player.team !== projectile.source.team &&
       distance(player, projectile) <= radius + 2 && clearLine(projectile, player, 0, room.map));
     if (!target) continue;
     if (projectile.type === 'arrow') hit(room, projectile.source, target, projectile.damage, now);
@@ -210,7 +226,7 @@ function advanceProjectile(room, projectile, dt, now) {
   if (!impact && projectile.remaining > 0) return true;
   if (projectile.type === 'fireball') {
     effect(room, 'blast', projectile, 0, 66, projectile.source.team, now);
-    for (const target of room.players) {
+    for (const target of attackTargets(room)) {
       if (distance(target, projectile) <= 66 && clearLine(projectile, target, 0, room.map)) {
         hit(room, projectile.source, target, projectile.damage, now);
       }
@@ -226,12 +242,15 @@ function move(room, player, vector, dt, now) {
   if (player.moving) player.facing = Math.atan2(vector.y, vector.x);
 }
 
-function tick(room, now, dt, botInput) {
-  if (now >= room.endsAt) return finish(room);
+function tick(room, now, dt, botInput, route) {
+  modes.begin(room, now);
+  if (now >= room.endsAt) return modes.finish(room, room.endsAt);
+  const hooks = { ...scenarioHooks, route };
+  if (room.scenario?.mode !== 'control') modes.tick(room, now, dt, hooks);
   for (const player of room.players) {
     if (room.phase !== 'playing') break;
     if (!player.alive) {
-      if (now >= player.respawnAt) spawn(room, player, now);
+      if (modes.respawns(room) && now >= player.respawnAt) spawn(room, player, now);
       continue;
     }
     const vector = player.bot ? botInput(room, player, now) :
@@ -241,6 +260,7 @@ function tick(room, now, dt, botInput) {
   room.projectiles = room.projectiles.filter(projectile =>
     room.phase === 'playing' && advanceProjectile(room, projectile, dt, now));
   room.effects = room.effects.filter(item => item.until > now);
+  if (room.phase === 'playing' && room.scenario?.mode === 'control') modes.tick(room, now, dt, hooks);
 }
 
 function openChest(room, player, id, now) {
@@ -261,7 +281,7 @@ function castRune(room, player, now) {
   if (room.phase !== 'playing' || !player.alive || now >= room.endsAt ||
       !loot.consumeRune(player, now)) return false;
   const damage = loot.shockwave.damage * loot.modifiers(player, now).attack;
-  for (const enemy of room.players) {
+  for (const enemy of attackTargets(room)) {
     if (loot.inRange(player, enemy, loot.shockwave.range) && clearLine(player, enemy, 0, room.map)) {
       hit(room, player, enemy, damage, now);
     }
@@ -292,13 +312,16 @@ function snapshot(room, now, viewer = null) {
   const sees = point => !local || canSee(viewer, point, room.map);
   const players = local ? room.players.filter(player => player === viewer ||
     (player.team === viewer.team ? distance(viewer, player) <= visionRadius : sees(player))) : room.players;
-  const results = room.phase === 'ended' ? room.roster.map(({ id, name, team, bot, job, kills, deaths, assists, damage }) =>
-    ({ id, name, team, bot, job, kills, deaths, assists, damage })) : null;
+  const results = room.phase === 'ended' ? room.roster.map(player => {
+    const { id, name, team, bot, job, kills, deaths, assists, damage, role, eliminatedAt } = player;
+    return { id, name, team, bot, job, kills, deaths, assists, damage, role,
+      survival: room.scenario?.mode === 'survival' ? Math.max(0, (eliminatedAt ?? Math.min(now, room.endsAt)) - room.scenario.startedAt) : null };
+  }) : null;
   const awards = results ? teamAwards(results) : null;
   const mvp = room.winner ? awards?.[room.winner]?.mvp ?? null :
     results ? [...results].sort(rankMvp)[0]?.id ?? null : null;
   const attackRange = local && viewer.alive ? classes[viewer.job].range : 0;
-  const targetInRange = attackRange > 0 && players.some(player => player.alive && player.team !== viewer.team &&
+  const targetInRange = attackRange > 0 && players.concat(room.scenario?.beasts.filter(sees) ?? []).some(player => player.alive && player.team !== viewer.team &&
     distance(viewer, player) <= attackRange && clearLine(viewer, player, 0, room.map));
   const chests = room.chests.filter(chest => sees(chest) ||
     (local && loot.inRange(viewer, chest, loot.interactRange) && clearLine(viewer, chest, 2, room.map)));
@@ -306,19 +329,22 @@ function snapshot(room, now, viewer = null) {
     loot.inRange(viewer, chest, loot.interactRange) && clearLine(viewer, chest, 2, room.map))
     .sort((a, b) => distance(viewer, a) - distance(viewer, b))[0]?.id ?? null : null;
   return {
-    id: room.id, phase: room.phase, winner: room.winner, score: room.score, now,
+    id: room.id, mode: modes.modeOf(room), scenario: modes.view(room, local ? viewer : null, now, sees, clearLine), phase: room.phase, winner: room.winner, score: room.score, now,
     remaining: Math.max(0, room.endsAt - now), effects: room.effects.filter(sees), kills: room.kills,
     chests, nearbyChest, openedChestIds: room.chests.filter(chest => chest.openedAt !== null).map(chest => chest.id),
     inventory: local ? viewer.inventory.map(item => item && { label: item.label, quality: item.quality }) : [],
     buffs: local ? loot.activeBuffs(viewer, now).map(({ label, until }) => ({ label, until })) : [],
     attackRange, targetInRange, visionRadius, concealed: !!local && inTallGrass(viewer, room.map),
     projectiles: room.projectiles.filter(sees).map(({ id, x, y, angle, type }) => ({ id, x, y, angle, type })),
-    players: players.map(({ id, x, y, name, team, job, hp, bot, alive, moving, angle, facing,
+    players: players.map(({ id, x, y, name, team, job, role, hp, bot, alive, moving, angle, facing,
       action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt }) =>
-      ({ id, x, y, name, team, job, hp, maxHp: classes[job].hp, bot, alive, moving, angle, facing,
+      ({ id, x, y, name, team, job, role, hp, maxHp: classes[job].hp, bot, alive, moving, angle, facing,
         action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt })),
     results, mvp, teamAwards: awards
   };
 }
 
-module.exports = { map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };
+function interact(room, player, id, now) { return modes.interact(room, player, id, now, scenarioHooks); }
+function scenarioGoal(room, player, now) { return modes.botGoal(room, player, now, scenarioHooks); }
+
+module.exports = { interact, scenarioGoal, map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };

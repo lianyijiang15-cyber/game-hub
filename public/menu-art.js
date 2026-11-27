@@ -62,6 +62,8 @@ paintPixelArt(menuAvatar, 0, 0, 2, { O: '#301f3e', L: '#a793ca', S: '#72608e', H
 
 previewMap.then(map => {
   if (!map) return;
+  drawMapPreview($('home-map'), map, .5, .52);
+  drawMapPreview($('modes-map'), map, .32, .43);
   const canvas = $('menu-arena-map');
   drawMapPreview(canvas, map, 0.31, 0.74);
   const ctx = canvas.getContext('2d');

@@ -99,7 +99,7 @@ async function accountRequest(route, body) {
   }
 
   $('menu-profile').onclick = openAccount;
-  for (const [id, open] of [['menu-arena', openLobby], ['menu-soup', openSoup]]) {
+  for (const [id, open] of [['menu-arena', openModes], ['menu-soup', openSoup]]) {
     $(id).onclick = async () => {
       await initialSession;
       if (playerAccount.username && !playerAccount.profile) return openAccount();

@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
-<link rel="stylesheet" href="style.css?v=16">
-<link rel="stylesheet" href="menu.css?v=2">
-<link rel="stylesheet" href="account.css?v=1">
+<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="menu.css?v=3">
+<link rel="stylesheet" href="account.css?v=2">
 </head>
 <body>
 <main>
@@ -21,6 +21,7 @@
   </div>
 </section>
 <section id="home" hidden aria-labelledby="menu-heading">
+  <canvas class="menu-map-backdrop" id="home-map" width="960" height="540" aria-hidden="true"></canvas>
   <div class="menu-frame">
     <div class="menu-bar">
       <h1 id="menu-heading">遊戲選單</h1>
@@ -32,7 +33,7 @@
         <span class="menu-kicker">5v5 團隊對抗</span>
         <span class="menu-arena-word menu-arena-pixel" aria-hidden="true">PIXEL</span>
         <span class="menu-arena-word menu-arena-clash" aria-hidden="true">CLASH</span>
-        <span class="menu-arena-name" id="menu-arena-name">像素戰爭</span>
+        <span class="menu-arena-name" id="menu-arena-name">像素衝突</span>
         <span class="menu-heroes" aria-hidden="true">
           <span><canvas id="menu-warrior" width="52" height="52"></canvas></span>
           <span><canvas id="menu-archer" width="52" height="52"></canvas></span>
@@ -62,6 +63,33 @@
         <span id="profile-name">登入／註冊</span><small id="profile-status">玩家帳號</small>
       </button>
     </div>
+  </div>
+</section>
+<section id="modes" hidden aria-labelledby="modes-heading">
+  <canvas class="menu-map-backdrop" id="modes-map" width="960" height="540" aria-hidden="true"></canvas>
+  <div class="menu-frame mode-frame">
+    <div class="menu-bar">
+      <h2 id="modes-heading">像素衝突</h2>
+      <button class="menu-back" id="modes-back" type="button">← 遊戲選單</button>
+    </div>
+    <div class="mode-grid">
+      <button class="menu-tile mode-card mode-flag" id="mode-flag" type="button">
+        <span class="mode-emblem" aria-hidden="true"></span>
+        <small>20 分鐘 · 5v5</small><strong>拔旗戰</strong>
+        <span>擊敗妖獸、採集草藥調製解藥，搶先拔下中央的敵隊旗幟。</span>
+      </button>
+      <button class="menu-tile mode-card mode-survival" id="mode-survival" type="button">
+        <span class="mode-emblem" aria-hidden="true"></span>
+        <small>24 分鐘 · 5v5</small><strong>生存戰</strong>
+        <span>搜尋有限的補給，提防入夜後的陷阱。比較全隊平均生存時間。</span>
+      </button>
+      <button class="menu-tile mode-card mode-control" id="mode-control" type="button">
+        <span class="mode-emblem" aria-hidden="true"></span>
+        <small>限時 20 分鐘 · 5v5</small><strong>據點戰</strong>
+        <span>找到移動據點、守住標記倒數，或在敵隊標記完成前搶奪。</span>
+      </button>
+    </div>
+    <button class="menu-back mode-classic" id="mode-deathmatch" type="button">經典團隊死鬥 →</button>
   </div>
 </section>
 <dialog id="account-dialog" aria-labelledby="account-title">
@@ -106,8 +134,12 @@
   </div>
   <p id="player-message" role="status"></p>
   <section id="player-history" hidden>
-    <h3>像素戰爭</h3><ul id="arena-history"></ul>
+    <h3>像素衝突</h3><ul id="arena-history"></ul>
     <h3>海龜湯</h3><ul id="soup-history"></ul>
+  </section>
+  <section id="history-detail" hidden>
+    <button class="menu-back" id="history-back" type="button">← 歷史戰績</button>
+    <div id="history-detail-content"></div>
   </section>
   <section id="player-friends" hidden>
     <form id="friend-form" method="post" action="/api/account/friends/request">
@@ -146,8 +178,8 @@
 </div>
 </section>
 <section id="lobby" hidden>
-<button class="ghost" onclick="home()">← 返回首頁</button>
-<h2>團隊對抗</h2>
+<button class="ghost" onclick="show('modes')">← 選擇副本</button>
+<h2 id="lobby-mode">團隊死鬥</h2>
 <div class="panel">
 <label>暱稱 <input id="nickname" maxlength="24" placeholder="輸入暱稱">
 </label>
@@ -238,7 +270,7 @@
   <div id="battle" hidden>
     <div class="scoreboard">
       <span class="red"><span>紅隊</span><strong id="red-score">0</strong></span>
-      <span class="match-clock"><strong id="clock">05:00</strong><small>團隊死鬥</small></span>
+      <span class="match-clock"><strong id="clock">05:00</strong><small id="battle-mode-name">團隊死鬥</small></span>
       <span class="blue"><strong id="blue-score">0</strong><span>藍隊</span></span>
     </div>
     <div class="arena-frame">
@@ -248,8 +280,17 @@
     </div>
     <aside class="arena-minimap" aria-label="小地圖">
       <canvas id="minimap" width="160" height="160" aria-label="地形、寶箱和可見敵人"></canvas>
-      <small>白：自己　紅：敵人　金：寶箱</small>
+      <small>白：自己　藍：隊友　紅：敵人</small>
+      <button id="map-toggle" type="button" hidden>全圖 [M]</button>
     </aside>
+    <div id="tactical-overlay" hidden>
+      <canvas id="tactical-map" width="400" height="400" aria-label="競賽地圖及隊友定位"></canvas>
+    </div>
+    <div id="mode-hud" hidden>
+      <span id="mode-status"></span>
+      <button id="mode-antidote" type="button" hidden>使用解藥 [F]</button>
+    </div>
+    <button id="mode-interact" type="button" hidden></button>
     <p id="chest-prompt" hidden><kbd>E</kbd> 開啟寶箱</p>
     <div class="loot-bar">
       <p id="loot-toast" role="status" hidden></p>
@@ -267,7 +308,7 @@
       <div class="ability"><kbd>左鍵</kbd><span id="attack-status"></span></div>
       <div class="ability"><kbd>Q</kbd><span id="skill-status"></span></div>
     </div>
-    <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>E</kbd> 開箱 · <kbd>Enter</kbd> 聊天</p>
+    <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>E</kbd> 互動 · <kbd>Enter</kbd> 聊天</p>
     <ul id="kill-feed" aria-label="擊殺通知"></ul>
   </div>
   <section id="results" aria-labelledby="winner" hidden>
@@ -283,7 +324,7 @@
       </div>
     </aside>
     <div id="results-board" class="results-board">
-      <h2 id="winner"></h2>
+      <h2 id="winner"></h2><p id="mode-result" hidden></p>
       <section class="results-team blue" aria-labelledby="results-blue-title">
         <h3 id="results-blue-title"><span id="blue-outcome"></span> 藍隊 <b id="final-blue"></b></h3>
         <table>
@@ -312,10 +353,10 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=2"></script>
-<script src="app.js?v=18"></script>
-<script src="arena-renderer.js?v=17"></script>
-<script src="menu-art.js?v=1"></script>
-<script src="account.js?v=1"></script>
-<script src="player-panel.js?v=1"></script>
+<script src="app.js?v=19"></script>
+<script src="arena-renderer.js?v=18"></script>
+<script src="menu-art.js?v=2"></script>
+<script src="account.js?v=2"></script>
+<script src="player-panel.js?v=2"></script>
 </body>
 </html>

@@ -48,7 +48,16 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
 
   route('get', '/history', async (_req, res, user) => {
     const account = (await store.read())[user.key];
-    res.json({ arena: account.arenaHistory ?? [], soup: account.soupHistory ?? [] });
+    res.json({ arena: (account.arenaHistory ?? []).map(({ detail, ...record }) => record), soup: account.soupHistory ?? [] });
+  });
+
+  route('get', '/history/:id', async (req, res, user) => {
+    const account = (await store.read())[user.key];
+    const arena = account.arenaHistory?.find(record => record.id === req.params.id);
+    if (arena) return res.json({ kind: 'arena', ...arena });
+    const soup = account.soupHistory?.find(record => record.id === req.params.id);
+    if (soup) return res.json({ kind: 'soup', ...soup });
+    res.status(404).json({ error: '找不到這場紀錄。' });
   });
 
   route('post', '/soup/start', (_req, res, user) => {
@@ -67,7 +76,8 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
     playSoup(game, action, question);
     const view = soupView(game);
     if (game.result && !game.recorded) {
-      const entry = { id, title: view.title, result: game.result, hints: view.hints, date: new Date().toISOString() };
+      const entry = { id, title: view.title, result: game.result, hints: view.hints, progress: view.progress,
+        clues: view.clues, difficulty: game.story.difficulty, date: new Date().toISOString() };
       await store.update(accounts => {
         const account = accounts[user.key];
         if (account.soupHistory?.some(record => record.id === id)) return {};
@@ -141,13 +151,18 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
   function saveArena(matchId, participants, result) {
     if (!participants.size) return Promise.resolve();
     const date = new Date().toISOString();
+    const detail = {
+      players: result.results, duration: result.duration, awards: result.teamAwards, mvp: result.mvp, winner: result.winner,
+      objective: result.scenario ? { reason: result.scenario.reason, points: result.scenario.points,
+        flag: result.scenario.flag } : null
+    };
     return store.update(accounts => {
       for (const [key, player] of participants) {
         const account = accounts[key];
         if (!account || account.arenaHistory?.some(record => record.id === matchId)) continue;
         const { team, job, kills, deaths, assists, damage } = player;
         (account.arenaHistory ??= []).unshift({
-          id: matchId, date, team, job, kills, deaths, assists, damage, score: result.score,
+          id: matchId, date, team, job, kills, deaths, assists, damage, score: result.score, mode: result.mode, detail,
           result: result.winner === null ? 'draw' : team === result.winner ? 'win' : 'loss'
         });
       }

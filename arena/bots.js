@@ -1,6 +1,6 @@
 'use strict';
 
-const { map, classes, blocked, clearLine, distance, attack, canSee } = require('./combat');
+const { map, classes, blocked, clearLine, distance, attack, canSee, scenarioGoal } = require('./combat');
 const { campOffset } = require('./world');
 const graphs = new WeakMap();
 function navigation(world) {
@@ -84,7 +84,8 @@ function steer(player, target) {
 }
 
 function botInput(room, bot, now) {
-  const enemies = room.players.filter(player => player.alive && player.team !== bot.team &&
+  const objective = scenarioGoal(room, bot, now);
+  const enemies = room.players.concat(room.scenario?.beasts ?? []).filter(player => player.alive && player.team !== bot.team &&
     canSee(bot, player, room.map));
   enemies.sort((a, b) => distance(bot, a) - distance(bot, b) ||
     ((a.slot + bot.slot) % 5) - ((b.slot + bot.slot) % 5));
@@ -96,7 +97,7 @@ function botInput(room, bot, now) {
     y: room.map.height / 2 + side * (bot.slot - 2) * 64
   });
   if (distance(bot, patrolPoint()) < 24) bot.patrolHome = !bot.patrolHome;
-  const target = enemy || (bot.lastSeen?.until > now && distance(bot, bot.lastSeen) > 24 ? bot.lastSeen : patrolPoint());
+  const target = enemy || (bot.lastSeen?.until > now && distance(bot, bot.lastSeen) > 24 ? bot.lastSeen : objective ?? patrolPoint());
 
   const job = classes[bot.job];
   const gap = distance(bot, target);

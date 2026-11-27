@@ -69,3 +69,19 @@
 }
 #player-dialog li small { color: #ddd3e6; }
 #player-message:empty { display: none; }
+
+.history-entry {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  margin: 0;
+  padding: 4px;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+}
+.history-entry:hover { background: #9b87cc25; }
+.history-table { overflow-x: auto; }
+.history-table table { width: 100%; border-collapse: collapse; text-align: left; }
+.history-table th, .history-table td { padding: 6px 8px; border-bottom: 1px solid #665974; }
+.history-table td:first-child { overflow-wrap: anywhere; }

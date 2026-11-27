@@ -615,3 +615,48 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 @media (prefers-reduced-motion: reduce) {
   #title-start { animation: none; }
 }
+
+#mode-hud {
+  position: absolute;
+  z-index: 2;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 52vw;
+  text-align: center;
+  color: #ffebc0;
+  background: #152124e8;
+  border: 1px solid #9e8b59;
+  padding: 5px 9px;
+  font-size: clamp(.68rem, 1.3vw, .95rem);
+}
+#map-toggle, #mode-antidote { margin: 4px; padding: 4px 8px; font-size: .75rem; }
+#mode-interact {
+  position: absolute;
+  z-index: 2;
+  bottom: 118px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px solid #dfbc77;
+  background: #31292a;
+  color: #fff0c2;
+}
+#tactical-overlay {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #10171bbb;
+  pointer-events: none;
+}
+#tactical-map {
+  width: min(76vw, 76dvh, 620px);
+  height: auto;
+  image-rendering: pixelated;
+  border: 3px solid #bcaa76;
+}
+#map-toggle { pointer-events: auto; }
+#mode-interact[data-anchored="true"] { bottom: auto; margin: 0; }
+#battle[data-mode="survival"] .scoreboard .red strong,
+#battle[data-mode="survival"] .scoreboard .blue strong { font-size: clamp(.9rem, 3vw, 1.55rem); }

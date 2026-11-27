@@ -109,10 +109,17 @@ let aim = null;
 let worldMap = null;
 let worldChests = [];
 let lootToastUntil = 0;
+const modeNames = { deathmatch: '團隊死鬥', flag: '拔旗戰', survival: '生存戰', control: '據點戰' };
+const roleNames = { commander: '指揮', support: '輔助', fighter: '打手' };
+const modeReasons = { flag: '敵隊旗幟已被拔下', closest: '以最靠近旗區的存活隊員判定',
+  eliminated: '所有玩家已淘汰', time: '時間結束', 'all-marked': '所有據點已完成標記' };
+let selectedMode = 'deathmatch';
+let fullMap = false;
+
 const matchKey = 'game-hub-seat';
 
 function show(id) {
-  for (const panel of ['title-screen', 'home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
+  for (const panel of ['title-screen', 'home', 'modes', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
   if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading', 'in-results');
   if (id === 'home') $('menu-arena').focus();
   if (id === 'title-screen') $('title-start').focus();
@@ -120,7 +127,13 @@ function show(id) {
 
 $('title-start').onclick = () => show('home');
 $('menu-back').onclick = () => show('title-screen');
-$('menu-arena').onclick = openLobby;
+function openModes() {
+  show('modes');
+  $('mode-flag').focus();
+}
+$('menu-arena').onclick = openModes;
+$('modes-back').onclick = home;
+for (const mode of Object.keys(modeNames)) $('mode-' + mode).onclick = () => openLobby(mode);
 $('menu-soup').onclick = openSoup;
 
 function exitRoom() {
@@ -149,7 +162,9 @@ function home() {
   show('home');
 }
 
-function openLobby() {
+function openLobby(mode = selectedMode) {
+  selectedMode = mode;
+  $('lobby-mode').textContent = modeNames[mode];
   $('error').textContent = '';
   const name = typeof playerAccount === 'undefined' ? '' : playerAccount.profile?.name;
   $('nickname').readOnly = Boolean(name);
@@ -206,7 +221,7 @@ function enter(event, data) {
   });
 }
 
-function createRoom() { enter('create', { type: 'arena', size: 10 }); }
+function createRoom() { enter('create', { type: 'arena', size: 10, mode: selectedMode }); }
 function joinRoom(id) { enter('join', { id: id || $('room-code').value }); }
 function element(tag, text) {
   const node = document.createElement(tag);
@@ -217,8 +232,9 @@ function element(tag, text) {
 function renderRoomList() {
   const list = $('room-list');
   list.replaceChildren();
-  if (!listedRooms.length) list.append(element('p', '目前沒有房間'));
-  for (const entry of listedRooms) {
+  const matching = listedRooms.filter(entry => (entry.mode ?? 'deathmatch') === selectedMode);
+  if (!matching.length) list.append(element('p', '目前沒有房間'));
+  for (const entry of matching) {
     const label = { lobby: '等待中', selection: '選角中', loading: '載入中', playing: '對戰中', ended: '已結束' }[entry.phase];
     const row = element('p', `${entry.id} · ${entry.count}/${entry.size} · ${label} `);
     if (entry.phase === 'lobby' && entry.count < entry.size) {
@@ -300,7 +316,7 @@ function renderLoading(state) {
       art.src = `/art/${player.job}-cutout.webp`;
       art.alt = '';
       card.append(art, element('strong', player.name),
-        element('small', jobNames[player.job] + (player.bot ? ' · AI' : '')));
+        element('small', jobNames[player.job] + (player.role ? ' · ' + roleNames[player.role] : '') + (player.bot ? ' · AI' : '')));
       roster.append(card);
     }
   }
@@ -308,6 +324,7 @@ function renderLoading(state) {
 
 function renderRoom(state) {
   if (state.id !== room) return;
+  selectedMode = state.mode ?? selectedMode;
   const me = state.players.find(player => player.id === socket.id);
   if (!me) return;
   const host = state.host === socket.id;
@@ -322,6 +339,8 @@ function renderRoom(state) {
       worldMap = null;
       worldChests = [];
       lootToastUntil = 0;
+      fullMap = false;
+      $('tactical-overlay').hidden = true;
     }
   }
   phase = state.phase;
@@ -481,7 +500,7 @@ function lootCommand(event, ...args) {
   socket.timeout(2500).emit(event, ...args, (failure, result) => {
     if (room !== id || phase !== 'playing') return;
     const reward = result?.reward;
-    $('loot-toast').textContent = failure ? '道具操作逾時' : result?.error ||
+    $('loot-toast').textContent = failure ? '道具操作逾時' : result?.error || result?.message ||
       (event === 'lootOpen' ? `取得 ${reward.label} · 欄位 ${reward.slot + 1}` :
         reward ? `使用 ${reward.label}${reward.healing ? ' · +' + reward.healing + ' HP' : ''}` : '已施放震波');
     lootToastUntil = performance.now() + 2500;
@@ -497,7 +516,7 @@ lootButtons.forEach((button, index) => {
 });
 
 function drawLootHud(state, serverTime) {
-  $('chest-prompt').hidden = state.nearbyChest == null;
+  $('chest-prompt').hidden = state.nearbyChest == null || Boolean(state.scenario?.nearby);
   $('loot-toast').hidden = performance.now() >= lootToastUntil;
   const buffs = (state.buffs || []).filter(buff => buff.until > serverTime);
   $('buff-status').hidden = !buffs.length;
@@ -534,7 +553,12 @@ window.addEventListener('keydown', event => {
   }
   if (event.repeat) return;
   if (event.code === 'KeyQ') attack(true);
-  if (event.code === 'KeyE' && frame?.nearbyChest != null) lootCommand('lootOpen', frame.nearbyChest);
+  if (event.code === 'KeyE') {
+    if (frame?.scenario?.nearby) lootCommand('modeInteract', frame.scenario.nearby);
+    else if (frame?.nearbyChest != null) lootCommand('lootOpen', frame.nearbyChest);
+  }
+  if (event.code === 'KeyF' && frame?.mode === 'flag') lootCommand('modeAntidote');
+  if (event.code === 'KeyM' && frame?.scenario) toggleMap();
   if (event.code === 'KeyR' && frame?.buffs?.some(buff => buff.label === '震波符文 [R]')) lootCommand('lootRune');
   if (/^Digit[1-5]$/.test(event.code)) useLootSlot(Number(event.code.slice(-1)) - 1);
 });
@@ -563,7 +587,63 @@ $('arena').onpointerdown = event => {
   attack(false);
 };
 
+function formatDuration(ms) {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function scoreText(state, team) {
+  return state.mode === 'survival' ? formatDuration(state.score[team]) : state.score[team];
+}
+
+function toggleMap() {
+  fullMap = !fullMap;
+  $('tactical-overlay').hidden = !fullMap;
+  if (fullMap) stopMovement();
+}
+$('map-toggle').onclick = toggleMap;
+$('mode-antidote').onclick = () => lootCommand('modeAntidote');
+$('mode-interact').onclick = () => {
+  if (frame?.scenario?.nearby) lootCommand('modeInteract', frame.scenario.nearby);
+};
+
+function drawModeHud(state, now) {
+  const info = state.scenario;
+  $('mode-hud').hidden = $('map-toggle').hidden = !info;
+  const interaction = $('mode-interact');
+  interaction.hidden = !info?.nearby;
+  if (interaction.dataset.anchored === 'true') {
+    interaction.style.left = '';
+    interaction.style.top = '';
+  }
+  interaction.dataset.anchored = 'false';
+  if (!info) return;
+  const words = [modeNames[info.mode], roleNames[info.role]];
+  $('mode-antidote').hidden = info.mode !== 'flag';
+  if (info.mode === 'flag') words.push('毒氣免疫 ' + formatDuration(info.protectedUntil - now),
+    `草藥 月露 ${info.herbs[0]} · 赤蕊 ${info.herbs[1]} · 星脈 ${info.herbs[2]}`);
+  if (info.mode === 'survival') {
+    words.push(info.night ? '黑夜' : '白天', '生存資源 ' + formatDuration(info.protectedUntil - now));
+    if (info.exposureUntil > now) words.push('定位暴露 ' + formatDuration(info.exposureUntil - now));
+  }
+  if (info.mode === 'control') words.push(`已標記 ${state.score['紅隊'] + state.score['藍隊']}/${info.pointCount}`, ...info.points.filter(point => point.marking)
+    .map(point => `${point.marking}標記中 ${formatDuration(point.ends - now)}`));
+  $('mode-status').textContent = words.filter(Boolean).join('｜');
+  const point = info.points.find(point => point.id === info.nearby);
+  if (point) {
+    const canvas = $('arena');
+    const bounds = canvas.getBoundingClientRect();
+    interaction.dataset.anchored = 'true';
+    interaction.style.left = Math.min(bounds.width - 95, Math.max(95,
+      (point.x - arenaCamera.x) * bounds.width / canvas.width)) + 'px';
+    interaction.style.top = Math.max(100, (point.y - arenaCamera.y) * bounds.height / canvas.height - 74) + 'px';
+  }
+  interaction.textContent = '[E] ' + { flag: '拔下敵方旗幟', survival: '開啟補給包', control: '開始標記 · 3 分鐘' }[info.mode];
+}
+
 function renderResults(state) {
+  $('mode-result').hidden = !state.scenario;
+  $('mode-result').textContent = state.scenario ? modeNames[state.mode] + ' · ' + (modeReasons[state.scenario.reason] ?? '') : '';
   $('winner').textContent = state.winner ? state.winner + '獲勝' : '平手';
   $('results-board').dataset.winner = state.winner || '';
   const mvp = state.results.find(player => player.id === state.mvp);
@@ -577,7 +657,7 @@ function renderResults(state) {
   }
 
   for (const [team, key] of [['藍隊', 'blue'], ['紅隊', 'red']]) {
-    $(`final-${key}`).textContent = state.score[team];
+    $(`final-${key}`).textContent = scoreText(state, team);
     $(`${key}-outcome`).textContent = !state.winner ? '平手' : state.winner === team ? '勝利' : '敗北';
     const awards = state.teamAwards?.[team];
     const roster = $(`results-${key}`);
@@ -644,8 +724,10 @@ socket.on('arenaState', state => {
     button.disabled = !alive || !item;
   });
   $('concealed').hidden = !state.concealed;
-  $('red-score').textContent = state.score['紅隊'];
-  $('blue-score').textContent = state.score['藍隊'];
+  $('battle-mode-name').textContent = modeNames[state.mode ?? 'deathmatch'];
+  $('battle').dataset.mode = state.mode ?? 'deathmatch';
+  $('red-score').textContent = scoreText(state, '紅隊');
+  $('blue-score').textContent = scoreText(state, '藍隊');
   $('kill-feed').replaceChildren(...state.kills.map(kill => element('li', `${kill.attacker} 擊倒 ${kill.victim}`)));
 });
 
@@ -671,11 +753,14 @@ function renderFrame(time) {
     $('attack-status').textContent = `${frame.attackRange || '—'} px · ${cooldown(me.attackAt)}`;
     $('skill-status').textContent = `${skills[me.job]} · ${cooldown(me.skillAt)}`;
     $('respawn').hidden = me.alive;
-    if (!me.alive) $('respawn').textContent = `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;
+    if (!me.alive) $('respawn').textContent = ['flag', 'survival'].includes(frame.mode)
+      ? '已淘汰 · 可查看隊友定位' : `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;
   }
   const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
   drawLootHud(frame, serverTime);
   drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time);
+  drawModeHud(frame, serverTime);
   drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id);
+  if (fullMap) drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id, $('tactical-map'));
 }
 requestAnimationFrame(renderFrame);

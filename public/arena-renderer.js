@@ -267,7 +267,7 @@ function sprite(ctx, p, old, blend, time, localId) {
     for (const shift of [-14, 12]) rect(ctx, color.light, x + shift, y - 35, 2, 35);
     ctx.restore();
   }
-  const name = `${p.bot ? '[AI] ' : ''}${p.name} · ${letters[p.job]}`;
+  const name = `${p.bot ? '[AI] ' : ''}${p.name} · ${p.role ? roleNames[p.role] : letters[p.job]}`;
   ctx.font = 'bold 12px system-ui';
   ctx.textAlign = 'center';
   ctx.lineWidth = 3;
@@ -328,12 +328,12 @@ function minimapView(map, center) {
   };
 }
 
-function drawMinimap(state, old, blend, map, chests, localId) {
+function drawMinimap(state, old, blend, map, chests, localId, tactical = null) {
   const me = state.players.find(player => player.id === localId);
   if (!me) return;
   const center = displayPosition(me, old?.players.find(player => player.id === localId), blend);
-  const view = minimapView(map, center);
-  const canvas = $('minimap');
+  const view = tactical ? { x: 0, y: 0, width: map.width, height: map.height } : minimapView(map, center);
+  const canvas = tactical ?? $('minimap');
   const ctx = canvas.getContext('2d', { alpha: false });
   if (minimapWorld !== map) {
     minimapWorld = map;
@@ -356,11 +356,58 @@ function drawMinimap(state, old, blend, map, chests, localId) {
     const size = open.has(chest.id) ? 2 : 3;
     rect(ctx, mark, x(chest.x) - 1, y(chest.y) - 1, size, size);
   }
-  for (const player of state.players) {
-    if (!player.alive || player === me || !inView(player)) continue;
+  const scenario = state.scenario;
+  const markers = new Map(state.players.filter(player => player.alive).map(player => [player.id, player]));
+  for (const marker of scenario?.markers ?? []) markers.set(marker.id, marker);
+  for (const target of [...(scenario?.points ?? []), ...(scenario?.flag ? [scenario.flag] : []), ...(scenario?.supplies ?? [])]) {
+    if (!inView(target)) continue;
+    const shade = target.owner || target.marking;
+    rect(ctx, shade ? colors[shade].light : '#f3cf69', x(target.x) - 2, y(target.y) - 2, 5, 5);
+  }
+  for (const player of markers.values()) {
+    if (player.id === localId || !inView(player)) continue;
     rect(ctx, player.team === me.team ? '#78d5ff' : '#ff6b71', x(player.x) - 2, y(player.y) - 2, 4, 4);
   }
   rect(ctx, '#fff8e3', x(center.x) - 2, y(center.y) - 2, 5, 5);
+}
+
+function drawObjective(ctx, point, time, shared) {
+  const { x, y } = point;
+  rect(ctx, '#26252d', x - 12, y, 24, 7);
+  rect(ctx, '#ddc5a5', x - 2, y - 36, 4, 38);
+  if (shared) {
+    rect(ctx, colors['紅隊'].mid, x - 23, y - 34, 21, 15);
+    rect(ctx, colors['藍隊'].mid, x + 2, y - 34, 21, 15);
+  } else {
+    const team = point.owner ?? point.marking;
+    const color = team ? colors[team].light : '#f8d172';
+    rect(ctx, color, x + 2, y - 34, 21, 15);
+    if (point.ends) {
+      rect(ctx, '#201922', x - 17, y - 45, 36, 5);
+      rect(ctx, color, x - 16, y - 44, 34 * Math.max(0, 1 - (point.ends - time) / 180_000), 3);
+    }
+  }
+}
+
+function drawBeast(ctx, beast, time) {
+  const { x, y, species } = beast;
+  const bob = Math.floor(time / 175) % 2;
+  const fur = ['#6bb377', '#c77258', '#9d7bc9'][species];
+  const top = y - [23, 28, 34][species] - bob;
+  rect(ctx, '#171d28', x - 17, y - 3, 34, 8);
+  rect(ctx, '#232134', x - 16, top + 5, 32, y - top - 3);
+  rect(ctx, fur, x - 13, top + 6, 26, y - top - 10);
+  rect(ctx, fur, x - 12, top, 6, 9);
+  rect(ctx, fur, x + 6, top, 6, 9);
+  rect(ctx, '#ffc682', x - 8, top + 10, 4, 3);
+  rect(ctx, '#ffc682', x + 4, top + 10, 4, 3);
+  rect(ctx, '#302333', x - 4, top + 16, 8, 4);
+  rect(ctx, '#181b24', x - 15, top - 7, 30, 4);
+  rect(ctx, '#f5a479', x - 14, top - 6, 28 * beast.hp / beast.maxHp, 2);
+  ctx.font = 'bold 10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff4d4';
+  ctx.fillText(['苔牙狼', '棘背獸', '幽光靈'][species], x, top - 10);
 }
 
 function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
@@ -378,6 +425,13 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   ctx.translate(-arenaCamera.x, -arenaCamera.y);
   paintWorld(ctx, map, width, height);
   for (const chest of state.chests || []) drawChest(ctx, chest, time);
+  const scenario = state.scenario;
+  if (scenario?.flag) drawObjective(ctx, scenario.flag, time, true);
+  for (const point of scenario?.points ?? []) drawObjective(ctx, point, time, false);
+  for (const pack of scenario?.supplies ?? []) {
+    drawChest(ctx, { ...pack, quality: pack.kind === 'medicine' ? 'rare' : 'common', openedAt: null }, time);
+  }
+  for (const beast of scenario?.beasts ?? []) drawBeast(ctx, beast, time);
   for (const p of [...state.players].sort((a, b) => a.y - b.y)) {
     if (p.x < arenaCamera.x - 96 || p.y < arenaCamera.y - 96 ||
         p.x > arenaCamera.x + width + 96 || p.y > arenaCamera.y + height + 96) continue;
@@ -425,6 +479,7 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
     fog.addColorStop(1, '#101718f0');
     rect(ctx, fog, 0, 0, width, height);
   }
+  if (scenario?.night) rect(ctx, '#11173669', 0, 0, width, height);
   if (position && state.attackRange) {
     ctx.save();
     ctx.strokeStyle = state.targetInRange ? '#a8f8a6' : '#fff0c2bd';

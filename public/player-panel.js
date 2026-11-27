@@ -14,23 +14,100 @@ const showPlayerPanel = (() => {
     $(id).replaceChildren(...entries);
   }
 
+  function historyRow(item, title, summary) {
+    const row = element('li', '');
+    const button = element('button', '');
+    button.className = 'history-entry';
+    button.type = 'button';
+    button.append(element('strong', title), element('span', summary),
+      element('small', dateLabel.format(new Date(item.date))));
+    button.onclick = () => openHistory(item.id);
+    row.append(button);
+    return row;
+  }
+
   function renderHistory({ arena, soup }) {
     const results = { win: '勝利', loss: '敗北', draw: '平手' };
-    rows('arena-history', arena, '還沒有對戰紀錄。', item => {
-      const row = element('li', '');
-      row.append(element('strong', results[item.result] + ' · ' + item.team + ' · ' + jobNames[item.job]),
-        element('span', `紅 ${item.score['紅隊']} / 藍 ${item.score['藍隊']} · K/D/A ${item.kills}/${item.deaths}/${item.assists} · 傷害 ${item.damage}`),
-        element('small', dateLabel.format(new Date(item.date))));
-      return row;
-    });
-    rows('soup-history', soup, '還沒有推理紀錄。', item => {
-      const row = element('li', '');
-      row.append(element('strong', item.title), element('span',
-        `${item.result === 'solved' ? '完成推理' : '揭曉答案'} · 使用 ${item.hints} 次提示`),
-        element('small', dateLabel.format(new Date(item.date))));
-      return row;
-    });
+    rows('arena-history', arena, '還沒有對戰紀錄。', item => historyRow(item,
+      `${modeNames[item.mode ?? 'deathmatch']} · ${results[item.result]} · ${item.team}`,
+      `紅 ${scoreText(item, '紅隊')} / 藍 ${scoreText(item, '藍隊')} · K/D/A ${item.kills}/${item.deaths}/${item.assists}`));
+    rows('soup-history', soup, '還沒有推理紀錄。', item => historyRow(item, item.title,
+      `${item.result === 'solved' ? '完成推理' : '揭曉答案'} · 使用 ${item.hints} 次提示`));
   }
+
+  function renderHistoryDetail(record) {
+    const content = $('history-detail-content');
+    const date = dateLabel.format(new Date(record.date));
+    if (record.kind === 'soup') {
+      content.append(element('h3', record.title), element('p', date),
+        element('p', record.result === 'solved' ? '結果：完成推理' : '結果：揭曉答案'),
+        element('p', `使用提示 ${record.hints} 次`));
+      if (record.clues != null) content.append(element('p', `解鎖線索 ${record.progress}/${record.clues}`));
+      if (record.difficulty) content.append(element('p', `難度：${record.difficulty}`));
+      return;
+    }
+    const detail = record.detail;
+    const summary = record.result === 'win' ? '勝利' : record.result === 'loss' ? '敗北' : '平手';
+    content.append(element('h3', `${modeNames[record.mode ?? 'deathmatch']} · ${summary}`),
+      element('p', `${date} · 紅隊 ${scoreText(record, '紅隊')} / 藍隊 ${scoreText(record, '藍隊')}`));
+    if (!detail) {
+      content.append(element('p', `個人紀錄 · ${jobNames[record.job]} · K/D/A ${record.kills}/${record.deaths}/${record.assists} · 傷害 ${record.damage}`),
+        element('small', '這場比賽早於完整對局紀錄功能，僅留存個人統計。'));
+      return;
+    }
+    if (detail.duration != null) content.append(element('p', '對局時長 ' + formatDuration(detail.duration)));
+    const reason = detail.objective?.reason;
+    if (reason && modeReasons[reason]) content.append(element('p', modeReasons[reason]));
+    for (const team of ['紅隊', '藍隊']) {
+      content.append(element('h4', team));
+      const table = element('table', '');
+      const head = element('thead', '');
+      const labels = element('tr', '');
+      const survival = record.mode === 'survival';
+      const columns = ['玩家', '職業／職務', 'K/D/A', '傷害', ...(survival ? ['生存'] : []), '稱號'];
+      labels.append(...columns.map(label => element('th', label)));
+      head.append(labels);
+      const tbody = element('tbody', '');
+      for (const p of detail.players.filter(player => player.team === team)) {
+        const row = element('tr', '');
+        const awards = detail.awards?.[team];
+        const badge = [p.id === awards?.mvp && 'MVP', p.id === awards?.lowestKda && '戰犯'].filter(Boolean).join(' / ');
+        const values = [p.name + (p.bot ? ' · AI' : ''), [jobNames[p.job], roleNames[p.role]].filter(Boolean).join('／'),
+          `${p.kills}/${p.deaths}/${p.assists}`, p.damage, ...(survival ? [formatDuration(p.survival)] : []), badge];
+        row.append(...values.map(value => element('td', String(value))));
+        tbody.append(row);
+      }
+      table.append(head, tbody);
+      const scroll = element('div', '');
+      scroll.className = 'history-table';
+      scroll.append(table);
+      content.append(scroll);
+    }
+  }
+
+  async function openHistory(id) {
+    const request = ++activeRead;
+    $('player-history').hidden = true;
+    $('history-detail').hidden = false;
+    $('history-back').focus();
+    $('history-detail-content').replaceChildren();
+    message.textContent = '載入中…';
+    try {
+      const record = await accountRequest('history/' + encodeURIComponent(id));
+      if (!panel.open || request !== activeRead) return;
+      renderHistoryDetail(record);
+      message.textContent = '';
+    } catch (error) {
+      if (panel.open && request === activeRead) message.textContent = error.message;
+    }
+  }
+
+  $('history-back').onclick = () => {
+    activeRead++;
+    message.textContent = '';
+    $('history-detail').hidden = true;
+    $('player-history').hidden = false;
+  };
 
   function friendLabel(player) { return player.name + ' · ' + player.id; }
 
@@ -96,6 +173,7 @@ const showPlayerPanel = (() => {
     if (section !== activePanel) $('friend-query').value = '';
     activePanel = section;
     $('player-title').textContent = section === 'history' ? '歷史戰績' : '好友';
+    $('history-detail').hidden = true;
     $('player-history').hidden = section !== 'history';
     $('player-friends').hidden = section !== 'friends';
     for (const id of ['arena-history', 'soup-history', 'friend-list', 'friend-sent', 'friend-incoming']) {

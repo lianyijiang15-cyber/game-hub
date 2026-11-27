@@ -7,7 +7,8 @@ const crypto = require('node:crypto');
 const { performance } = require('node:perf_hooks');
 const { Server } = require('socket.io');
 const combat = require('./arena/combat');
-const { botInput } = require('./arena/bots');
+const modes = require('./arena/modes');
+const { botInput, route } = require('./arena/bots');
 const { createAccountRouter } = require('./accounts/router');
 
 const app = express();
@@ -31,17 +32,17 @@ const now = () => Math.floor(performance.now());
 
 function list(target = io) {
   target.emit('rooms', [...rooms.values()].map(room => ({
-    id: room.id, size: seats, count: room.players.length, phase: room.phase
+    id: room.id, size: seats, count: room.players.length, phase: room.phase, mode: room.mode
   })));
 }
 
 function roomState(room, viewerId) {
   const viewer = room.players.find(player => player.id === viewerId);
   return {
-    id: room.id, host: room.host, size: seats, phase: room.phase,
+    id: room.id, host: room.host, size: seats, phase: room.phase, mode: room.mode,
     loadingRemaining: Math.max(0, (room.loadingUntil ?? 0) - now()),
-    players: room.players.map(({ id, name, job, ready, bot, team }) => ({
-      id, name, ready, bot, ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, team } : id === viewerId ? { job } : {})
+    players: room.players.map(({ id, name, job, ready, bot, team, slot }) => ({
+      id, name, ready, bot, ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot) } : {}) } : id === viewerId ? { job } : {})
     }))
   };
 }
@@ -130,6 +131,8 @@ function runMatch(room) {
       lastTick = time;
       if (time < room.loadingUntil) return;
       room.phase = 'playing';
+      room.matchStartedAt = time;
+      modes.begin(room, time);
       for (const player of room.players) {
         player.spawnedAt = time;
         if (!player.bot) player.playedMatch = room.matchId;
@@ -138,7 +141,7 @@ function runMatch(room) {
       broadcast(time);
       return;
     }
-    if (room.phase === 'playing') combat.tick(room, time, Math.min((time - lastTick) / 1000, 0.05), botInput);
+    if (room.phase === 'playing') combat.tick(room, time, Math.min((time - lastTick) / 1000, 0.05), botInput, route);
     lastTick = time;
     if (room.phase === 'ended') {
       clearInterval(room.timer);
@@ -146,6 +149,7 @@ function runMatch(room) {
       const result = combat.snapshot(room, time);
       const participants = new Map(room.roster.filter(player => player.accountKey && player.playedMatch === room.matchId)
         .map(player => [player.accountKey, player.statsAtDeparture ?? playerStats(player)]));
+      result.duration = Math.max(0, Math.min(time, room.endsAt) - room.matchStartedAt);
       accounts.saveArena(room.matchId, participants, result).catch(error => {
         console.error('Could not save arena history:', error.code ?? error.name);
       });
@@ -222,7 +226,9 @@ io.on('connection', socket => {
     if (rooms.size >= maxRooms) return { error: '房間已達上限' };
     let id;
     do { id = crypto.randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(id));
-    const created = { id, host: socket.id, phase: 'lobby', players: [] };
+    const mode = data.mode ?? 'deathmatch';
+    if (typeof mode !== 'string' || !Object.hasOwn(modes.durations, mode)) return { error: '未知副本' };
+    const created = { id, host: socket.id, phase: 'lobby', mode, players: [] };
     rooms.set(id, created);
     const ticket = join(socket, created, name, account?.key);
     return { id, ticket, room: roomState(created, socket.id) };
@@ -346,6 +352,14 @@ io.on('connection', socket => {
     player.input = { x: data.x, y: data.y };
     player.inputAt = now();
   });
+  command('modeInteract', (id, { room, player }) => {
+    if (!room || typeof id !== 'string' || id.length > 24) return { error: '無效的互動目標' };
+    return combat.interact(room, player, id, now());
+  }, 250);
+  command('modeAntidote', (_, { room, player }) => {
+    if (!room) return { error: '目前無法使用解藥' };
+    return modes.antidote(room, player, now());
+  }, 400);
   command('lootOpen', (id, { room, player }) => {
     if (!room || !Number.isSafeInteger(id)) return { error: '寶箱目前無法開啟' };
     const reward = combat.openChest(room, player, id, now());

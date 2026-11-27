@@ -139,6 +139,10 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
 
   context.home();
   elements.get('menu-arena').onclick();
+  assert.equal(elements.get('modes').hidden, false);
+  elements.get('mode-control').onclick();
+  assert.equal(elements.get('lobby-mode').textContent, '據點戰');
+  elements.get('mode-deathmatch').onclick();
   assert.equal(elements.get('lobby').hidden, false);
   elements.get('nickname').value = 'Tester';
   context.createRoom();
@@ -275,14 +279,15 @@ test('account menu presents registration, mandatory naming, history and friends'
     register: { ok: true },
     login: { username: 'Player7', profile: null },
     profile: { profile },
-    history: { arena: [], soup: [{ title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' }] },
+    history: { arena: [], soup: [{ id: 'saved-soup', title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' }] },
+    'history/saved-soup': { kind: 'soup', title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' },
     friends: { friends: [], incoming: [], sent: [opponent] },
     'friends/request': { player: opponent },
     logout: { ok: true }
   };
   let openedArena = false;
   const context = vm.createContext({
-    $: find, AbortSignal, openLobby() { openedArena = true; }, openSoup() {},
+    $: find, AbortSignal, openModes() { openedArena = true; }, openSoup() {},
     socket: { disconnect() { return this; }, connect() {} },
     element(_tag, text) { return { ...node(), textContent: text }; },
     async fetch(url, options) {
@@ -319,7 +324,13 @@ test('account menu presents registration, mandatory naming, history and friends'
   assert.equal(openedArena, true);
 
   await find('menu-history').onclick();
-  assert.equal(find('soup-history').children[0].children[0].textContent, '第一題');
+  const historyButton = find('soup-history').children[0].children[0];
+  assert.equal(historyButton.children[0].textContent, '第一題');
+  await historyButton.onclick();
+  assert.equal(find('history-detail').hidden, false);
+  assert.equal(find('history-detail-content').children[0].textContent, '第一題');
+  find('history-back').onclick();
+  assert.equal(find('player-history').hidden, false);
   find('player-dialog').close();
   await find('menu-friends').onclick();
   find('friend-by').value = 'id';

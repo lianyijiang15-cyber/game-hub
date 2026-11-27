@@ -63,7 +63,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.match(html, /id="title-start"[^>]*>TAP TO START<\/button>/);
   assert.match(html, /<section id="home" hidden\b[^>]*>/);
   assert.match(html, /id="menu-soup-name">海龜湯/);
-  assert.match(html, /id="menu-arena-name">像素戰爭/);
+  assert.match(html, /id="menu-arena-name">像素衝突/);
   assert.equal((await fetch(base + '/menu.css')).status, 200);
   assert.equal((await fetch(base + '/menu-art.js')).status, 200);
   const titleMap = await fetch(base + '/title-map');
@@ -198,6 +198,11 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
     assert.equal(arena[0][metric], official[metric]);
   }
   assert.equal(arena[0].result, 'draw');
+  const detailPath = base + '/api/account/history/' + arena[0].id;
+  const detail = await (await fetch(detailPath, { headers: { Cookie: cookie } })).json();
+  assert.equal(detail.detail.players.length, 10);
+  assert.deepEqual(detail.detail.awards, result.teamAwards);
+  assert.equal((await fetch(detailPath)).status, 401);
   const retainedPlayers = liveRoom.players.map(({ id, name, bot, job }) => ({ id, name, bot, job }));
   const waiting = [host, guest].map(client => receive(client, 'room', state => state.id === id && state.phase === 'lobby'));
   assert.ok((await send(guest, 'rematch')).error);
@@ -227,7 +232,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   await send(guest, 'leave');
   assert.equal(rooms.has(id), false);
 
-  const solo = await send(guest, 'create', { type: 'arena', size: 10, name: 'Solo Host' });
+  const solo = await send(guest, 'create', { type: 'arena', size: 10, name: 'Solo Host', mode: 'flag' });
   assert.equal((await send(guest, 'fillBots')).room.players.filter(player => player.bot).length, 9);
   const ready = receive(guest, 'room', room => room.players.every(player => player.ready));
   assert.equal((await send(guest, 'ready')).ok, true);
@@ -253,7 +258,18 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.deepEqual(resume.map, map);
   assert.equal(resume.room.host, outsider.id);
   assert.notEqual(resume.ticket, solo.ticket);
-  assert.equal((await recovered).players.length, 5);
+  const field = await recovered;
+  assert.equal(field.players.length, 5);
+  assert.equal(field.mode, 'flag');
+  assert.equal(field.scenario.markers.length, 5);
+  const liveFlag = rooms.get(solo.id);
+  const player = liveFlag.players.find(member => member.id === outsider.id);
+  assert.ok((await send(outsider, 'modeInteract', 'flag')).error);
+  Object.assign(player, { x: field.scenario.flag.x, y: field.scenario.flag.y });
+  await wait(260);
+  const flagFinish = receive(outsider, 'arenaState', state => state.phase === 'ended');
+  assert.ok((await send(outsider, 'modeInteract', 'flag')).message);
+  assert.equal((await flagFinish).winner, player.team);
   await send(outsider, 'leave');
   assert.equal(rooms.has(solo.id), false);
 });
