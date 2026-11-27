@@ -87,17 +87,20 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     requestAnimationFrame: callback => frames.push(callback),
     setInterval() {}
   });
-  for (const script of ['soup-bank.js', 'app.js', 'arena-renderer.js']) vm.runInContext(read(script), context);
+  for (const script of ['soup-bank.js', 'app.js', 'arena-renderer.js', 'menu-art.js']) vm.runInContext(read(script), context);
+  assert.ok(pixelDraws > 0);
   context.show('title-screen');
   elements.get('title-start').onclick();
   assert.equal(elements.get('title-screen').hidden, true);
   assert.equal(elements.get('home').hidden, false);
-  context.show('title-screen');
+  elements.get('menu-back').onclick();
+  assert.equal(elements.get('title-screen').hidden, false);
   keyHandlers.get('keydown')({ code: 'Enter', preventDefault() {} });
   assert.equal(elements.get('title-screen').hidden, true);
   assert.equal(elements.get('home').hidden, false);
-  context.drawTitleMap(require('../arena/combat').map);
-  assert.ok(pixelDraws > 0);
+  const beforeMap = pixelDraws;
+  context.drawMapPreview(elements.get('title-map'), require('../arena/combat').map, 0.5, 0.5);
+  assert.ok(pixelDraws > beforeMap);
   assert.equal(vm.runInContext('arenaCamera.x + arenaCamera.y', context), 0);
   // Separate cameras own their positions, even when driven by the same map and clock.
   vm.runInContext(`
@@ -125,7 +128,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     firstCamera.x + firstCamera.y;
   `, context), 0);
   assert.equal(vm.runInContext("stories.length", context), vm.runInContext("extraStories.length + 2", context));
-  context.openSoup();
+  elements.get('menu-soup').onclick();
   assert.equal(elements.get('soup').hidden, false);
   assert.ok(elements.get('soup-story').textContent);
   context.hint();
@@ -134,7 +137,9 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   context.reveal();
   assert.ok(elements.get('soup-end').textContent);
 
-  context.openLobby();
+  context.home();
+  elements.get('menu-arena').onclick();
+  assert.equal(elements.get('lobby').hidden, false);
   elements.get('nickname').value = 'Tester';
   context.createRoom();
   assert.equal(elements.get('room-id').textContent, 'ABCDE0');

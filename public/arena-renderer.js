@@ -441,12 +441,11 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   rect(ctx, '#fff0c2', cursor.x, cursor.y + 3, 1, 4);
 }
 
-function drawTitleMap(map) {
-  const canvas = $('title-map');
+function drawMapPreview(canvas, map, centerX, centerY) {
   const ctx = canvas.getContext('2d', { alpha: false });
   const camera = {
-    x: Math.floor(map.width / 2 - canvas.width / 2),
-    y: Math.floor(map.height / 2 - canvas.height / 2)
+    x: Math.floor(map.width * centerX - canvas.width / 2),
+    y: Math.floor(map.height * centerY - canvas.height / 2)
   };
   ctx.save();
   ctx.translate(-camera.x, -camera.y);
@@ -454,8 +453,9 @@ function drawTitleMap(map) {
   ctx.restore();
 }
 
-if (typeof fetch === 'function') {
-  fetch('/title-map').then(response => response.ok ? response.json() : null).then(map => {
-    if (map && !$('title-screen').hidden) drawTitleMap(map);
-  }).catch(() => {});
-}
+const previewMap = typeof fetch === 'function'
+  ? fetch('/title-map').then(response => response.ok ? response.json() : null).catch(() => null)
+  : Promise.resolve(null);
+previewMap.then(map => {
+  if (map) drawMapPreview($('title-map'), map, 0.5, 0.5);
+});

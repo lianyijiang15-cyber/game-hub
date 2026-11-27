@@ -1,0 +1,73 @@
+'use strict';
+
+for (const [job, team] of [['warrior', '紅隊'], ['archer', '藍隊'], ['mage', '藍隊']]) {
+  const ctx = $('menu-' + job).getContext('2d');
+  ctx.translate(20, 46);
+  const color = colors[team];
+  armor(ctx, job, color, 0, 0, false);
+  weapon(ctx, { job, facing: 0 }, color, 0);
+}
+
+// Pixel silhouettes stay sharp at any panel size.
+function paintPixelArt(ctx, x, y, size, palette, rows) {
+  for (const [row, pixels] of rows.entries()) {
+    for (const [col, pixel] of [...pixels].entries()) {
+      if (palette[pixel]) rect(ctx, palette[pixel], x + col * size, y + row * size, size, size);
+    }
+  }
+}
+
+const mysteryArt = $('menu-mystery-art').getContext('2d');
+paintPixelArt(mysteryArt, 46, 0, 4, { O: '#162e35', B: '#d9f9c1', Q: '#347365' }, [
+  '.OOOOOOOOO.',
+  'OBBBBBBBBBO',
+  'OBBBQQQBBBO',
+  'OBBBBBQBBBO',
+  'OBBBBQBBBBO',
+  'OBBBBQBBBBO',
+  'OBBBBBBBBBO',
+  'OBBBBQBBBBO',
+  '.OOOBBOOOO.',
+  '...OBO.....',
+  '...OO......'
+]);
+paintPixelArt(mysteryArt, 0, 30, 6, { O: '#132e32', S: '#367b5a', L: '#68a76f', H: '#a8d982', E: '#182f2d' }, [
+  '....OOOO.......',
+  '..OOLLLLO......',
+  '.OSLLHLLLO..OO.',
+  '.OSLHHLSLO.OHHO',
+  'OSLLHSLLLSOHHEO',
+  'OSLLLSSSLLOHHHO',
+  'OSSSSSSSSSSHHO.',
+  '.OHHHHHHHHHOO..',
+  '..OSO..OSOO....',
+  '..OO...OO......'
+]);
+const menuAvatar = $('menu-avatar').getContext('2d');
+paintPixelArt(menuAvatar, 0, 0, 2, { O: '#301f3e', L: '#a793ca', S: '#72608e', H: '#e2d5f4' }, [
+  '................',
+  '.....OOOOOO.....',
+  '....OLHHHLLO....',
+  '....OLLLLLLO....',
+  '....OLLOOLLO....',
+  '....OLLSSLLO....',
+  '.....OLLLLO.....',
+  '....OOSSSSOO....',
+  '...OLLLLLLLLO...',
+  '..OLLHHLLHHOO...',
+  '..OLLLLLLLLSO...',
+  '..OSSSSSSSSOO...',
+  '...OOOOOOOOO....'
+]);
+
+previewMap.then(map => {
+  if (!map) return;
+  const canvas = $('menu-arena-map');
+  drawMapPreview(canvas, map, 0.31, 0.74);
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.translate(canvas.width * 0.74, canvas.height * 0.83);
+  ctx.scale(3, 3);
+  drawChest(ctx, { x: 0, y: 0, quality: 'legendary', openedAt: null }, 0);
+  ctx.restore();
+});

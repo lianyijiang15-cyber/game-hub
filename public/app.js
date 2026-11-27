@@ -44,10 +44,14 @@ const matchKey = 'game-hub-seat';
 function show(id) {
   for (const panel of ['title-screen', 'home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
   if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading', 'in-results');
-  document.querySelector('header').hidden = id !== 'home';
+  if (id === 'home') $('menu-arena').focus();
+  if (id === 'title-screen') $('title-start').focus();
 }
 
 $('title-start').onclick = () => show('home');
+$('menu-back').onclick = () => show('title-screen');
+$('menu-arena').onclick = openLobby;
+$('menu-soup').onclick = openSoup;
 
 function exitRoom() {
   sessionStorage.removeItem(matchKey);

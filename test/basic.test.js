@@ -42,7 +42,11 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const html = await response.text();
   assert.match(html, /<title>PIXEL CLASH 像素衝突<\/title>/);
   assert.match(html, /id="title-start"[^>]*>TAP TO START<\/button>/);
-  assert.match(html, /<section id="home" hidden>.*海龜湯/s);
+  assert.match(html, /<section id="home" hidden\b[^>]*>/);
+  assert.match(html, /id="menu-soup-name">海龜湯/);
+  assert.match(html, /id="menu-arena-name">像素戰爭/);
+  assert.equal((await fetch(base + '/menu.css')).status, 200);
+  assert.equal((await fetch(base + '/menu-art.js')).status, 200);
   const titleMap = await fetch(base + '/title-map');
   assert.equal(titleMap.status, 200);
   assert.deepEqual(await titleMap.json(), combat.map);

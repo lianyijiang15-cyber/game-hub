@@ -5,13 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
 <link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="menu.css?v=1">
 </head>
 <body>
 <main>
-<header hidden>
-<h1>PIXEL <em>CLASH</em>
-</h1>
-</header>
 <section id="title-screen" aria-labelledby="title-name">
   <canvas id="title-map" width="960" height="540" aria-hidden="true"></canvas>
   <div class="title-interface">
@@ -22,21 +19,49 @@
     <button id="title-start" type="button">TAP TO START</button>
   </div>
 </section>
-<section id="home" hidden>
-<div class="cards">
-<article>
-<div class="symbol">🐢</div>
-<h2>海龜湯</h2>
-<p>單人推理 · 是 / 不是 / 無關 · 三次提示</p>
-<button onclick="openSoup()">開始推理</button>
-</article>
-<article>
-<div class="symbol">⚔️</div>
-<h2>團隊對抗</h2>
-<p>5v5 開放世界死鬥 · 真人與 AI 同場</p>
-<button onclick="openLobby()">建立或加入房間</button>
-</article>
-</div>
+<section id="home" hidden aria-labelledby="menu-heading">
+  <div class="menu-frame">
+    <div class="menu-bar">
+      <h1 id="menu-heading">遊戲選單</h1>
+      <button class="menu-back" id="menu-back" type="button">← 返回標題</button>
+    </div>
+    <div class="menu-grid">
+      <button class="menu-tile menu-arena" id="menu-arena" type="button" aria-labelledby="menu-arena-name">
+        <canvas id="menu-arena-map" width="576" height="640" aria-hidden="true"></canvas>
+        <span class="menu-kicker">5v5 團隊對抗</span>
+        <span class="menu-arena-word menu-arena-pixel" aria-hidden="true">PIXEL</span>
+        <span class="menu-arena-word menu-arena-clash" aria-hidden="true">CLASH</span>
+        <span class="menu-arena-name" id="menu-arena-name">像素戰爭</span>
+        <span class="menu-heroes" aria-hidden="true">
+          <span><canvas id="menu-warrior" width="52" height="52"></canvas></span>
+          <span><canvas id="menu-archer" width="52" height="52"></canvas></span>
+          <span><canvas id="menu-mage" width="52" height="52"></canvas></span>
+        </span>
+        <span class="menu-action" aria-hidden="true">進入對戰 <span>→</span></span>
+      </button>
+      <button class="menu-tile menu-soup" id="menu-soup" type="button" aria-labelledby="menu-soup-name">
+        <span class="menu-kicker">單人推理</span>
+        <span class="menu-soup-word" aria-hidden="true">TURTLE <span>MYSTERY</span></span>
+        <span class="menu-soup-name" id="menu-soup-name">海龜湯</span>
+        <span class="menu-action" aria-hidden="true">開始推理 <span>→</span></span>
+        <canvas id="menu-mystery-art" width="96" height="84" aria-hidden="true"></canvas>
+      </button>
+      <div class="menu-social">
+        <button class="menu-tile menu-history" type="button" disabled>
+          <span class="menu-social-icon menu-trophy" aria-hidden="true"></span>
+          <span>歷史戰績</span><small>籌備中</small>
+        </button>
+        <button class="menu-tile menu-friends" type="button" disabled>
+          <span class="menu-social-icon menu-party" aria-hidden="true"></span>
+          <span>好友</span><small>籌備中</small>
+        </button>
+      </div>
+      <button class="menu-tile menu-profile" type="button" disabled>
+        <span class="menu-avatar" aria-hidden="true"><canvas id="menu-avatar" width="32" height="32"></canvas></span>
+        <span>登入／註冊</span><small>頭像設定 · 籌備中</small>
+      </button>
+    </div>
+  </div>
 </section>
 <section id="soup" hidden>
 <button class="ghost" onclick="home()">← 返回大廳</button>
@@ -227,7 +252,8 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=16"></script>
-<script src="arena-renderer.js?v=16"></script>
+<script src="app.js?v=17"></script>
+<script src="arena-renderer.js?v=17"></script>
+<script src="menu-art.js?v=1"></script>
 </body>
 </html>
