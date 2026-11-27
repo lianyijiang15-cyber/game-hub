@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜開放世界對抗</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <main>
@@ -73,13 +73,17 @@
   </div>
   <p id="room-error" role="status"></p>
   <div id="waiting" class="panel">
-    <section id="class-profile" class="class-select" data-job="warrior" aria-label="個人選角">
+    <section id="class-profile" class="class-select" hidden data-job="warrior" aria-label="個人選角">
       <div class="picker-stage">
         <h3 class="picker-title">選擇出戰職業</h3>
-        <div id="class-options" class="class-options" role="group" aria-label="職業">
-          <button type="button" id="class-warrior" data-job="warrior" aria-pressed="true"><img src="/art/warrior-cutout.webp" alt="" width="220" height="310"><span>戰士</span></button>
-          <button type="button" id="class-archer" data-job="archer" aria-pressed="false"><img src="/art/archer-cutout.webp" alt="" width="220" height="310"><span>弓箭手</span></button>
-          <button type="button" id="class-mage" data-job="mage" aria-pressed="false"><img src="/art/mage-cutout.webp" alt="" width="220" height="310"><span>法師</span></button>
+        <div class="picker-carousel">
+          <button class="class-arrow" id="class-prev" type="button" aria-label="上一個職業">‹</button>
+          <div id="class-options" class="class-options" role="group" aria-label="職業">
+            <button type="button" id="class-warrior" data-job="warrior" data-position="center" aria-pressed="true"><img src="/art/warrior-model.webp" alt="" width="220" height="310"><span>戰士</span></button>
+            <button type="button" id="class-archer" data-job="archer" data-position="right" aria-pressed="false"><img src="/art/archer-model.webp" alt="" width="220" height="310"><span>弓箭手</span></button>
+            <button type="button" id="class-mage" data-job="mage" data-position="left" aria-pressed="false"><img src="/art/mage-model.webp" alt="" width="220" height="310"><span>法師</span></button>
+          </div>
+          <button class="class-arrow" id="class-next" type="button" aria-label="下一個職業">›</button>
         </div>
         <div class="class-copy" aria-live="polite">
           <p id="class-role"></p>
@@ -87,15 +91,16 @@
           <p id="job-description"></p>
           <p class="class-skill"><kbd>Q</kbd> <strong id="class-skill"></strong></p>
         </div>
+        <div id="selection-team" class="selection-team" aria-label="同隊角色"></div>
         <div class="ready-actions">
-          <button id="ready">遊戲開始</button>
+          <button id="ready">確認選角</button>
           <button id="start" hidden>遊戲開始</button>
           <button id="unlock" class="ghost" hidden>重新選角</button>
           <p id="start-help" role="status"></p>
         </div>
       </div>
       <aside class="class-sheet" aria-label="職業美術與能力">
-        <img id="class-art" src="/art/warrior-cutout.webp" alt="戰士立繪" width="220" height="310" fetchpriority="high">
+        <img id="class-art" src="/art/warrior-key-art.webp" alt="戰士立繪" width="220" height="310" fetchpriority="high">
         <div id="class-chart" class="class-chart" role="img" aria-label="職業能力雷達圖">
           <span class="axis-hp">生命</span><span class="axis-speed">速度</span>
           <span class="axis-range">射程</span><span class="axis-damage">傷害</span><span class="axis-rate">攻速</span>
@@ -110,6 +115,7 @@
         </dl>
       </aside>
     </section>
+    <section id="room-waiting" aria-label="等待大廳">
     <h3 id="seat-count"></h3>
     <div id="players" aria-label="玩家席位"></div>
     <div class="bot-settings">
@@ -119,6 +125,10 @@
         <button id="fill-bots">一鍵補滿 AI</button>
       </div>
     </div>
+      <button id="lobby-ready">準備</button>
+      <button id="lobby-start">開始遊戲</button>
+      <p id="lobby-help" class="muted" role="status"></p>
+    </section>
   </div>
   <section id="match-loading" class="match-loading" aria-labelledby="loading-title" hidden>
     <h2 id="loading-title">即將進入對戰</h2>
@@ -169,7 +179,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=7"></script>
-<script src="arena-renderer.js?v=7"></script>
+<script src="app.js?v=8"></script>
+<script src="arena-renderer.js?v=8"></script>
 </body>
 </html>

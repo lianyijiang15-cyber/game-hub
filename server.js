@@ -19,7 +19,7 @@ const seats = 10;
 const maxRooms = 50;
 const reconnectWindow = 45000;
 const loadingDuration = process.env.NODE_ENV === 'test' ? 200 : 3500;
-const matchActive = room => room.phase === 'loading' || room.phase === 'playing';
+const matchActive = room => room.phase === 'selection' || room.phase === 'loading' || room.phase === 'playing';
 const channel = room => 'arena:' + room.id;
 const now = () => Math.floor(performance.now());
 
@@ -30,11 +30,12 @@ function list(target = io) {
 }
 
 function roomState(room, viewerId) {
+  const viewer = room.players.find(player => player.id === viewerId);
   return {
     id: room.id, host: room.host, size: seats, phase: room.phase,
     loadingRemaining: Math.max(0, (room.loadingUntil ?? 0) - now()),
     players: room.players.map(({ id, name, job, ready, bot, team }) => ({
-      id, name, ready, bot, ...(room.phase === 'loading' ? { job, team } : id === viewerId ? { job } : {})
+      id, name, ready, bot, ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, team } : id === viewerId ? { job } : {})
     }))
   };
 }
@@ -258,21 +259,32 @@ io.on('connection', socket => {
     publish(room);
   });
   command('chooseClass', (job, { room, player }) => {
-    if (room?.phase !== 'lobby' || player.ready || !combat.jobs.includes(job)) return { error: '目前無法選擇此職業' };
+    if (room?.phase !== 'selection' || player.ready || !combat.jobs.includes(job)) return { error: '目前無法選擇此職業' };
     player.job = job;
     player.ready = false;
     publish(room);
   });
   command('ready', (_, { room, player }) => {
-    if (room?.phase !== 'lobby') return { error: '目前無法切換準備狀態' };
+    if (room?.phase !== 'lobby' && room?.phase !== 'selection') return { error: '目前無法切換準備狀態' };
     player.ready = !player.ready;
     publish(room);
   });
-  hostCommand('start', 'lobby', room => {
+  command('start', (_, { room }) => {
+    if (!room || room.host !== socket.id || !['lobby', 'selection'].includes(room.phase)) {
+      return { error: '此操作目前僅限房主使用' };
+    }
     if (room.players.length !== seats || !room.players.every(player => player.ready)) {
       return { error: '需要 10 名已準備玩家' };
     }
-    runMatch(room);
+    if (room.phase === 'selection') {
+      runMatch(room);
+      return;
+    }
+    combat.assignTeams(room.players);
+    room.phase = 'selection';
+    room.map = null;
+    room.players.forEach(player => { player.ready = player.bot; });
+    publish(room);
   });
   hostCommand('returnLobby', 'ended', room => {
     clearTimeout(room.expiry);

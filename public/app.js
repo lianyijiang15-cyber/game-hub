@@ -40,7 +40,7 @@ const matchKey = 'game-hub-seat';
 
 function show(id) {
   for (const panel of ['home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
-  if (id !== 'game') $('game').classList.remove('in-combat');
+  if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection');
   document.querySelector('header').hidden = id !== 'home';
 }
 
@@ -136,7 +136,7 @@ function renderRoomList() {
   list.replaceChildren();
   if (!listedRooms.length) list.append(element('p', '目前沒有房間'));
   for (const entry of listedRooms) {
-    const label = { lobby: '等待中', loading: '載入中', playing: '對戰中', ended: '已結束' }[entry.phase];
+    const label = { lobby: '等待中', selection: '選角中', loading: '載入中', playing: '對戰中', ended: '已結束' }[entry.phase];
     const row = element('p', `${entry.id} · ${entry.count}/${entry.size} · ${label} `);
     if (entry.phase === 'lobby' && entry.count < entry.size) {
       const join = element('button', '加入');
@@ -158,7 +158,7 @@ function renderClass(job) {
   const profile = $('class-profile');
   if (profile.dataset.job !== job || !$('class-role').textContent) {
     const art = $('class-art');
-    art.src = `/art/${job}-cutout.webp`;
+    art.src = `/art/${job}-key-art.webp`;
     art.alt = jobNames[job] + '立繪';
   }
   profile.dataset.job = job;
@@ -180,10 +180,12 @@ function renderClass(job) {
   $('class-skill').textContent = skills[job];
   for (const [id, button] of Object.entries(classButtons)) {
     button.setAttribute('aria-pressed', String(id === job));
+    button.dataset.position = ['center', 'right', 'left'][(classOrder.indexOf(id) - classOrder.indexOf(job) + classOrder.length) % classOrder.length];
   }
 }
 
-const classButtons = Object.fromEntries(Object.keys(classDetails).map(job => [
+const classOrder = Object.keys(classDetails);
+const classButtons = Object.fromEntries(classOrder.map(job => [
   job, $('class-' + job)
 ]));
 for (const [job, button] of Object.entries(classButtons)) {
@@ -191,6 +193,15 @@ for (const [job, button] of Object.entries(classButtons)) {
     if ($('class-profile').dataset.job !== job) sendRoomCommand('chooseClass', job);
   };
 }
+
+function rotateClass(direction) {
+  if ($('class-prev').disabled) return;
+  const current = classOrder.indexOf($('class-profile').dataset.job);
+  const job = classOrder[(current + direction + classOrder.length) % classOrder.length];
+  sendRoomCommand('chooseClass', job);
+}
+$('class-prev').onclick = () => rotateClass(-1);
+$('class-next').onclick = () => rotateClass(1);
 
 function renderLoading(state) {
   loadingDeadline = performance.now() + state.loadingRemaining;
@@ -217,22 +228,53 @@ function renderRoom(state) {
   if (!me) return;
   const host = state.host === socket.id;
   const waiting = state.phase === 'lobby';
+  const selecting = state.phase === 'selection';
   if (phase !== state.phase) {
     stopMovement();
-    $('messages').replaceChildren();
+    if (phase === 'lobby' || waiting || state.phase === 'ended') $('messages').replaceChildren();
     if (state.phase === 'playing' || waiting) frame = previous = null;
     if (state.phase === 'loading') worldMap = null;
   }
   phase = state.phase;
-  $('waiting').hidden = !waiting;
+  $('waiting').hidden = !(waiting || selecting);
+  $('room-waiting').hidden = !waiting;
+  $('class-profile').hidden = !selecting;
   $('match-loading').hidden = phase !== 'loading';
   if (phase === 'loading') renderLoading(state);
   $('battle').hidden = phase !== 'playing';
   $('game').classList.toggle('in-combat', phase === 'playing');
+  $('game').classList.toggle('in-selection', selecting);
   $('results').hidden = phase !== 'ended';
   $('chat-title').textContent = waiting ? '房間聊天' : '隊伍聊天';
   $('return-lobby').hidden = $('rematch').hidden = !host;
   $('results-note').textContent = host ? '' : '等待房主返回大廳或開始下一局。';
+  const full = state.players.length === state.size;
+  const unready = state.players.filter(player => !player.ready).length;
+  if (selecting) {
+    renderClass(me.job);
+    for (const button of Object.values(classButtons)) button.disabled = me.ready;
+    $('class-prev').disabled = $('class-next').disabled = me.ready;
+    $('ready').hidden = me.ready;
+    $('unlock').hidden = !me.ready;
+    $('start').hidden = !host || !me.ready;
+    $('start').disabled = !full || unready > 0;
+    $('start-help').textContent = !me.ready ? '選好後按「確認選角」' :
+      unready ? `等待 ${unready} 名玩家確認職業` : host ? '全員已確認，可以開局' : '全員已確認，等待房主開局';
+    const team = $('selection-team');
+    team.replaceChildren();
+    for (const player of state.players.filter(entry => entry.team && entry.team === me.team)) {
+      const tile = element('div', '');
+      tile.className = 'selection-teammate';
+      tile.dataset.ready = String(player.ready);
+      const art = element('img', '');
+      art.src = `/art/${player.job}-avatar.webp`;
+      art.alt = '';
+      tile.append(art, element('strong', player.name),
+        element('small', jobNames[player.job] + (player.ready ? ' · 已確認' : ' · 選角中')));
+      team.append(tile);
+    }
+    return;
+  }
   if (!waiting) return;
   $('seat-count').textContent = `玩家 ${state.players.length}/${state.size}`;
   $('players').replaceChildren();
@@ -240,20 +282,11 @@ function renderRoom(state) {
     const tile = element('div', '');
     tile.className = 'player-tile';
     tile.dataset.ready = String(player.ready);
-    if (player.id === me.id) {
-      const avatar = element('img', '');
-      avatar.className = 'player-avatar';
-      avatar.src = `/art/${me.job}-avatar.webp`;
-      avatar.alt = '';
-      avatar.width = avatar.height = 88;
-      tile.append(avatar);
-    } else {
-      const badge = element('span', player.bot ? 'AI' : '?');
-      badge.className = 'private-avatar';
-      tile.append(badge);
-    }
+    const badge = element('span', player.bot ? 'AI' : '玩家');
+    badge.className = 'private-avatar';
+    tile.append(badge);
     tile.append(element('strong', player.name),
-      element('small', `${player.id === me.id ? '你 · ' : ''}${player.ready ? '已準備' : '選角中'}${player.id === state.host ? ' · 房主' : ''}`));
+      element('small', `${player.id === me.id ? '你 · ' : ''}${player.ready ? '已準備' : '未準備'}${player.id === state.host ? ' · 房主' : ''}`));
     if (host && player.bot) {
       const remove = element('button', '移除 AI');
       remove.className = 'ghost';
@@ -268,26 +301,23 @@ function renderRoom(state) {
     empty.append(element('span', '+'), element('small', '空位'));
     $('players').append(empty);
   }
-  renderClass(me.job);
-  for (const button of Object.values(classButtons)) button.disabled = me.ready;
-  const full = state.players.length === state.size;
   const bots = state.players.filter(player => player.bot).length;
   $('bot-controls').hidden = !host;
   $('add-bot').disabled = $('fill-bots').disabled = full;
   $('bot-summary').textContent = `${bots} 名 AI · ${state.size - state.players.length} 個空位`;
   $('bot-help').textContent = host ? '用 AI 補足空位，單人也能開局。' : '由房主加入或移除 AI。';
-  const unready = state.players.filter(player => !player.ready).length;
-  $('ready').hidden = me.ready;
-  $('unlock').hidden = !me.ready;
-  $('start').hidden = !host || !me.ready;
-  $('start').disabled = !full || unready > 0;
-  $('start-help').textContent = !full ? `還有 ${state.size - state.players.length} 個空位` :
-    !me.ready ? '按「遊戲開始」確認職業' :
-    unready ? `等待 ${unready} 名玩家準備` : host ? '全員就緒，可以開局' : '全員就緒，等待房主開局';
+  $('lobby-ready').textContent = me.ready ? '取消準備' : '準備';
+  $('lobby-start').hidden = !host;
+  $('lobby-start').disabled = !full || unready > 0;
+  $('lobby-help').textContent = !full ? `還有 ${state.size - state.players.length} 個空位` :
+    unready ? `等待 ${unready} 名玩家準備` : '全員就緒，等待房主進入選角';
+
 }
 socket.on('room', renderRoom);
 $('add-bot').onclick = () => sendRoomCommand('addBot');
 $('fill-bots').onclick = () => sendRoomCommand('fillBots');
+$('lobby-ready').onclick = () => sendRoomCommand('ready');
+$('lobby-start').onclick = () => sendRoomCommand('start');
 $('ready').onclick = () => sendRoomCommand('ready');
 $('unlock').onclick = () => sendRoomCommand('ready');
 $('start').onclick = () => sendRoomCommand('start');
@@ -356,6 +386,11 @@ window.addEventListener('keydown', event => {
   if (event.code === 'Enter' && !event.repeat && event.target.tagName !== 'BUTTON') {
     event.preventDefault();
     $('chat-input').focus();
+  }
+  if (phase === 'selection' && (event.code === 'ArrowLeft' || event.code === 'ArrowRight')) {
+    event.preventDefault();
+    if (!event.repeat) rotateClass(event.code === 'ArrowLeft' ? -1 : 1);
+    return;
   }
   if (phase !== 'playing') return;
   if (movement.has(event.code)) {

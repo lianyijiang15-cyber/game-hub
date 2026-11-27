@@ -91,17 +91,24 @@ function spawn(room, player, now) {
   player.respawnAt = now + 50;
 }
 
+function assignTeams(players) {
+  const order = [...players].sort((a, b) => Number(a.bot) - Number(b.bot));
+  order.forEach((player, index) => {
+    player.team = teams[index % 2];
+    player.slot = Math.floor(index / 2);
+  });
+}
+
 function start(room, now, seed) {
+  if (room.phase !== 'selection') assignTeams(room.players);
   Object.assign(room, {
     phase: 'playing', map: seed === undefined ? map : generateWorld(seed), score: { [teams[0]]: 0, [teams[1]]: 0 }, effects: [],
     projectiles: [], kills: [], sequence: 0, endsAt: now + 300000, winner: null
   });
   room.roster = [...room.players];
-  // Spread humans across both sides, then assign the remaining seats to bots.
-  room.roster.sort((a, b) => Number(a.bot) - Number(b.bot));
-  room.roster.forEach((player, index) => {
+  room.roster.forEach(player => {
     Object.assign(player, {
-      team: teams[index % 2], slot: Math.floor(index / 2), alive: false,
+      alive: false,
       kills: 0, deaths: 0, damage: 0, route: null, routeAt: 0, lastSeen: null, patrolHome: false
     });
   });
@@ -243,4 +250,4 @@ function snapshot(room, now, viewer = null) {
   };
 }
 
-module.exports = { map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee };
+module.exports = { map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams };

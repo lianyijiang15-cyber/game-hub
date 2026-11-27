@@ -37,7 +37,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     };
   }
   for (const [, id] of read('index.html').matchAll(/id="([^"]+)"/g)) elements.set(id, element());
-  const hostPlayer = { id: 'self', name: 'Tester', job: 'mage', ready: false, bot: false };
+  const hostPlayer = { id: 'self', name: 'Tester', job: 'warrior', ready: false, bot: false };
   const bot = index => ({ id: 'bot-' + index, name: 'AI ' + index, job: 'archer', ready: true, bot: true });
   const roster = { id: 'ABCDE0', host: 'self', phase: 'lobby', size: 10, players: [hostPlayer] };
   const socket = {
@@ -55,9 +55,11 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
         }
         if (event === 'ready') hostPlayer.ready = !hostPlayer.ready;
         if (event === 'start') {
-          roster.phase = 'loading';
+          const waiting = roster.phase === 'lobby';
+          roster.phase = waiting ? 'selection' : 'loading';
           roster.loadingRemaining = 3500;
           roster.players.forEach((p, i) => { p.team = i < 5 ? '紅隊' : '藍隊'; });
+          if (waiting) hostPlayer.ready = false;
         }
         args.at(-1)(null, { id: 'ABCDE0', room: roster });
       } };
@@ -128,16 +130,31 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[0], 'fillBots');
   assert.equal(elements.get('bot-summary').textContent, '9 名 AI · 0 個空位');
   assert.equal(elements.get('fill-bots').disabled, true);
+  assert.equal(elements.get('class-profile').hidden, true);
+  assert.equal(elements.get('lobby-start').disabled, true);
+  elements.get('lobby-ready').onclick();
+  assert.equal(elements.get('lobby-start').disabled, false);
+  elements.get('lobby-start').onclick();
+  assert.equal(elements.get('class-profile').hidden, false);
+  assert.equal(elements.get('room-waiting').hidden, true);
+  assert.equal(elements.get('chat-title').textContent, '隊伍聊天');
+  assert.equal(elements.get('selection-team').children.length, 5);
   assert.equal(elements.get('start').disabled, true);
-  elements.get('class-archer').onclick();
+  elements.get('class-next').onclick();
   assert.deepEqual(emitted.at(-1), ['chooseClass', 'archer']);
-  assert.equal(elements.get('class-art').src, '/art/archer-cutout.webp');
+  assert.equal(elements.get('class-art').src, '/art/archer-key-art.webp');
   assert.equal(elements.get('class-name').textContent, '弓箭手');
-  assert.equal(elements.get('players').children[0].children[0].src, '/art/archer-avatar.webp');
-  elements.get('class-mage').onclick();
-  assert.equal(elements.get('class-art').src, '/art/mage-cutout.webp');
+  assert.equal(elements.get('selection-team').children[0].children[0].src, '/art/archer-avatar.webp');
+  assert.equal(elements.get('class-archer').dataset.position, 'center');
+  assert.equal(elements.get('class-warrior').dataset.position, 'left');
+  elements.get('class-prev').onclick();
+  assert.equal(elements.get('class-art').src, '/art/warrior-key-art.webp');
+  elements.get('class-prev').onclick();
+  assert.equal(elements.get('class-art').src, '/art/mage-key-art.webp');
+  assert.equal(elements.get('class-mage').dataset.position, 'center');
   elements.get('ready').onclick();
   assert.deepEqual(emitted.at(-1), ['ready']);
+  assert.equal(elements.get('class-next').disabled, true);
   assert.equal(elements.get('start').disabled, false);
   elements.get('start').onclick();
   assert.deepEqual(emitted.at(-1), ['start']);
