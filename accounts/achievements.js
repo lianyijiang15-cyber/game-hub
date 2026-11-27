@@ -58,7 +58,7 @@ function achievementCatalog(account) {
     if (item.count >= item.goal) return [item];
     if (item.rarity === 'legendary') return [];
     if (item.rarity === 'hidden') return [{ rarity: item.rarity, hint: item.hint, count: 0, goal: 1 }];
-    return [{ id: item.id, rarity: item.rarity, count: item.count, goal: item.goal }];
+    return [{ id: item.id, description: item.description, rarity: item.rarity, count: item.count, goal: item.goal }];
   });
   return { arena: redact(arena), soup: redact(soup), coins };
 }

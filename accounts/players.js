@@ -19,6 +19,27 @@ function playerId(accounts) {
   return id;
 }
 
+function validAvatar(photo) {
+  if (typeof photo !== 'string' || photo.length > 24000 ||
+      !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(photo)) return false;
+  const jpeg = Buffer.from(photo.slice('data:image/jpeg;base64,'.length), 'base64');
+  if (jpeg.length < 12 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8 ||
+      jpeg.at(-2) !== 0xff || jpeg.at(-1) !== 0xd9) return false;
+  for (let offset = 2; offset + 4 <= jpeg.length && jpeg[offset] === 0xff;) {
+    const marker = jpeg[offset + 1];
+    const size = jpeg.readUInt16BE(offset + 2);
+    if (size < 2 || offset + 2 + size > jpeg.length || marker === 0xda) return false;
+    if (marker === 0xc0 || marker === 0xc2) {
+      if (size < 8) return false;
+      const height = jpeg.readUInt16BE(offset + 5);
+      const width = jpeg.readUInt16BE(offset + 7);
+      return width > 0 && width <= 128 && height > 0 && height <= 128;
+    }
+    offset += size + 2;
+  }
+  return false;
+}
+
 function mountPlayerRoutes(router, store, session, setSessionProfile) {
   function route(method, path, action, needsProfile = true) {
     router[method](path, (req, res, next) => {
@@ -48,6 +69,23 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
     setSessionProfile(user.key, result.profile);
     return res.json(result);
   }, false);
+
+  route('get', '/avatar', async (_req, res, user) => {
+    const account = (await store.read())[user.key];
+    res.set('Cache-Control', 'private, no-store').json({ photo: account.avatar ?? null });
+  });
+
+  route('post', '/avatar', async (req, res, user) => {
+    const photo = req.body?.photo;
+    if (photo !== null && !validAvatar(photo)) return res.status(400).json({ error: '這張圖片格式不正確或檔案過大。' });
+    await store.update(accounts => {
+      const account = accounts[user.key];
+      if (photo === null) delete account.avatar;
+      else account.avatar = photo;
+      return { changed: true };
+    });
+    res.json({ photo });
+  });
 
   route('get', '/achievements', async (_req, res, user) => {
     const account = (await store.read())[user.key];

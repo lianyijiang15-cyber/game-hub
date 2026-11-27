@@ -49,6 +49,10 @@ test('account validation, persistence, login, cookie and revocation', async t =>
     assert.equal((await request('register', { ...credentials, username })).status, 400);
   }
   assert.equal((await request('register', { ...credentials, password: 'short7' })).status, 400);
+  assert.equal((await request('register', { ...credentials, password: 'A'.repeat(49) })).status, 400);
+  assert.equal((await request('register', { username: 'ShortPass8', password: '12345678' })).status, 201);
+  assert.equal((await request('login', { username: 'ShortPass8', password: '12345678' })).status, 200);
+  assert.equal((await request('register', { username: 'LongPass48', password: 'X'.repeat(48) })).status, 201);
   assert.equal((await request('register', credentials, { Origin: 'https://example.test' })).status, 403);
 
   const registered = await Promise.all([
@@ -101,6 +105,16 @@ test('account validation, persistence, login, cookie and revocation', async t =>
   const { profile: second } = await (await request('profile', { name: '月光弓手' }, secondHeaders)).json();
   assert.match(second.id, /^[A-Z]{2}\d{6}$/);
   assert.notEqual(second.id, first.id);
+
+  const avatar = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCUAomv/9k=';
+  assert.equal((await request('avatar', { photo: avatar })).status, 401);
+  assert.equal((await request('avatar', { photo: 'data:image/svg+xml;base64,PHN2Zy8+' }, headers)).status, 400);
+  assert.deepEqual(await (await request('avatar', { photo: avatar }, headers)).json(), { photo: avatar });
+  const avatarResponse = await request('avatar', undefined, headers);
+  assert.match(avatarResponse.headers.get('cache-control'), /no-store/);
+  assert.deepEqual(await avatarResponse.json(), { photo: avatar });
+  assert.deepEqual(await (await request('avatar', undefined, secondHeaders)).json(), { photo: null });
+  assert.deepEqual(await (await request('avatar', { photo: null }, headers)).json(), { photo: null });
 
   const sent = await request('friends/request', { by: 'name', query: second.name }, headers);
   assert.equal(sent.status, 201);

@@ -17,6 +17,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   let narration;
   const narrationTimers = new Map();
   let wallTime = 100;
+  let pointerCapture;
   const canvasContext = {
     fillRect() { pixelDraws++; },
     createRadialGradient() { return { addColorStop() {} }; }
@@ -37,6 +38,9 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
       setAttribute(name, value) { this[name] = value; },
       append(...items) { this.children.push(...items); },
       replaceChildren(...items) { this.children = items; },
+      setPointerCapture(id) { pointerCapture = id; },
+      hasPointerCapture(id) { return pointerCapture === id; },
+      releasePointerCapture() { pointerCapture = null; },
       getContext() { return canvasContext; },
       getBoundingClientRect() { return { width: 480, height: 288, left: 0, top: 0 }; },
       matches() { return false; },
@@ -90,6 +94,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     },
     window: {
       addEventListener(event, handler) { keyHandlers.set(event, handler); },
+      matchMedia() { return { matches: true }; },
       SpeechSynthesisUtterance: class { constructor(text) { this.text = text; } },
       speechSynthesis: {
         getVoices: () => [{ lang: 'zh-TW' }],
@@ -323,6 +328,16 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[1].x, 1);
   keyHandlers.get('keyup')(keyboard('KeyD'));
   assert.equal(emitted.at(-1)[1].x, 0);
+  const pad = elements.get('touch-movement');
+  assert.equal(pad.hidden, false);
+  const touch = { pointerId: 7, pointerType: 'touch', clientX: 400, clientY: 144, preventDefault() {} };
+  pad.onpointerdown(touch);
+  assert.deepEqual(Array.from(Object.values(emitted.at(-1)[1])), [1, 0]);
+  pad.onpointermove({ ...touch, clientX: 240, clientY: 40 });
+  assert.equal(emitted.at(-1)[1].y, -1);
+  pad.onpointercancel(touch);
+  assert.deepEqual(Array.from(Object.values(emitted.at(-1)[1])), [0, 0]);
+  assert.equal(pointerCapture, null);
   arena.onpointerdown({ button: 0, clientX: 90, clientY: 45 });
   assert.equal(emitted.at(-1)[0], 'arenaAttack');
   assert.equal(emitted.at(-1)[1].x, vm.runInContext('arenaCamera.x + 180 / arenaZoom', context));
@@ -421,6 +436,7 @@ test('account menu presents registration, achievements, detailed records and fri
   function node() {
     return {
       value: '', children: [], focus() {},
+      removeAttribute(name) { delete this[name]; },
       setAttribute(name, value) { this[name] = value; },
       showModal() { this.open = true; },
       close() { this.open = false; this.onclose?.(); },
@@ -493,7 +509,7 @@ test('account menu presents registration, achievements, detailed records and fri
   assert.equal(find('arena-achievements').children[0]['data-unlocked'], 'false');
   assert.equal(find('soup-achievements').children[0]['data-unlocked'], 'true');
   const hiddenBadge = find('arena-achievements').children[0].children[0];
-  assert.equal(hiddenBadge.textContent, '?');
+  assert.equal(hiddenBadge.children[0].textContent, '?');
   hiddenBadge.onclick();
   assert.match(find('achievement-detail').children[1].textContent, /樹根/);
   find('soup-achievements').children[0].children[0].onclick();

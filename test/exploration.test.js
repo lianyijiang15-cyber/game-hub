@@ -60,6 +60,8 @@ test('achievement catalog redacts unknown entries and derives unlocks and coin r
   assert.ok(unknown.arena.every(item => !item.title));
   assert.ok(unknown.soup.every(item => !item.reward));
   assert.ok(!unknown.arena.some(item => item.id === 'finisher'));
+  assert.equal(unknown.arena.find(item => item.id === 'first-match').description, '完成一場像素衝突對局。');
+  assert.ok(unknown.soup.every(item => item.rarity !== 'hidden' || item.hint && !item.description));
   const record = { result: 'win', mode: 'deathmatch', kills: 5, deaths: 0, chestsOpened: 50, finisher: true, finished: true };
   const value = achievementCatalog({ arenaHistory: [record, record], secrets: { 'snow-secret': 'found' } });
   assert.equal(value.coins, 100);

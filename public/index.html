@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
-<link rel="stylesheet" href="style.css?v=22">
+<link rel="stylesheet" href="style.css?v=23">
 <link rel="stylesheet" href="menu.css?v=3">
-<link rel="stylesheet" href="account.css?v=4">
+<link rel="stylesheet" href="account.css?v=5">
 <link rel="stylesheet" href="casebook.css?v=4">
 </head>
 <body>
+<button id="sound-toggle" type="button" aria-pressed="true" aria-label="遊戲音效及音樂">♪ <span>音效</span></button>
 <main>
 <section id="title-screen" aria-labelledby="title-name">
   <canvas id="title-map" width="960" height="540" aria-hidden="true"></canvas>
@@ -60,7 +61,7 @@
         </button>
       </div>
       <button class="menu-tile menu-profile" id="menu-profile" type="button" aria-haspopup="dialog">
-        <span class="menu-avatar" aria-hidden="true"><canvas id="menu-avatar" width="32" height="32"></canvas></span>
+        <span class="menu-avatar" aria-hidden="true"><canvas id="menu-avatar" width="32" height="32"></canvas><img id="menu-avatar-photo" alt="" hidden></span>
         <span id="profile-name">登入／註冊</span><small id="profile-status">玩家帳號</small>
       </button>
     </div>
@@ -109,11 +110,11 @@
       autocapitalize="none" spellcheck="false" aria-describedby="account-username-help">
     <small id="account-username-help">3–24 個英數字元，至少各有一個英文字母和數字。</small>
     <label for="account-password">密碼</label>
-    <input id="account-password" name="password" type="password" required minlength="15" maxlength="128"
+    <input id="account-password" name="password" type="password" required minlength="8" maxlength="128"
       autocomplete="current-password" aria-describedby="account-password-help">
-    <small id="account-password-help">15–128 個字元，可使用空白及符號。</small>
+    <small id="account-password-help">8–48 個字元，可使用空白及符號。</small>
     <label id="account-confirm-label" for="account-confirm" hidden>再輸入一次密碼</label>
-    <input id="account-confirm" type="password" autocomplete="new-password" maxlength="128" hidden disabled>
+    <input id="account-confirm" type="password" autocomplete="new-password" minlength="8" maxlength="48" hidden disabled>
     <button id="account-submit" type="submit">登入</button>
   </form>
   <div id="account-signed-in" hidden>
@@ -124,6 +125,12 @@
         placeholder="輸入尚未被使用的名稱">
       <button id="account-save-name" type="submit">儲存名稱</button>
     </form>
+    <div id="account-avatar-actions" hidden>
+      <img id="account-avatar-preview" alt="目前的自訂頭像" hidden>
+      <label for="account-avatar-file">頭像照片</label>
+      <input id="account-avatar-file" type="file" accept="image/*">
+      <button id="account-avatar-reset" type="button" hidden>恢復預設頭像</button>
+    </div>
     <button id="account-logout" type="button">登出</button>
   </div>
   <p id="account-message" role="status"></p>
@@ -387,6 +394,7 @@
       <canvas id="arena" width="960" height="576" aria-label="開放世界團隊對抗地圖"></canvas>
       <p id="respawn" hidden></p>
     </div>
+    <div id="touch-movement" aria-label="觸控移動搖桿" hidden><span id="touch-stick" aria-hidden="true"></span></div>
     <aside class="arena-minimap" aria-label="小地圖">
       <button id="map-preview" type="button" aria-label="開啟戰術地圖">
         <canvas id="minimap" width="160" height="160" aria-hidden="true"></canvas>
@@ -407,7 +415,7 @@
       <button id="mode-antidote" type="button" hidden>使用解藥 [F]</button>
     </div>
     <button id="mode-interact" type="button" hidden></button>
-    <p id="chest-prompt" hidden><kbd>E</kbd> 開啟寶箱</p>
+    <button type="button" id="chest-prompt" hidden><kbd>E</kbd> 開啟寶箱</button>
     <div class="loot-bar">
       <p id="loot-toast" role="status" hidden></p>
       <p id="buff-status" hidden></p>
@@ -477,11 +485,12 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=4"></script>
 <script src="heroes.js?v=4"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 <script src="arena-renderer.js?v=23"></script>
 <script src="menu-art.js?v=5"></script>
 <script src="arena-guide.js?v=2"></script>
-<script src="account.js?v=3"></script>
-<script src="player-panel.js?v=5"></script>
+<script src="account.js?v=4"></script>
+<script src="game-audio.js?v=1"></script>
+<script src="player-panel.js?v=6"></script>
 </body>
 </html>

@@ -29,7 +29,12 @@ const showPlayerPanel = (() => {
       const label = unlocked ? item.title : rarity === 'hidden' ? '隱藏成就' : '未解鎖成就';
       row.setAttribute('data-unlocked', String(unlocked));
       row.setAttribute('data-rarity', rarity);
-      const button = element('button', unlocked ? glyphs[index % glyphs.length] : '?');
+      const button = element('button', '');
+      const icon = element('span', unlocked ? glyphs[index % glyphs.length] : '?');
+      icon.className = 'achievement-emblem';
+      icon.setAttribute('aria-hidden', 'true');
+      button.append(icon);
+      if (unlocked) button.append(element('small', item.title));
       button.type = 'button';
       button.setAttribute('aria-label', label);
       button.setAttribute('aria-pressed', 'false');
@@ -39,7 +44,8 @@ const showPlayerPanel = (() => {
         button.setAttribute('aria-pressed', 'true');
         const lines = unlocked
           ? [element('p', item.description), element('p', '獎勵　' + item.reward)]
-          : [element('p', rarity === 'hidden' ? item.hint : `進度 ${item.count} / ${item.goal}`)];
+          : rarity === 'hidden' ? [element('p', item.hint)]
+            : [element('p', item.description ?? ''), element('p', `進度 ${item.count} / ${item.goal}`)];
         detail.replaceChildren(element('strong', label), ...lines);
       };
       row.append(button);

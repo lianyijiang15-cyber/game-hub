@@ -98,8 +98,8 @@ function createAccountRouter(file) {
       if (typeof username !== 'string' || !usernamePattern.test(username)) {
         return res.status(400).json({ error: '帳號須為 3 至 24 個英數字元，且至少各含一個英文字母與數字。' });
       }
-      if (typeof password !== 'string' || password.length < 15 || password.length > 128) {
-        return res.status(400).json({ error: '密碼須為 15 至 128 個字元。' });
+      if (typeof password !== 'string' || password.length < 8 || password.length > (register ? 48 : 128)) {
+        return res.status(400).json({ error: '密碼須為 8 至 48 個字元。' });
       }
 
       const key = username.toLowerCase();
@@ -177,6 +177,7 @@ function createAccountRouter(file) {
     }
     next();
   });
+  router.use('/avatar', json({ limit: '26kb' }));
   router.use(json({ limit: '4kb' }));
   router.get('/session', (req, res) => {
     const loggedIn = session(req);

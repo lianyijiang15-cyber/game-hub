@@ -32,7 +32,8 @@ async function accountRequest(route, body) {
 
   let mode = 'login';
   let busy = false;
-  const actionButtons = ['account-close', 'account-login', 'account-register', 'account-submit', 'account-logout', 'account-save-name'];
+  let avatar = null;
+  const actionButtons = ['account-close', 'account-login', 'account-register', 'account-submit', 'account-logout', 'account-save-name', 'account-avatar-file', 'account-avatar-reset'];
 
   function renderAccount() {
     const { username: currentUser, profile } = playerAccount;
@@ -41,6 +42,15 @@ async function accountRequest(route, body) {
     $('account-current').textContent = profile?.name ?? '';
     $('account-player-id').textContent = profile?.id ?? '';
     $('account-profile-info').hidden = !profile;
+    $('account-avatar-actions').hidden = !profile;
+    for (const id of ['account-avatar-preview', 'menu-avatar-photo']) {
+      const picture = $(id);
+      picture.hidden = !avatar;
+      if (avatar) picture.src = avatar;
+      else picture.removeAttribute('src');
+    }
+    $('menu-avatar').hidden = Boolean(avatar);
+    $('account-avatar-reset').hidden = !avatar;
     $('account-name-form').hidden = !currentUser || Boolean(profile);
     $('account-signed-in').hidden = !currentUser;
     $('account-modes').hidden = Boolean(currentUser);
@@ -52,6 +62,7 @@ async function accountRequest(route, body) {
     $('account-confirm-label').hidden = confirmation.hidden = confirmation.disabled = !register;
     confirmation.required = register;
     password.autocomplete = register ? 'new-password' : 'current-password';
+    password.maxLength = register ? 48 : 128;
     submit.textContent = register ? '建立帳號' : '登入';
   }
 
@@ -86,9 +97,24 @@ async function accountRequest(route, body) {
     }
   }
 
+  async function loadAvatar() {
+    if (!playerAccount.profile) return;
+    const id = playerAccount.profile.id;
+    try {
+      const { photo } = await accountRequest('avatar');
+      if (playerAccount.profile?.id === id) {
+        avatar = photo;
+        renderAccount();
+      }
+    } catch {
+      // The default portrait still works if the saved photo is temporarily unavailable.
+    }
+  }
+
   const initialSession = accountRequest('session').then(result => {
     Object.assign(playerAccount, result);
     renderAccount();
+    return loadAvatar();
   }).catch(() => {});
 
   function openAccount() {
@@ -139,7 +165,10 @@ async function accountRequest(route, body) {
         renderAccount();
         message.textContent = '';
         socket.disconnect().connect();
-        if (playerAccount.profile) dialog.close();
+        if (playerAccount.profile) {
+          dialog.close();
+          await loadAvatar();
+        }
         else $('account-player-name').focus();
       }
     });
@@ -147,6 +176,7 @@ async function accountRequest(route, body) {
 
   $('account-logout').onclick = () => runAccountAction(async () => {
     await accountRequest('logout', {});
+    avatar = null;
     Object.assign(playerAccount, { username: null, profile: null });
     $('nickname').value = '';
     socket.disconnect().connect();
@@ -168,6 +198,45 @@ async function accountRequest(route, body) {
       $('account-logout').focus();
     });
   };
+
+  async function cropAvatar(file) {
+    if (!file.type.startsWith('image/') || file.size > 8 * 1024 * 1024) {
+      throw new Error('請選擇 8 MB 以下的圖片。');
+    }
+    const source = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      image.src = source;
+      await image.decode();
+      const size = Math.min(image.naturalWidth, image.naturalHeight);
+      if (!size) throw new Error('無法讀取這張圖片。');
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 128;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.fillStyle = '#182031';
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.drawImage(image, (image.naturalWidth - size) / 2, (image.naturalHeight - size) / 2,
+        size, size, 0, 0, 128, 128);
+      return canvas.toDataURL('image/jpeg', .75);
+    } catch {
+      throw new Error('無法讀取這張圖片，請試用 JPEG 或 PNG。');
+    } finally {
+      URL.revokeObjectURL(source);
+    }
+  }
+
+  async function saveAvatar(photo) {
+    avatar = (await accountRequest('avatar', { photo })).photo;
+    renderAccount();
+    message.textContent = photo ? '頭像已儲存。' : '已恢復預設頭像。';
+  }
+
+  $('account-avatar-file').onchange = event => {
+    const [file] = event.target.files;
+    event.target.value = '';
+    if (file) return runAccountAction(async () => saveAvatar(await cropAvatar(file)));
+  };
+  $('account-avatar-reset').onclick = () => runAccountAction(() => saveAvatar(null));
 
   $('menu-history').onclick = () => openPlayerPanel('achievements');
   $('menu-friends').onclick = () => openPlayerPanel('friends');

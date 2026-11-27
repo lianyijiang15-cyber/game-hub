@@ -286,6 +286,11 @@ let listedRooms = [];
 let joining = false;
 let roomRequest = 0;
 const keys = new Set();
+const touchPad = $('touch-movement');
+const touchStick = $('touch-stick');
+const coarsePointer = window.matchMedia?.('(any-pointer: coarse)');
+let touchPointer = null;
+let touchVector = { x: 0, y: 0 };
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
 let spectatorTarget = null;
 let eliminationNoticeUntil = 0;
@@ -302,6 +307,7 @@ const panKeys = new Set(['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight']);
 function localPlayer(state = frame) { return state?.players?.find(player => player.id === socket.id); }
 function directionOfKeys(spectating = false) {
   const axis = (key, arrow) => Number(keys.has(key) || spectating && keys.has(arrow));
+  if (touchPointer !== null) return touchVector;
   return { x: axis('KeyD', 'ArrowRight') - axis('KeyA', 'ArrowLeft'),
     y: axis('KeyS', 'ArrowDown') - axis('KeyW', 'ArrowUp') };
 }
@@ -708,10 +714,48 @@ function sendMovement() {
   socket.volatile.emit('arenaInput', directionOfKeys());
 }
 
+function resetTouch() {
+  const pointer = touchPointer;
+  touchPointer = null;
+  touchVector = { x: 0, y: 0 };
+  touchStick.setAttribute('style', '');
+  if (pointer !== null && touchPad.hasPointerCapture?.(pointer)) touchPad.releasePointerCapture(pointer);
+}
+
 function stopMovement() {
   keys.clear();
+  resetTouch();
   if (phase === 'playing' && socket.connected && localPlayer()?.alive) socket.emit('arenaInput', { x: 0, y: 0 });
 }
+
+function moveTouch(event) {
+  if (event.pointerId !== touchPointer) return;
+  const { left, top, width, height } = touchPad.getBoundingClientRect();
+  const radius = Math.min(width, height) * .34;
+  const x = (event.clientX - left - width / 2) / radius;
+  const y = (event.clientY - top - height / 2) / radius;
+  const length = Math.hypot(x, y);
+  const divisor = Math.max(1, length);
+  touchVector = length < .12 ? { x: 0, y: 0 } : { x: x / divisor, y: y / divisor };
+  touchStick.setAttribute('style', `transform:translate(${touchVector.x * radius}px, ${touchVector.y * radius}px)`);
+  if (spectatorTarget !== null) selectSpectator(null);
+  sendMovement();
+}
+
+touchPad.onpointerdown = event => {
+  if (event.pointerType !== 'touch' || touchPointer !== null || phase !== 'playing' || fullMap || !localPlayer()) return;
+  event.preventDefault();
+  touchPointer = event.pointerId;
+  touchPad.setPointerCapture(touchPointer);
+  moveTouch(event);
+};
+touchPad.onpointermove = moveTouch;
+touchPad.onpointerup = touchPad.onpointercancel = touchPad.onlostpointercapture = event => {
+  if (event.pointerId !== touchPointer) return;
+  resetTouch();
+  if (keys.size) sendMovement();
+  else stopMovement();
+};
 
 function aimInWorld() {
   const canvas = $('arena');
@@ -815,6 +859,12 @@ lootButtons.forEach((button, index) => {
   button.onclick = () => useLootSlot(index);
 });
 
+function interactNearby() {
+  if (frame?.scenario?.nearby) lootCommand('modeInteract', frame.scenario.nearby);
+  else if (frame?.nearbyChest != null) lootCommand('lootOpen', frame.nearbyChest);
+}
+$('chest-prompt').onclick = interactNearby;
+
 function drawLootHud(state, serverTime) {
   $('chest-prompt').hidden = state.nearbyChest == null || Boolean(state.scenario?.nearby);
   $('loot-toast').hidden = performance.now() >= lootToastUntil;
@@ -862,10 +912,7 @@ window.addEventListener('keydown', event => {
   if (event.code === 'KeyC') castHeroSkill(1);
   if (event.code === 'KeyV') castHeroSkill(2);
   if (event.code === 'KeyG' && frame?.mode === 'flag' && frame.scenario?.role === 'support') lootCommand('modeCraft');
-  if (event.code === 'KeyE') {
-    if (frame?.scenario?.nearby) lootCommand('modeInteract', frame.scenario.nearby);
-    else if (frame?.nearbyChest != null) lootCommand('lootOpen', frame.nearbyChest);
-  }
+  if (event.code === 'KeyE') interactNearby();
   if (event.code === 'KeyF' && frame?.mode === 'flag') lootCommand('modeAntidote');
   if (event.code === 'KeyM' && frame) toggleMap();
   if (event.code === 'KeyR' && frame?.buffs?.some(buff => buff.label === '震波符文 [R]')) lootCommand('lootRune');
@@ -873,12 +920,12 @@ window.addEventListener('keydown', event => {
 });
 window.addEventListener('keyup', event => {
   if (!keys.delete(event.code)) return;
-  if (keys.size) sendMovement();
+  if (keys.size || touchPointer !== null) sendMovement();
   else stopMovement();
 });
 window.addEventListener('blur', stopMovement);
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopMovement(); });
-setInterval(() => { if (keys.size) sendMovement(); }, 50);
+setInterval(() => { if (keys.size || touchPointer !== null) sendMovement(); }, 50);
 
 function updateAim(event) {
   const canvas = $('arena');
@@ -1020,6 +1067,7 @@ socket.on('achievementUnlocked', title => {
 socket.on('arenaMap', data => {
   if (data.id === room) {
     worldMap = data.map;
+    $('battle').dataset.scene = worldMap.scene ?? 'forest';
     worldChests = data.chests || [];
   }
 });
@@ -1087,6 +1135,7 @@ socket.on('arenaState', state => {
   const me = localPlayer();
   if (lastPlayer?.alive !== me?.alive || lastPlayer?.spawnedAt !== me?.spawnedAt) {
     keys.clear();
+    resetTouch();
     pendingAttack = null;
     attackDeadline = { server: 0, local: 0 };
     selectSpectator(null);
@@ -1127,6 +1176,8 @@ socket.on('arenaState', state => {
   });
   $('battle-mode-name').textContent = [modeNames[state.mode ?? 'deathmatch'], worldMap?.name].filter(Boolean).join(' · ');
   $('battle').dataset.mode = state.mode ?? 'deathmatch';
+  $('battle').dataset.scene = worldMap?.scene ?? 'forest';
+  touchPad.hidden = !coarsePointer?.matches || !localPlayer() || fullMap;
   $('red-score').textContent = scoreText(state, '紅隊');
   $('blue-score').textContent = scoreText(state, '藍隊');
   $('kill-feed').replaceChildren(...state.kills.map(kill => element('li', `${kill.attacker} 擊倒 ${kill.victim}`)));

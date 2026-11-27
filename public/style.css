@@ -749,3 +749,37 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 [data-item="shield"] .loot-icon { background-position: 0 100%; }
 [data-item="fury"] .loot-icon { background-position: 50% 100%; }
 [data-item="rune"] .loot-icon { background-position: 100% 100%; }
+
+#sound-toggle {
+  position: fixed; z-index: 12; right: max(10px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom)); margin: 0; padding: 6px 9px;
+  border: 1px solid #b49760; border-radius: 5px; color: #fff0ce;
+  background: #20283de8; font-size: .85rem;
+}
+#sound-toggle[aria-pressed="false"] { color: #c5c7ce; border-color: #797f91; }
+body:has(.in-combat) #sound-toggle {
+  top: max(10px, env(safe-area-inset-top)); bottom: auto;
+}
+#touch-movement {
+  display: grid; place-items: center; position: absolute; z-index: 4;
+  width: clamp(82px, 22vw, 120px); aspect-ratio: 1;
+  left: max(12px, env(safe-area-inset-left)); bottom: clamp(130px, 27dvh, 240px);
+  border: 2px solid #ead39a80; border-radius: 50%; background: #171f33a8;
+  touch-action: none; user-select: none;
+}
+#touch-movement[hidden] { display: none; }
+#touch-stick {
+  width: 35%; aspect-ratio: 1; border-radius: 50%; border: 2px solid #f7dfaf;
+  background: #af895cb8; box-shadow: 0 2px 6px #101524;
+  pointer-events: none;
+}
+#chest-prompt { pointer-events: auto; }
+@media (any-pointer: coarse) {
+  #arena { touch-action: none; }
+  .in-combat .controls { display: none; }
+  .in-combat #match-chat { width: min(255px, 43vw); }
+  .in-combat #messages { height: min(70px, 10dvh); }
+  .in-combat .hud { width: min(400px, 54vw); bottom: 68px; }
+  .in-combat #hero-skill-buttons button, .in-combat #chest-prompt,
+  .in-combat #mode-interact { min-height: 38px; }
+}
