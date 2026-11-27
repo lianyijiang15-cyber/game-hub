@@ -1,7 +1,7 @@
 'use strict';
 
 const { generateWorld, solid, impassable, campOffset } = require('./world');
-const { terrainBlocked, playerBlocked, movePlayer } = require('./collision');
+const { halfWidth, halfHeight, terrainBlocked, playerBlocked, movePlayer } = require('./collision');
 const loot = require('./loot');
 const modes = require('./modes');
 const skill = require('./hero-skills');
@@ -52,13 +52,22 @@ function axisSpan(origin, delta, low, high) {
 
 function clearLine(a, b, padding = 0, world = map, obstacle = padding ? impassable : solid) {
   if (blocked(a.x, a.y, padding, world, obstacle) || blocked(b.x, b.y, padding, world, obstacle)) return false;
+  return lineBetween(a, b, padding, padding, world, obstacle);
+}
+
+function walkLine(a, b, world) {
+  return !terrainBlocked(world, a.x, a.y) && !terrainBlocked(world, b.x, b.y) &&
+    lineBetween(a, b, halfWidth, halfHeight, world, impassable);
+}
+
+function lineBetween(a, b, padX, padY, world, obstacle) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  return !intersectsTiles(world, Math.min(a.x, b.x) - padding, Math.min(a.y, b.y) - padding,
-    Math.max(a.x, b.x) + padding, Math.max(a.y, b.y) + padding, (tile, left, top) => {
+  return !intersectsTiles(world, Math.min(a.x, b.x) - padX, Math.min(a.y, b.y) - padY,
+    Math.max(a.x, b.x) + padX, Math.max(a.y, b.y) + padY, (tile, left, top) => {
       if (!obstacle(tile)) return false;
-      const xSpan = axisSpan(a.x, dx, left - padding, left + world.tileSize + padding);
-      const ySpan = axisSpan(a.y, dy, top - padding, top + world.tileSize + padding);
+      const xSpan = axisSpan(a.x, dx, left - padX, left + world.tileSize + padX);
+      const ySpan = axisSpan(a.y, dy, top - padY, top + world.tileSize + padY);
       return xSpan && ySpan && Math.max(0, xSpan[0], ySpan[0]) < Math.min(1, xSpan[1], ySpan[1]);
     });
 }
@@ -102,6 +111,7 @@ function spawn(room, player, now) {
       hp: stats(player).hp, alive: true, input: { x: 0, y: 0 }, inputAt: 0,
       angle: side === 1 ? 0 : Math.PI, facing: side === 1 ? 0 : Math.PI, moving: false,
       contributors: new Map(), buffs: new Map(), powers: new Map(), skillTimes: [0, 0, 0], nextAttack: false,
+      route: null, routeAt: 0, routeTarget: null, lastSeen: null, botProgress: null, botDetour: null, patrolHome: false,
       nextBotSkill: 0, warped: 0, attackAt: 0, skillAt: 0, slowUntil: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
     });
     return;
@@ -133,7 +143,7 @@ function start(room, now, seed) {
     Object.assign(player, {
       alive: false,
       inventory: Array(loot.inventorySize).fill(null),
-      kills: 0, deaths: 0, assists: 0, damage: 0, drainAt: 0, role: null, route: null, routeAt: 0, lastSeen: null, patrolHome: false
+      kills: 0, deaths: 0, assists: 0, damage: 0, drainAt: 0, role: null
     });
   });
   room.roster.forEach(player => spawn(room, player, now));
@@ -430,4 +440,4 @@ function snapshot(room, now, viewer = null) {
 function interact(room, player, id, now) { return modes.interact(room, player, id, now, scenarioHooks); }
 function scenarioGoal(room, player, now) { return modes.botGoal(room, player, now, scenarioHooks); }
 
-module.exports = { heroes, playableHeroes, cast, canTarget, stats, interact, scenarioGoal, map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };
+module.exports = { heroes, playableHeroes, cast, canTarget, stats, interact, scenarioGoal, map, classes, jobs, blocked, clearLine, walkLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };

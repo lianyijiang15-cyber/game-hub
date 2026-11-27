@@ -43,4 +43,4 @@ function movePlayer(world, players, actor, dx, dy) {
   return actor.x !== originX || actor.y !== originY;
 }
 
-module.exports = { terrainBlocked, playerBlocked, movePlayer };
+module.exports = { halfWidth, halfHeight, terrainBlocked, playerBlocked, movePlayer };

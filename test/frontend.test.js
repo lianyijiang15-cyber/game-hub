@@ -15,6 +15,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   const frames = [];
   let pixelDraws = 0;
   let narration;
+  const narrationTimers = new Map();
   let wallTime = 100;
   const canvasContext = {
     fillRect() { pixelDraws++; },
@@ -99,6 +100,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     sessionStorage: { getItem() {}, setItem() {}, removeItem() {} },
     performance: { now: () => wallTime },
     requestAnimationFrame: callback => frames.push(callback),
+    setTimeout(callback, delay) { narrationTimers.set(callback, delay); return callback; },
+    clearTimeout(callback) { narrationTimers.delete(callback); },
     setInterval() {}
   });
   for (const script of ['soup-bank.js', 'heroes.js', 'app.js', 'arena-renderer.js', 'menu-art.js', 'arena-guide.js']) vm.runInContext(read(script), context);
@@ -156,8 +159,23 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   elements.get('comic-next').onclick();
   assert.equal(elements.get('comic-page-count').textContent, '2 / 2');
   elements.get('comic-narration').onclick();
-  assert.equal(narration.text, elements.get('comic-caption').textContent);
+  assert.ok(elements.get('comic-caption').textContent.startsWith(narration.text));
+  assert.ok(narration.rate < 1);
   assert.equal(narration.voice.lang, 'zh-TW');
+  elements.get('comic-narration').onclick();
+  vm.runInContext("soupPanels[soupPage] = '門口傳來腳步聲。忽然，腳步聲停止了……'", context);
+  elements.get('comic-narration').onclick();
+  const firstPhrase = narration;
+  assert.equal(firstPhrase.text, '門口傳來腳步聲。');
+  firstPhrase.onend();
+  const [nextPhrase, pause] = [...narrationTimers][0];
+  assert.equal(pause, 230);
+  narrationTimers.delete(nextPhrase);
+  nextPhrase();
+  assert.equal(narration.text, '忽然，腳步聲停止了……');
+  assert.ok(narration.rate < firstPhrase.rate && narration.pitch < firstPhrase.pitch);
+  // Restore the case before verifying the reference captions.
+  vm.runInContext('soupPanels = soupView(soup).panels', context);
   elements.get('comic-previous').onclick();
   assert.equal(narration, null);
   assert.equal(elements.get('comic-page-count').textContent, '1 / 2');
@@ -165,6 +183,11 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   elements.get('comic-start').onclick();
   assert.equal(elements.get('soup-investigation').hidden, false);
   assert.ok(elements.get('soup-story').textContent);
+  assert.equal(elements.get('soup-investigation-layout').hidden, false);
+  const panels = elements.get('soup-reference-pages').children;
+  assert.deepEqual(Array.from(panels, panel => panel.children[0].dataset.page), ['0', '1']);
+  assert.ok(panels.every(panel => panel.children[1].textContent.length > 0));
+  assert.equal(panels[1].children[1].textContent, elements.get('comic-caption').textContent);
   context.hint();
   assert.match(elements.get('answer').textContent, /提示/);
   assert.equal(elements.get('hints').textContent, 2);
@@ -310,7 +333,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[1].x, 0);
   const ally = { id: 'ally', name: '遠方隊友', job: 'warrior', hero: 'sky', team: '紅隊', x: 2280, y: 1780, hp: 4300, maxHp: 8000, alive: true };
   socketHandlers.get('arenaState')({
-    id: 'ABCDE0', now: 120, phase: 'playing', remaining: 299880,
+    id: 'ABCDE0', now: 120, phase: 'playing', mode: 'survival', remaining: 299880,
     players: [{ ...player, alive: false, hp: 0 }, ally], teammates: [ally],
     effects: [{ type: 'hero-skill', appearance: 'heal', x: 1600, y: 1400, tint: '#91ffb2', until: 810 }],
     kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }
@@ -330,6 +353,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(watch['aria-pressed'], 'true');
   assert.equal(vitals.children[1].children[1].value, 4300);
   frames.shift()(200);
+  assert.match(elements.get('respawn').textContent, /已淘汰/);
+  assert.equal(elements.get('respawn').hidden, false);
   const initialCamera = vm.runInContext('arenaCamera.x', context);
   assert.equal(initialCamera, Math.round(ally.x - arena.width / 1.38 / 2));
   const initialMessages = emitted.length;
@@ -339,6 +364,18 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   keyHandlers.get('keyup')(keyboard('ArrowRight'));
   assert.ok(vm.runInContext('arenaCamera.x', context) > initialCamera);
   assert.equal(emitted.length, initialMessages);
+  wallTime = 5180;
+  socketHandlers.get('arenaState')({
+    id: 'ABCDE0', now: 5110, phase: 'playing', mode: 'survival', remaining: 294890,
+    players: [{ ...player, alive: false, hp: 0 }, ally], teammates: [ally],
+    effects: [], kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }
+  });
+  frames.shift()(5189);
+  assert.equal(elements.get('respawn').hidden, false);
+  frames.shift()(5190);
+  assert.equal(elements.get('respawn').hidden, true);
+  watch.onclick();
+  assert.equal(watch['aria-pressed'], 'true');
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', phase: 'ended', winner: '紅隊', mvp: 'self', score: { 紅隊: 7, 藍隊: 2 },
     teamAwards: { 紅隊: { mvp: 'self', lowestKda: 'red-low' }, 藍隊: { mvp: 'blue-mvp', lowestKda: 'blue-low' } },

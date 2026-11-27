@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="style.css?v=22">
 <link rel="stylesheet" href="menu.css?v=3">
 <link rel="stylesheet" href="account.css?v=2">
-<link rel="stylesheet" href="casebook.css?v=2">
+<link rel="stylesheet" href="casebook.css?v=3">
 </head>
 <body>
 <main>
@@ -199,26 +199,32 @@
         <button id="comic-start" class="soup-primary" type="button" hidden>開始提問 →</button>
       </div>
     </section>
-    <section id="soup-investigation" class="room-entry-card" aria-labelledby="soup-title" hidden>
-      <h3 id="soup-title"></h3>
-      <p id="soup-story"></p>
-      <p id="soup-progress"></p>
-      <form id="soup-question-form">
-        <label for="question">用能回答「是」、「不是」或「無關」的問題找線索。</label>
-        <div class="soup-question-row">
-          <input id="question" maxlength="300" required placeholder="例如：這件事發生在晚上嗎？">
-          <button class="soup-primary" type="submit">提問</button>
+    <div id="soup-investigation-layout" hidden>
+      <section id="soup-investigation" class="room-entry-card" aria-labelledby="soup-title" hidden>
+        <h3 id="soup-title"></h3>
+        <p id="soup-story"></p>
+        <p id="soup-progress"></p>
+        <form id="soup-question-form">
+          <label for="question">用能回答「是」、「不是」或「無關」的問題找線索。</label>
+          <div class="soup-question-row">
+            <input id="question" maxlength="300" required placeholder="例如：這件事發生在晚上嗎？">
+            <button class="soup-primary" type="submit">提問</button>
+          </div>
+        </form>
+        <p id="answer" role="status"></p>
+        <div class="soup-case-actions">
+          <button class="menu-back" id="soup-hint" type="button" onclick="hint()">取得提示（剩餘 <span id="hints">3</span> 次）</button>
+          <button class="menu-back" type="button" onclick="reveal()">揭曉答案</button>
+          <button class="menu-back" id="soup-reread" type="button">重看漫畫</button>
+          <button class="menu-back" id="soup-next-case" type="button">換一題</button>
         </div>
-      </form>
-      <p id="answer" role="status"></p>
-      <div class="soup-case-actions">
-        <button class="menu-back" id="soup-hint" type="button" onclick="hint()">取得提示（剩餘 <span id="hints">3</span> 次）</button>
-        <button class="menu-back" type="button" onclick="reveal()">揭曉答案</button>
-        <button class="menu-back" id="soup-reread" type="button">重看漫畫</button>
-        <button class="menu-back" id="soup-next-case" type="button">換一題</button>
-      </div>
-      <p id="soup-end" role="status"></p>
-    </section>
+        <p id="soup-end" role="status"></p>
+      </section>
+      <aside class="soup-reference" aria-labelledby="soup-reference-title">
+        <h3 id="soup-reference-title">劇情漫畫</h3>
+        <div id="soup-reference-pages"></div>
+      </aside>
+    </div>
     <p id="soup-record" role="status"></p>
   </div>
 </section>
@@ -448,7 +454,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=4"></script>
 <script src="heroes.js?v=4"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 <script src="arena-renderer.js?v=22"></script>
 <script src="menu-art.js?v=5"></script>
 <script src="arena-guide.js?v=2"></script>

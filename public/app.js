@@ -22,6 +22,7 @@ narrationButton.hidden = !narrationVoice || !Utterance;
 
 function stopNarration() {
   if (!activeNarration) return;
+  clearTimeout(activeNarration.timer);
   activeNarration = null;
   narrationVoice.cancel();
   narrationButton.textContent = '播放旁白';
@@ -30,33 +31,55 @@ function stopNarration() {
 narrationButton.onclick = () => {
   if (activeNarration) return stopNarration();
   if (!narrationVoice || !Utterance || soupStage !== 'comic' || !soupPanels[soupPage]) return;
-  const clip = new Utterance(soupPanels[soupPage]);
-  clip.lang = 'zh-TW';
-  clip.rate = .88;
   const voices = narrationVoice.getVoices();
-  const voice = voices.find(option => /^zh[-_](tw|hant)/i.test(option.lang)) ??
-    voices.find(option => /^zh(?:[-_]|$)/i.test(option.lang));
-  if (voice) clip.voice = voice;
-  activeNarration = clip;
-  $('soup-record').textContent = '';
+  const mandarin = voices.filter(option => /^zh(?:[-_]|$)/i.test(option.lang));
+  const taiwan = mandarin.filter(option => /^zh[-_](tw|hant)/i.test(option.lang));
+  const choices = taiwan.length ? taiwan : mandarin;
+  const voice = choices.find(option => /natural|neural|online|premium|enhanced|自然|高品質/i.test(option.name)) ?? choices[0];
+  // Keep commas inside each spoken phrase so the voice can use its own internal pauses.
+  const phrases = soupPanels[soupPage].match(/[^。！？；…]+[。！？；…]*|[。！？；…]+/g)
+    ?.map(phrase => phrase.trim()).filter(Boolean);
+  if (!phrases?.length) return;
+  const narration = { timer: null };
+  activeNarration = narration;
   narrationButton.textContent = '停止旁白';
-  clip.onend = () => {
-    if (activeNarration !== clip) return;
-    activeNarration = null;
-    narrationButton.textContent = '播放旁白';
-  };
-  clip.onerror = () => {
-    if (activeNarration !== clip) return;
-    clip.onend();
-    $('soup-record').textContent = '無法播放中文旁白，可以繼續閱讀漫畫字幕。';
-  };
-  narrationVoice.speak(clip);
+
+  function speak(index) {
+    if (activeNarration !== narration) return;
+    const phrase = phrases[index];
+    const clip = new Utterance(phrase);
+    const question = /[？?]/.test(phrase);
+    const suspense = /[…]|突然|忽然|沒想到|竟然|震驚|卻|只傳來/.test(phrase);
+    clip.lang = 'zh-TW';
+    clip.rate = suspense ? .83 : index % 2 ? .92 : .89;
+    clip.pitch = question ? 1.08 : suspense ? .92 : index % 2 ? 1.02 : .98;
+    if (voice) clip.voice = voice;
+    clip.onend = () => {
+      if (activeNarration !== narration) return;
+      if (index + 1 < phrases.length) {
+        narration.timer = setTimeout(() => speak(index + 1), suspense ? 480 : 230);
+      } else {
+        activeNarration = null;
+        narrationButton.textContent = '播放旁白';
+      }
+    };
+    clip.onerror = () => {
+      if (activeNarration !== narration) return;
+      stopNarration();
+      $('soup-record').textContent = '無法播放中文旁白，可以繼續閱讀漫畫字幕。';
+    };
+    narrationVoice.speak(clip);
+  }
+
+  $('soup-record').textContent = '';
+  speak(0);
 };
 
 function showSoupStage(stage) {
   if (stage !== 'comic') stopNarration();
   soupStage = stage;
   for (const name of ['levels', 'comic', 'investigation']) $('soup-' + name).hidden = stage !== name;
+  $('soup-investigation-layout').hidden = stage !== 'investigation';
   $('soup-level-back').hidden = stage === 'levels';
 }
 
@@ -77,7 +100,19 @@ function prepareComic(view) {
   soupPanels = view.panels;
   $('soup-difficulty').textContent = view.difficulty;
   $('soup-comic-title').textContent = view.title;
-  $('comic-picture').setAttribute('style', `background-image: url(/art/comics/${encodeURIComponent(view.storyId)}.webp)`);
+  const background = `background-image: url(/art/comics/${encodeURIComponent(view.storyId)}.webp)`;
+  $('comic-picture').setAttribute('style', background);
+  $('soup-reference-pages').replaceChildren(...soupPanels.map((caption, index) => {
+    const panel = element('figure', '');
+    panel.className = 'soup-page';
+    const picture = element('div', '');
+    picture.className = 'comic-picture';
+    picture.dataset.page = String(index);
+    picture.setAttribute('style', background);
+    picture.setAttribute('aria-hidden', 'true');
+    panel.append(picture, element('figcaption', caption));
+    return panel;
+  }));
   $('question').value = '';
   renderSoup(view);
   showComicPage(0);
@@ -241,6 +276,7 @@ let roomRequest = 0;
 const keys = new Set();
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
 let spectatorTarget = null;
+let eliminationNoticeUntil = 0;
 let pendingAttack = null;
 let attackDeadline = { server: 0, local: 0 };
 
@@ -1039,6 +1075,9 @@ socket.on('arenaState', state => {
     selectSpectator(null);
   }
   if (me?.alive) syncAttackDeadline(me.attackAt, state.now);
+  if (me?.alive === false && lastPlayer?.alive !== false) {
+    eliminationNoticeUntil = performance.now() + 5000;
+  }
   receivedAt = performance.now();
   if (state.phase === 'ended') {
     renderResults(state);
@@ -1097,8 +1136,9 @@ function renderFrame(time) {
     const attackLeft = attackDeadline.local - time;
     $('attack-status').textContent = `${frame.attackRange || '—'} px · ${attackLeft > 0 ? (attackLeft / 1000).toFixed(1) + ' 秒' : '就緒'}`;
     drawHeroHud(frame, me, serverTime, cooldown);
-    $('respawn').hidden = me.alive;
-    if (!me.alive) $('respawn').textContent = ['flag', 'survival'].includes(frame.mode)
+    const eliminated = ['flag', 'survival'].includes(frame.mode);
+    $('respawn').hidden = me.alive || (eliminated && time >= eliminationNoticeUntil);
+    if (!$('respawn').hidden && !me.alive) $('respawn').textContent = eliminated
       ? '已淘汰 · WASD／方向鍵移動視角' :
       `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活 · WASD／方向鍵移動視角`;
   }

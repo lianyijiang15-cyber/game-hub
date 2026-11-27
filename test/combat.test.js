@@ -164,6 +164,38 @@ test('AI navigates around the central rocks and completes a match without Ollama
   assert.ok(room.players.some(p => p.damage > 0));
 });
 
+test('AI patrols past an obstructed waypoint and avoids a teammate blocking its route', () => {
+  const room = match();
+  const bot = room.players[0];
+  const ally = room.players[2];
+  const size = 100;
+  const open = 'g'.repeat(size - 2);
+  room.map = { width: 3200, height: 3200, columns: size, rows: size, tileSize: 32,
+    tiles: Array.from({ length: size }, (_, index) => index === 0 || index === size - 1
+      ? '#'.repeat(size) : '#' + open + '#') };
+  const row = Math.floor(1472 / 32);
+  const col = Math.floor((1600 + require('../arena/world').campOffset) / 32);
+  const blockedRow = room.map.tiles[row];
+  room.map.tiles[row] = blockedRow.slice(0, col) + 'w' + blockedRow.slice(col + 1);
+  room.players = [bot, ally];
+  Object.assign(bot, { bot: true, x: 1200, y: 1488 });
+  Object.assign(ally, { x: 1227, y: 1488 });
+  for (let time = 50; time <= 1000; time += 50) {
+    combat.tick(room, time, .05, botInput, route);
+  }
+  assert.ok(bot.x > 1230, 'AI detours around its teammate');
+  for (let time = 1050; time <= 21000; time += 50) {
+    combat.tick(room, time, .05, botInput, route);
+    if (bot.patrolHome) break;
+  }
+  assert.equal(bot.patrolHome, true, 'AI reaches the walkable waypoint and chooses a new patrol destination');
+  const position = { x: bot.x, y: bot.y };
+  for (let time = 21050; time <= 22050; time += 50) {
+    combat.tick(room, time, .05, botInput, route);
+  }
+  assert.ok(combat.distance(bot, position) > 30);
+});
+
 test('attack range, timely assists and winner MVP are calculated on the server', () => {
   const room = match();
   const [killer, target, helper, other, late] = room.players;

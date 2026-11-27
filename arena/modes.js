@@ -357,7 +357,7 @@ function botGoal(room, bot, now, hooks) {
     return state.flags.filter(flag => !flag.owner)
       .sort((a, b) => distance(bot, a) - distance(bot, b))[bot.slot % Math.max(1, state.flags.filter(flag => !flag.owner).length)];
   }
-  const candidates = state.mode === 'flag' ? state.beasts : state.supplies.filter(pack => !pack.used);
+  const candidates = state.mode === 'flag' ? state.beasts.filter(beast => beast.alive) : state.supplies.filter(pack => !pack.used);
   return [...candidates].sort((a, b) => distance(bot, a) - distance(bot, b))[0];
 }
 
