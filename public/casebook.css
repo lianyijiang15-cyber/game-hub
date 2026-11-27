@@ -1,0 +1,85 @@
+.room-mode-heading, .guide-header, .soup-navigation, .soup-comic-heading, .soup-page-actions,
+.soup-case-actions { display: flex; align-items: center; gap: 10px; }
+.room-mode-heading { gap: 14px; }
+#lobby .guide-info {
+  display: grid; place-items: center; width: 32px; height: 32px; margin: 0; padding: 0;
+  border: 1px solid var(--room-accent); border-radius: 50%; background: #222c32;
+  color: var(--room-accent); font: 700 1.25rem Georgia, serif;
+}
+#mode-guide {
+  width: min(780px, calc(100% - 26px)); max-height: 90dvh; padding: clamp(15px, 3vw, 27px);
+  color: #f9edda; background: #18232d; border: 2px solid var(--room-accent); box-shadow: 8px 8px #090e14cf;
+}
+#mode-guide::backdrop { background: #0a141bba; }
+.guide-header { justify-content: space-between; }
+.guide-header h2 { margin: 0; color: var(--room-accent); font-size: clamp(1.15rem, 3vw, 1.7rem); }
+#guide-close { padding: 4px 12px; font-size: 1.25rem; }
+.guide-figure { margin: 16px 0; }
+#guide-scene { width: 100%; height: auto; image-rendering: pixelated; display: block; background: #20322d; }
+#guide-caption { color: #c9ded6; padding-top: 6px; font-size: .85rem; }
+.guide-steps { display: grid; gap: 8px 24px; padding-inline-start: 1.6rem; margin-bottom: 0; }
+.guide-steps li::marker, .guide-steps strong { color: var(--room-accent); }
+.guide-steps p { margin: 5px 0; line-height: 1.55; }
+
+#soup {
+  position: fixed; inset: 0; z-index: 9; isolation: isolate; overflow: auto;
+  color: #f2f2df; background: #152725; --room-accent: #a5cfb0;
+}
+#soup::before {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; content: "";
+  background: linear-gradient(140deg, #132926ef, #14252bc7 50%, #0e1d22eb);
+}
+.soup-frame {
+  grid-template-rows: auto 1fr auto;
+  align-content: start;
+}
+#soup-heading { margin: 0; font-size: clamp(1.28rem, 3vw, 2.15rem); letter-spacing: .15em; }
+.soup-navigation, .soup-case-actions { flex-wrap: wrap; }
+.soup-navigation { justify-content: flex-end; }
+#soup-levels { align-self: center; }
+#soup-level-heading { margin-top: 0; color: #d9efdc; font-size: clamp(1.25rem, 2.7vw, 2rem); }
+.soup-level-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(10px, 2vw, 26px); }
+#soup .soup-level {
+  --trim: #a6ceaf; padding: 0 0 1rem; background: #152831; align-content: start; gap: .45rem;
+  min-height: 0;
+}
+#soup-medium { --case-image: url('/art/comics/class.webp'); }
+#soup-easy { --case-image: url('/art/comics/clock.webp'); }
+#soup-hard { --case-image: url('/art/comics/snow.webp'); }
+.soup-level-art {
+  display: block; aspect-ratio: 16 / 9;
+  background: linear-gradient(0deg, #142730b8, transparent 60%), var(--case-image) left center / 200% 100%, #203630;
+}
+.soup-level strong { padding: 0 14px; color: #dcf5df; font-size: clamp(1.2rem, 2.5vw, 2rem); }
+.soup-level > span:last-child { padding: 0 14px; color: #c5d9d1; }
+#soup-comic, #soup-investigation { width: min(100%, 820px); margin: 0 auto; align-self: center; }
+.soup-comic-heading { justify-content: space-between; margin-bottom: 8px; }
+.soup-comic-heading h3 { margin: 0; text-align: center; font-size: clamp(1.12rem, 2.6vw, 1.8rem); }
+#soup-difficulty, #comic-page-count { color: #b5e1be; white-space: nowrap; font-size: .85rem; }
+.soup-page { margin: 0; background: #ece9d0; color: #182822; padding: clamp(7px, 1.3vw, 13px); box-shadow: 7px 7px #070e14bf; }
+.comic-picture {
+  aspect-ratio: 16 / 9; border: 2px solid #203130;
+  background-color: #263b37; background-repeat: no-repeat; background-size: 200% 100%; background-position: left center;
+}
+.comic-picture[data-page="1"] { background-position: right center; }
+#comic-caption { margin-top: 7px; padding: 7px 9px; border: 1px solid #3f574c; line-height: 1.65; font-weight: 700; }
+.soup-page-actions { justify-content: space-between; margin-top: 10px; }
+.soup-primary {
+  padding: 8px 15px; margin: 0; border: 1px solid #e2ecd5; border-radius: 0;
+  background: #b8ddbd; color: #192824; font-weight: 800;
+}
+.soup-question-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+#soup-investigation p { line-height: 1.6; }
+#answer:not(:empty), #soup-end:not(:empty) { border-left: 3px solid var(--room-accent); padding: 7px 11px; background: #253843; }
+#soup-record { margin: 0; color: #f4d9b2; }
+#soup-levels button:focus-visible, #mode-guide button:focus-visible, #soup button:focus-visible {
+  outline: 2px solid #f5df9b; outline-offset: 3px;
+}
+@media (min-width: 660px) {
+  .guide-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 650px) {
+  .soup-level-grid { grid-template-columns: 1fr; }
+  .soup-level-art { aspect-ratio: 23 / 6; background-size: 200% auto; }
+  .soup-navigation { gap: 4px; }
+}

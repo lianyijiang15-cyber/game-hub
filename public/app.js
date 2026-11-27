@@ -7,11 +7,56 @@ let soup = null;
 let onlineSoup = false;
 let soupSequence = 0;
 let soupPending = false;
+let soupDifficulty;
+let soupStoryId;
+let soupStage = 'levels';
+let soupPage = 0;
+let soupPanels = [];
+const soupLevelButtons = ['soup-easy', 'soup-medium', 'soup-hard'];
+
+function showSoupStage(stage) {
+  soupStage = stage;
+  for (const name of ['levels', 'comic', 'investigation']) $('soup-' + name).hidden = stage !== name;
+  $('soup-level-back').hidden = stage === 'levels';
+}
+
+function showComicPage(index) {
+  soupPage = Math.max(0, Math.min(index, soupPanels.length - 1));
+  $('comic-picture').dataset.page = String(soupPage);
+  $('comic-caption').textContent = soupPanels[soupPage];
+  $('comic-page-count').textContent = `${soupPage + 1} / ${soupPanels.length}`;
+  $('comic-previous').disabled = soupPage === 0;
+  const last = soupPage === soupPanels.length - 1;
+  $('comic-next').hidden = last;
+  $('comic-start').hidden = !last;
+}
+
+function prepareComic(view) {
+  soupStoryId = view.storyId;
+  soupPanels = view.panels;
+  $('soup-difficulty').textContent = view.difficulty;
+  $('soup-comic-title').textContent = view.title;
+  $('comic-picture').setAttribute('style', `background-image: url(/art/comics/${encodeURIComponent(view.storyId)}.webp)`);
+  $('question').value = '';
+  renderSoup(view);
+  showComicPage(0);
+  showSoupStage('comic');
+  $('comic-next').focus();
+}
+
+function chooseSoupLevel() {
+  soupSequence++;
+  $('soup-record').textContent = '';
+  showSoupStage('levels');
+  $('soup-easy').focus();
+}
+
 
 function renderSoup(view) {
   $('soup-title').textContent = view.title;
   $('soup-story').textContent = view.intro;
   $('hints').textContent = 3 - view.hints;
+  $('soup-hint').disabled = view.hints >= 3;
   $('soup-progress').textContent = `已解鎖線索：${view.progress}/${view.clues}`;
   $('answer').textContent = view.reply;
   $('soup-end').textContent = view.end;
@@ -19,38 +64,64 @@ function renderSoup(view) {
 
 function openSoup() {
   show('soup');
-  return newSoup();
+  chooseSoupLevel();
 }
 
-async function newSoup() {
-  if (soupPending) return;
+async function newSoup(difficulty = soupDifficulty) {
+  if (soupPending || !soupDifficulties.includes(difficulty)) return;
   const sequence = ++soupSequence;
+  const previousStory = difficulty === soupDifficulty ? soupStoryId : undefined;
+  soupDifficulty = difficulty;
   onlineSoup = typeof playerAccount !== 'undefined' && Boolean(playerAccount.profile);
-  soup = null;
-  soupPending = false;
   $('soup-record').textContent = '';
   if (!onlineSoup) {
-    soup = startSoupGame();
-    renderSoup(soupView(soup));
+    soup = startSoupGame(Math.random, difficulty, previousStory);
+    prepareComic(soupView(soup));
     return;
   }
-  $('soup-title').textContent = '載入題目中…';
   soupPending = true;
-  for (const id of ['soup-story', 'soup-progress', 'answer', 'soup-end']) $(id).textContent = '';
+  const buttons = [...soupLevelButtons, 'soup-next-case'].map($);
+  for (const button of buttons) button.disabled = true;
+  $('soup-record').textContent = '載入漫畫與題目中…';
   try {
-    const view = await accountRequest('soup/start', {});
+    const view = await accountRequest('soup/start', { difficulty });
     if (sequence !== soupSequence) return;
     soup = view.id;
-    renderSoup(view);
+    $('soup-record').textContent = '';
+    prepareComic(view);
   } catch (error) {
     if (sequence === soupSequence) $('soup-record').textContent = error.message;
   } finally {
-    if (sequence === soupSequence) soupPending = false;
+    soupPending = false;
+    for (const button of buttons) button.disabled = false;
   }
 }
 
+for (const [index, id] of soupLevelButtons.entries()) $(id).onclick = () => newSoup(soupDifficulties[index]);
+$('soup-level-back').onclick = chooseSoupLevel;
+$('soup-next-case').onclick = () => newSoup();
+$('comic-previous').onclick = () => showComicPage(soupPage - 1);
+$('comic-next').onclick = () => {
+  showComicPage(soupPage + 1);
+  if (!$('comic-start').hidden) $('comic-start').focus();
+};
+$('comic-start').onclick = () => {
+  if (soupPage !== soupPanels.length - 1) return;
+  showSoupStage('investigation');
+  $('question').focus();
+};
+$('soup-reread').onclick = () => {
+  showComicPage(0);
+  showSoupStage('comic');
+  $('comic-next').focus();
+};
+$('soup-question-form').onsubmit = event => {
+  event.preventDefault();
+  return askSoup();
+};
+
 async function submitSoupAction(action, question) {
-  if (!soup || soupPending) return;
+  if (soupStage !== 'investigation' || !soup || soupPending) return;
   if (!onlineSoup) {
     playSoup(soup, action, question);
     renderSoup(soupView(soup));
@@ -67,7 +138,7 @@ async function submitSoupAction(action, question) {
     if (sequence === soupSequence) $('soup-record').textContent = error.message;
     return false;
   } finally {
-    if (sequence === soupSequence) soupPending = false;
+    soupPending = false;
   }
 }
 
@@ -183,6 +254,8 @@ function home() {
 function openLobby(mode = selectedMode) {
   selectedMode = mode;
   $('lobby-mode').textContent = modeNames[mode];
+  $('room-guide').hidden = mode === 'deathmatch';
+  $('room-guide').setAttribute('aria-label', modeNames[mode] + '玩法介紹');
   $('lobby').dataset.mode = mode;
   $('entry-rules').textContent = {
     deathmatch: '5v5 · 5 分鐘 · 率先取得 20 擊殺', flag: '5v5 · 20 分鐘 · 拔下敵方旗幟',

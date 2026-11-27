@@ -38,6 +38,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
       getBoundingClientRect() { return { width: 480, height: 288, left: 0, top: 0 }; },
       matches() { return false; },
       blur() {},
+      showModal() { this.open = true; },
+      close() { this.open = false; },
       focus() { this.onfocus?.(); }
     };
   }
@@ -88,7 +90,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     requestAnimationFrame: callback => frames.push(callback),
     setInterval() {}
   });
-  for (const script of ['soup-bank.js', 'heroes.js', 'app.js', 'arena-renderer.js', 'menu-art.js']) vm.runInContext(read(script), context);
+  for (const script of ['soup-bank.js', 'heroes.js', 'app.js', 'arena-renderer.js', 'menu-art.js', 'arena-guide.js']) vm.runInContext(read(script), context);
   assert.ok(pixelDraws > 0);
   context.show('title-screen');
   elements.get('title-start').onclick();
@@ -131,19 +133,61 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(vm.runInContext("stories.length", context), vm.runInContext("extraStories.length + 2", context));
   elements.get('menu-soup').onclick();
   assert.equal(elements.get('soup').hidden, false);
+  assert.equal(elements.get('soup-levels').hidden, false);
+  elements.get('soup-hard').onclick();
+  assert.equal(elements.get('soup-comic').hidden, false);
+  assert.equal(elements.get('soup-difficulty').textContent, '困難');
+  assert.equal(elements.get('comic-page-count').textContent, '1 / 2');
+  assert.ok(elements.get('comic-caption').textContent);
+  assert.equal(elements.get('soup-investigation').hidden, true);
+  elements.get('comic-start').onclick();
+  assert.equal(elements.get('soup-investigation').hidden, true);
+  elements.get('comic-next').onclick();
+  assert.equal(elements.get('comic-page-count').textContent, '2 / 2');
+  elements.get('comic-previous').onclick();
+  assert.equal(elements.get('comic-page-count').textContent, '1 / 2');
+  elements.get('comic-next').onclick();
+  elements.get('comic-start').onclick();
+  assert.equal(elements.get('soup-investigation').hidden, false);
   assert.ok(elements.get('soup-story').textContent);
   context.hint();
   assert.match(elements.get('answer').textContent, /提示/);
   assert.equal(elements.get('hints').textContent, 2);
   context.reveal();
   assert.ok(elements.get('soup-end').textContent);
+  elements.get('soup-reread').onclick();
+  assert.equal(elements.get('comic-page-count').textContent, '1 / 2');
+  elements.get('comic-next').onclick();
+  elements.get('comic-start').onclick();
+  assert.equal(elements.get('hints').textContent, 2);
+  elements.get('soup-next-case').onclick();
+  assert.equal(elements.get('soup-comic').hidden, false);
+  assert.equal(elements.get('soup-difficulty').textContent, '困難');
+  elements.get('soup-level-back').onclick();
+  assert.equal(elements.get('soup-levels').hidden, false);
 
   context.home();
   elements.get('menu-arena').onclick();
   assert.equal(elements.get('modes').hidden, false);
-  elements.get('mode-control').onclick();
-  assert.equal(elements.get('lobby-mode').textContent, '據點戰');
+  for (const [mode, name, caption] of [
+    ['flag', '拔旗戰', '中央旗區'], ['survival', '生存戰', '陷阱'], ['control', '據點戰', '進度條']
+  ]) {
+    elements.get('mode-' + mode).onclick();
+    assert.equal(elements.get('lobby-mode').textContent, name);
+    assert.equal(elements.get('room-guide').hidden, false);
+    elements.get('room-guide').onclick();
+    assert.equal(elements.get('mode-guide').open, true);
+    assert.equal(elements.get('guide-title').textContent, name + '玩法介紹');
+    assert.match(elements.get('guide-caption').textContent, new RegExp(caption));
+    assert.ok(elements.get('guide-steps').children.length >= 3);
+    const pixelsBeforeGuide = pixelDraws;
+    context.paintGuideScene(mode, require('../arena/combat').map);
+    assert.ok(pixelDraws > pixelsBeforeGuide);
+    elements.get('guide-close').onclick();
+    assert.equal(elements.get('mode-guide').open, false);
+  }
   elements.get('mode-deathmatch').onclick();
+  assert.equal(elements.get('room-guide').hidden, true);
   assert.equal(elements.get('lobby').hidden, false);
   elements.get('nickname').value = 'Tester';
   context.createRoom();

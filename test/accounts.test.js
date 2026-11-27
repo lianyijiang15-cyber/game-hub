@@ -113,7 +113,16 @@ test('account validation, persistence, login, cookie and revocation', async t =>
   assert.deepEqual((await (await request('friends', undefined, headers)).json()).friends, [second]);
   assert.deepEqual((await (await request('friends', undefined, secondHeaders)).json()).friends, [first]);
 
-  const puzzle = await (await request('soup/start', {}, headers)).json();
+  assert.equal((await request('soup/start', { difficulty: '超級' }, headers)).status, 400);
+  for (const difficulty of ['簡單', '中等', '困難']) {
+    const caseView = await (await request('soup/start', { difficulty }, headers)).json();
+    assert.equal(caseView.difficulty, difficulty);
+    assert.equal(caseView.panels.length, 2);
+    assert.equal(caseView.end, '');
+    assert.equal(Object.hasOwn(caseView, 'answer'), false);
+  }
+  const puzzle = await (await request('soup/start', { difficulty: '困難' }, headers)).json();
+  assert.equal(puzzle.difficulty, '困難');
   assert.equal((await request('soup/action', { id: puzzle.id, action: 'reveal' }, secondHeaders)).status, 400);
   assert.equal((await request('soup/action', { id: puzzle.id, action: 'hint' }, headers)).status, 200);
   for (let i = 0; i < 2; i++) {

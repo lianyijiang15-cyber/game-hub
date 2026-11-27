@@ -63,6 +63,11 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.match(html, /id="title-start"[^>]*>TAP TO START<\/button>/);
   assert.match(html, /<section id="home" hidden\b[^>]*>/);
   assert.match(html, /id="menu-soup-name">海龜湯/);
+  assert.match(html, /id="room-guide"[^>]*aria-haspopup="dialog"/);
+  for (const path of ['/arena-guide.js', '/casebook.css', '/art/comics/clock.webp',
+    '/art/comics/class.webp', '/art/comics/snow.webp']) {
+    assert.equal((await fetch(base + path, { method: 'HEAD' })).status, 200, path);
+  }
   assert.match(html, /id="menu-arena-name">像素衝突/);
   assert.equal((await fetch(base + '/menu.css')).status, 200);
   assert.equal((await fetch(base + '/menu-art.js')).status, 200);

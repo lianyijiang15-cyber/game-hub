@@ -79,6 +79,7 @@ previewMap.then(map => {
   drawMapPreview($('home-map'), map, .5, .52);
   drawMapPreview($('modes-map'), map, .32, .43);
   drawMapPreview($('room-entry-map'), map, .64, .55);
+  drawMapPreview($('soup-map'), map, .38, .42);
   const canvas = $('menu-arena-map');
   drawMapPreview(canvas, map, 0.31, 0.74);
   const ctx = canvas.getContext('2d');

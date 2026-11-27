@@ -267,14 +267,37 @@ const extraStories=[
 ];
 
 const stories=[
- {title:'餐廳裡的海龜湯',intro:'一名男子在餐廳喝了一口海龜湯，回家後卻做出了令人震驚的決定。為什麼？',clues:['他以前曾遭遇船難。','他當年吃過一碗被稱作海龜湯的湯。','餐廳的味道與記憶不同，讓他發現當年吃的不是海龜。'],hints:['想想男子過去的經歷。','關鍵在於兩次湯的味道。','當年的湯其實不是海龜肉。'],keys:['船','海龜','味道'],answer:'經典版本中，男子曾在船難後喝下被謊稱為海龜湯的湯。多年後嚐到真正的海龜湯，才察覺當年的真相。'},
- {title:'關燈的人',intro:'一個人晚上關燈睡覺，隔天得知許多人因此喪命。為什麼？',clues:['他住在靠海的地方。','這盞燈不是普通房間的照明。','他是燈塔管理員，關燈導致船隻迷航。'],hints:['注意這盞燈的位置。','燈光可能是給別人看的。','想想燈塔。'],keys:['海','燈','船'],answer:'他是燈塔管理員，誤關了指引船隻的燈，造成船難。'}
+ {title:'餐廳裡的海龜湯',difficulty:'困難',intro:'一名男子在餐廳喝了一口海龜湯，回家後卻做出了令人震驚的決定。為什麼？',clues:['他以前曾遭遇船難。','他當年吃過一碗被稱作海龜湯的湯。','餐廳的味道與記憶不同，讓他發現當年吃的不是海龜。'],hints:['想想男子過去的經歷。','關鍵在於兩次湯的味道。','當年的湯其實不是海龜肉。'],keys:['船','海龜','味道'],answer:'經典版本中，男子曾在船難後喝下被謊稱為海龜湯的湯。多年後嚐到真正的海龜湯，才察覺當年的真相。'},
+ {title:'關燈的人',difficulty:'中等',intro:'一個人晚上關燈睡覺，隔天得知許多人因此喪命。為什麼？',clues:['他住在靠海的地方。','這盞燈不是普通房間的照明。','他是燈塔管理員，關燈導致船隻迷航。'],hints:['注意這盞燈的位置。','燈光可能是給別人看的。','想想燈塔。'],keys:['海','燈','船'],answer:'他是燈塔管理員，誤關了指引船隻的燈，造成船難。'}
 ];
 stories.push(...extraStories);
 
-function startSoupGame(random = Math.random) {
-  return { story: stories[Math.floor(random() * stories.length)], hints: 0, progress: 0,
-    reply: '', result: null, revealed: false };
+const soupDifficulties = ['簡單', '中等', '困難'];
+// Captions describe only the opening scene, never its answer or hints.
+const soupComics = [
+  ['diner', '一名男子走進餐廳，點了一碗海龜湯。', '喝了一口後，他回家做了一個讓人震驚的決定。'],
+  ['light', '夜深了，一個人關掉燈，上床睡覺。', '隔天，他得知有許多人因此喪命。'],
+  ['clock', '阿澤走進房間，抬頭看牆上的時鐘。', '指針竟然倒著走，他卻說時鐘完全正常。'],
+  ['rain', '大雨下個不停。小美沒帶傘，在雨天走了十分鐘。', '到達目的地時，她的鞋子竟然沒有濕。'],
+  ['class', '畢業那天，全班一起拍了合照。', '老師說照片少了一個人，但每位學生都入鏡了。'],
+  ['alarm', '打烊後，商店外出現了不速之客。', '警報器一次也沒響，店主卻說自己靠它阻止了闖入。'],
+  ['bus', '小杰趕到站牌時，朋友已經搭上末班車。', '小杰錯過了車，卻比朋友還要早到家。'],
+  ['letter', '阿倫每天寫一封信給遠方的朋友。', '信一封也沒寄出去，朋友卻知道裡面寫了什麼。'],
+  ['elevator', '公寓電梯停用了一整天。', '住在十二樓的阿姨，這天沒有爬過任何一階樓梯。'],
+  ['snow', '雪地裡，一排腳印一路通往小屋。', '找不到離開的腳印，屋主卻確信訪客已經走了。'],
+  ['key', '小華把鑰匙放進抽屜，然後上了鎖。', '隔天，他沒打開抽屜，手上卻已經拿著那把鑰匙。'],
+  ['concert', '小琳去看了一場演唱會。', '她說歌手唱得很好，卻從頭到尾沒聽見任何聲音。'],
+  ['birthday', '一對雙胞胎在同一天出生。', '但每一年，哥哥都會比弟弟早一天過生日。'],
+  ['stage', '一名演員獨自走上舞台，觀眾席空無一人。', '演出結束後，劇場裡卻傳來熱烈的掌聲。']
+];
+
+function startSoupGame(random = Math.random, difficulty, previousId) {
+  const indexed = stories.map((story, index) => ({ story, comic: soupComics[index] }));
+  const matches = difficulty ? indexed.filter(({ story }) => story.difficulty === difficulty) : indexed;
+  const fresh = matches.filter(({ comic }) => comic[0] !== previousId);
+  const pool = fresh.length ? fresh : matches;
+  const { story, comic } = pool[Math.floor(random() * pool.length)];
+  return { story, comic, hints: 0, progress: 0, reply: '', result: null, revealed: false };
 }
 
 function playSoup(game, action, question) {
@@ -297,10 +320,10 @@ function playSoup(game, action, question) {
 
 function soupView(game) {
   return {
-    title: game.story.title, intro: game.story.intro, hints: game.hints,
+    title: game.story.title, difficulty: game.story.difficulty, storyId: game.comic[0], panels: game.comic.slice(1), intro: game.story.intro, hints: game.hints,
     progress: game.progress, clues: game.story.clues.length, reply: game.reply,
     end: game.revealed ? game.story.answer : game.result === 'solved' ? '你已解鎖所有線索！可按「揭曉答案」。' : ''
   };
 }
 
-if (typeof module !== 'undefined') module.exports = { startSoupGame, playSoup, soupView };
+if (typeof module !== 'undefined') module.exports = { startSoupGame, playSoup, soupView, soupDifficulties };

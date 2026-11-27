@@ -1,7 +1,7 @@
 'use strict';
 
 const { randomInt, randomUUID } = require('node:crypto');
-const { startSoupGame, playSoup, soupView } = require('../public/soup-bank');
+const { startSoupGame, playSoup, soupView, soupDifficulties } = require('../public/soup-bank');
 
 const idPattern = /^[A-Z]{2}\d{6}$/;
 const normalizeName = name => name.normalize('NFKC').trim().replace(/\s+/gu, ' ');
@@ -60,8 +60,12 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
     res.status(404).json({ error: '找不到這場紀錄。' });
   });
 
-  route('post', '/soup/start', (_req, res, user) => {
-    user.soup = startSoupGame();
+  route('post', '/soup/start', (req, res, user) => {
+    const difficulty = req.body?.difficulty;
+    if (difficulty !== undefined && !soupDifficulties.includes(difficulty)) {
+      return res.status(400).json({ error: '請選擇簡單、中等或困難。' });
+    }
+    user.soup = startSoupGame(Math.random, difficulty, user.soup?.comic?.[0]);
     user.soup.id = randomUUID();
     res.json({ id: user.soup.id, ...soupView(user.soup) });
   });
