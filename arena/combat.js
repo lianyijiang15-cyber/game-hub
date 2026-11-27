@@ -1,9 +1,12 @@
 'use strict';
 
-const { generateWorld, solid, impassable } = require('./world');
+const { generateWorld, solid, impassable, campOffset } = require('./world');
 const map = generateWorld();
+const visionRadius = 360;
+const grassRevealRadius = 80;
+const sightObstacle = tile => solid(tile) || tile === 'b';
 const classes = {
-  warrior: { hp: 150, speed: 150, range: 52, damage: 24, cooldown: 650 },
+  warrior: { hp: 300, speed: 150, range: 52, damage: 24, cooldown: 650 },
   archer: { hp: 100, speed: 185, range: 240, damage: 17, cooldown: 850 },
   mage: { hp: 80, speed: 165, range: 190, damage: 20, cooldown: 950 }
 };
@@ -35,8 +38,7 @@ function axisSpan(origin, delta, low, high) {
   return [Math.min(start, end), Math.max(start, end)];
 }
 
-function clearLine(a, b, padding = 0, world = map) {
-  const obstacle = padding ? impassable : solid;
+function clearLine(a, b, padding = 0, world = map, obstacle = padding ? impassable : solid) {
   if (blocked(a.x, a.y, padding, world, obstacle) || blocked(b.x, b.y, padding, world, obstacle)) return false;
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -49,11 +51,33 @@ function clearLine(a, b, padding = 0, world = map) {
     });
 }
 
+function inTallGrass(point, world) {
+  return world.tiles[Math.floor(point.y / world.tileSize)]?.[Math.floor(point.x / world.tileSize)] === 'b';
+}
+
+function canSee(observer, target, world) {
+  const gap = distance(observer, target);
+  if (gap > visionRadius) return false;
+  if (gap <= grassRevealRadius) return clearLine(observer, target, 0, world);
+  // A player in cover can look out, while targets in tall grass stay concealed.
+  if (inTallGrass(target, world)) return false;
+  if (!inTallGrass(observer, world)) return clearLine(observer, target, 0, world, sightObstacle);
+  const dx = target.x - observer.x;
+  const dy = target.y - observer.y;
+  for (let step = 4; step < gap; step += 4) {
+    const point = { x: observer.x + dx * step / gap, y: observer.y + dy * step / gap };
+    if (!inTallGrass(point, world)) {
+      return clearLine(observer, point, 0, world) && clearLine(point, target, 0, world, sightObstacle);
+    }
+  }
+  return false;
+}
+
 function spawn(room, player, now) {
   const { width, height } = room.map;
   const side = player.team === teams[0] ? 1 : -1;
   for (const offset of [0, -28, 28, -56, 56]) {
-    const position = { x: width / 2 - side * 464, y: height / 2 + side * ((player.slot - 2) * 72 + offset) };
+    const position = { x: width / 2 - side * campOffset, y: height / 2 + side * ((player.slot - 2) * 72 + offset) };
     if (blocked(position.x, position.y, radius, room.map) || room.players.some(other =>
       other !== player && other.alive && distance(position, other) < radius * 2)) continue;
     Object.assign(player, position, {
@@ -77,7 +101,7 @@ function start(room, now, seed) {
   room.roster.forEach((player, index) => {
     Object.assign(player, {
       team: teams[index % 2], slot: Math.floor(index / 2), alive: false,
-      kills: 0, deaths: 0, damage: 0, route: null, routeAt: 0
+      kills: 0, deaths: 0, damage: 0, route: null, routeAt: 0, lastSeen: null, patrolHome: false
     });
   });
   room.roster.forEach(player => spawn(room, player, now));
@@ -211,12 +235,17 @@ function tick(room, now, dt, botInput) {
   room.effects = room.effects.filter(item => item.until > now);
 }
 
-function snapshot(room, now) {
+function snapshot(room, now, viewer = null) {
+  const local = viewer && room.phase === 'playing';
+  const sees = point => !local || canSee(viewer, point, room.map);
+  const players = local ? room.players.filter(player => player === viewer ||
+    (player.team === viewer.team ? distance(viewer, player) <= visionRadius : sees(player))) : room.players;
   return {
     id: room.id, phase: room.phase, winner: room.winner, score: room.score, now,
-    remaining: Math.max(0, room.endsAt - now), effects: room.effects, kills: room.kills,
-    projectiles: room.projectiles.map(({ id, x, y, angle, type }) => ({ id, x, y, angle, type })),
-    players: room.players.map(({ id, x, y, name, team, job, hp, bot, alive, moving, angle, facing,
+    remaining: Math.max(0, room.endsAt - now), effects: room.effects.filter(sees), kills: room.kills,
+    visionRadius, concealed: !!local && inTallGrass(viewer, room.map),
+    projectiles: room.projectiles.filter(sees).map(({ id, x, y, angle, type }) => ({ id, x, y, angle, type })),
+    players: players.map(({ id, x, y, name, team, job, hp, bot, alive, moving, angle, facing,
       action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt }) =>
       ({ id, x, y, name, team, job, hp, maxHp: classes[job].hp, bot, alive, moving, angle, facing,
         action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt })),
@@ -225,4 +254,4 @@ function snapshot(room, now) {
   };
 }
 
-module.exports = { map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot };
+module.exports = { map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee };

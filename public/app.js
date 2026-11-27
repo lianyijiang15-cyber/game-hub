@@ -20,7 +20,7 @@ function hint(){if(hintCount>=3)return;$('answer').textContent='提示：'+soup.
 const jobNames = { warrior: '戰士', archer: '弓箭手', mage: '法師' };
 const skills = { warrior: '旋風斬', archer: '三重箭', mage: '火球術' };
 const classDetails = {
-  warrior: { role: '近戰前排', hp: 150, range: 52, description: '以盾甲扛住第一波攻勢，逼近敵人後用長劍封住狹窄通道。敵人圍上來時，旋風斬能同時攻擊周圍目標。' },
+  warrior: { role: '近戰前排', hp: 300, range: 52, description: '以盾甲扛住第一波攻勢，逼近敵人後用長劍封住狹窄通道。敵人圍上來時，旋風斬能同時攻擊周圍目標。' },
   archer: { role: '遠距游擊', hp: 100, range: 240, description: '利用長弓和最快的移動速度，從遠處牽制敵人。三重箭向不同角度飛出，適合封住通道或在近距離打中多支。' },
   mage: { role: '遠程範圍傷害', hp: 80, range: 190, description: '靠隊友掩護尋找施法角度。火球撞擊後會爆炸，適合攻擊聚在一起的敵人。' }
 };
@@ -373,6 +373,7 @@ socket.on('arenaState', state => {
     renderResults(state);
     return;
   }
+  $('concealed').hidden = !state.concealed;
   $('red-score').textContent = state.score['紅隊'];
   $('blue-score').textContent = state.score['藍隊'];
   $('kill-feed').replaceChildren(...state.kills.map(kill => element('li', `${kill.attacker} 擊倒 ${kill.victim}`)));

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜開放世界對抗</title>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <main>
@@ -117,9 +117,10 @@
     <div class="arena-frame">
       <canvas id="arena" width="960" height="576" aria-label="開放世界團隊對抗地圖"></canvas>
       <p id="respawn" hidden></p>
+      <p id="concealed" hidden>高草隱蔽中</p>
     </div>
     <div class="hud">
-      <div class="health-block"><span id="health"></span><progress id="health-bar" max="150" value="0" aria-label="生命值"></progress></div>
+      <div class="health-block"><span id="health"></span><progress id="health-bar" max="300" value="0" aria-label="生命值"></progress></div>
       <div class="ability"><kbd>左鍵</kbd><span id="attack-status"></span></div>
       <div class="ability"><kbd>Q</kbd><span id="skill-status"></span></div>
     </div>
@@ -148,7 +149,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=4"></script>
-<script src="arena-renderer.js?v=4"></script>
+<script src="app.js?v=5"></script>
+<script src="arena-renderer.js?v=5"></script>
 </body>
 </html>

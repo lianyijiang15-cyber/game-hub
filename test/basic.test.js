@@ -78,17 +78,19 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(initial.map, undefined);
   assert.equal(initial.now, shared.now);
   assert.equal(initial.players.filter(player => player.team === '紅隊').length, 5);
+  assert.ok(initial.players.every(player => player.team === '紅隊'));
+  assert.ok(shared.players.every(player => player.team === '藍隊'));
   const mine = initial.players.find(player => player.id === host.id);
   assert.equal(mine.job, 'archer');
-  const moved = receive(guest, 'arenaState', state => state.players.find(p => p.id === host.id).x > mine.x);
+  const moved = receive(host, 'arenaState', state => state.players.find(p => p.id === host.id)?.x > mine.x);
   host.emit('arenaInput', { x: 1, y: 0, hp: 1 });
   assert.equal((await moved).players.find(player => player.id === host.id).hp, 100);
   host.emit('arenaInput', { x: 0, y: 0 });
-  const stopped = await receive(guest, 'arenaState');
-  const next = await receive(guest, 'arenaState');
+  const stopped = await receive(host, 'arenaState');
+  const next = await receive(host, 'arenaState');
   assert.equal(stopped.players.find(p => p.id === host.id).x, next.players.find(p => p.id === host.id).x);
 
-  const fired = receive(guest, 'arenaState', state => state.projectiles.length === 3);
+  const fired = receive(host, 'arenaState', state => state.projectiles.length === 3);
   host.emit('arenaAttack', { x: mine.x + 100, y: mine.y, skill: true });
   assert.ok((await fired).projectiles.every(p => p.type === 'arrow'));
 
@@ -126,7 +128,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const soloMap = receive(guest, 'arenaMap');
   const soloFrame = receive(guest, 'arenaState', state => state.id === solo.id);
   assert.equal((await send(guest, 'start')).ok, true);
-  assert.equal((await soloFrame).players.filter(player => player.bot).length, 9);
+  assert.equal((await soloFrame).players.filter(player => player.bot).length, 4);
   const { map } = await soloMap;
   guest.disconnect();
   await wait(75);
@@ -139,7 +141,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.deepEqual(resume.map, map);
   assert.equal(resume.room.host, outsider.id);
   assert.notEqual(resume.ticket, solo.ticket);
-  assert.equal((await recovered).players.length, 10);
+  assert.equal((await recovered).players.length, 5);
   await send(outsider, 'leave');
   assert.equal(rooms.has(solo.id), false);
 });

@@ -19,6 +19,7 @@ function rect(ctx, color, x, y, width, height) {
 const terrainColors = {
   g: ['#587c45', '#60854a', '#64894b'],
   f: ['#395c3d', '#416841', '#456c42'],
+  b: ['#587948', '#62824a', '#617e48'],
   r: ['#60675e', '#666d64', '#73796c'],
   w: ['#306c83', '#32738a', '#34788c'],
   d: ['#826344', '#8d6a49', '#91714f'],
@@ -58,11 +59,23 @@ function paintTile(ctx, map, col, row, x, y) {
     rect(ctx, '#a3a799', x + 7, y + 6, 16, 3);
     rect(ctx, '#58635d', x + 13, y + 15, 13, 9);
   } else if (tile === 'f') {
-    rect(ctx, '#24483480', dx - 4, dy + 8, 13, 4);
-    rect(ctx, '#6b543c', dx + 1, dy + 4, 3, 6);
-    rect(ctx, '#264a36', dx - 4, dy + 1, 13, 6);
-    rect(ctx, '#608751', dx - 2, dy - 3, 9, 7);
-    rect(ctx, '#85a160', dx, dy - 4, 4, 2);
+    const tree = x + 13 + hash % 6;
+    rect(ctx, '#23432da0', tree - 10, y + 22, 23, 7);
+    rect(ctx, '#5d4932', tree - 2, y + 13, 5, 14);
+    rect(ctx, '#244b37', tree - 9, y + 7, 20, 15);
+    rect(ctx, '#2e6140', tree - 11, y + 9, 24, 9);
+    rect(ctx, '#4b7949', tree - 8, y + 5, 17, 10);
+    rect(ctx, '#619452', tree - 4, y + 3, 10, 6);
+    rect(ctx, '#8bab60', tree - 4, y + 4, 6, 2);
+  } else if (tile === 'b') {
+    for (let stem = 0; stem < 11; stem++) {
+      const blade = tileVariation(col * 13 + stem, row);
+      const sx = x + 2 + (blade % 27);
+      const sy = y + 10 + ((blade >>> 11) % 17);
+      const height = 5 + ((blade >>> 19) % 8);
+      rect(ctx, '#3c623a', sx, sy - height, 2, height);
+      rect(ctx, blade % 2 ? '#9bad59' : '#7c9c4c', sx - 1, sy - height, 2, 4);
+    }
   } else {
     rect(ctx, tile === 'g' ? '#9baa65' : '#c1a574', dx, dy, 4, 1);
     rect(ctx, tile === 'g' ? '#385d3c' : '#65503a', dx + 2, dy + 4, 2, 2);
@@ -238,8 +251,8 @@ function drawArena(state, old, blend, time, aim, localId, map) {
   if (canvas.height !== height) canvas.height = height;
   const older = new Map(old?.players.map(p => [p.id, p]));
   const player = state.players.find(p => p.id === localId);
-  if (player) {
-    const position = displayPosition(player, older.get(localId), blend);
+  const position = player && displayPosition(player, older.get(localId), blend);
+  if (position) {
     arenaCamera.x = Math.round(Math.max(0, Math.min(map.width - width, position.x - width / 2)));
     arenaCamera.y = Math.round(Math.max(0, Math.min(map.height - height, position.y - height / 2)));
   }
@@ -283,6 +296,16 @@ function drawArena(state, old, blend, time, aim, localId, map) {
     ctx.restore();
   }
   ctx.restore();
+  if (position && state.visionRadius) {
+    const x = position.x - arenaCamera.x;
+    const y = position.y - arenaCamera.y;
+    const radius = state.visionRadius;
+    const fog = ctx.createRadialGradient(x, y, radius * 0.74, x, y, radius + 6);
+    fog.addColorStop(0, '#10171800');
+    fog.addColorStop(0.96, '#101718e8');
+    fog.addColorStop(1, '#101718f0');
+    rect(ctx, fog, 0, 0, width, height);
+  }
   const cursor = aim || { x: width / 2 + 45, y: height / 2 };
   rect(ctx, '#fff0c2', cursor.x - 6, cursor.y, 4, 1);
   rect(ctx, '#fff0c2', cursor.x + 3, cursor.y, 4, 1);

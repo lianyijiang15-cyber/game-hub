@@ -22,7 +22,7 @@ test('seeded 100 × 100 worlds contain all terrain, connected land and safe sepa
     assert.notDeepEqual(map.tiles, generateWorld(seed + 1).tiles);
     assert.deepEqual([map.width, map.height, map.tileSize, map.tiles.length], [3200, 3200, 32, 100]);
     assert.ok(map.tiles.every(row => row.length === 100 && row[0] === '#' && row[99] === '#'));
-    for (const tile of 'gfrwdp') assert.ok(map.tiles.some(row => row.includes(tile)), tile);
+    for (const tile of 'gfrwdpb') assert.ok(map.tiles.some(row => row.includes(tile)), tile);
     assert.equal(map.tiles[0], '#'.repeat(100));
     assert.equal(map.tiles[99], '#'.repeat(100));
     const waterRow = map.tiles.findIndex(row => row.includes('w'));
@@ -47,6 +47,37 @@ test('seeded 100 × 100 worlds contain all terrain, connected land and safe sepa
       assert.ok(room.players.every(other => other === player || combat.distance(player, other) >= 72));
     }
   }
+});
+
+test('team camps are out of sight and high grass conceals enemies outside close range', () => {
+  const room = match();
+  const [observer, enemy] = room.players;
+  assert.equal(observer.hp, 300);
+  for (const ally of room.players.filter(player => player.team === observer.team)) {
+    for (const foe of room.players.filter(player => player.team !== observer.team)) {
+      assert.ok(combat.distance(ally, foe) >= 1888);
+      assert.equal(combat.canSee(ally, foe, room.map), false);
+    }
+  }
+  const tiles = Array(100).fill('g'.repeat(100));
+  tiles[20] = tiles[20].slice(0, 24) + 'b' + tiles[20].slice(25);
+  room.map = { ...room.map, tiles };
+  Object.assign(observer, { x: 640, y: 656 });
+  Object.assign(enemy, { x: 784, y: 656 });
+  assert.equal(combat.blocked(enemy.x, enemy.y, 12, room.map), false);
+  assert.equal(combat.canSee(observer, enemy, room.map), false);
+  assert.equal(combat.canSee(enemy, observer, room.map), true);
+  assert.ok(!combat.snapshot(room, 50, observer).players.some(player => player.id === enemy.id));
+  assert.equal(combat.snapshot(room, 50, enemy).concealed, true);
+  enemy.x = 832;
+  assert.equal(combat.canSee(observer, enemy, room.map), false);
+  assert.equal(combat.clearLine(observer, enemy, 0, room.map), true);
+  observer.x = 716;
+  enemy.x = 784;
+  assert.equal(combat.canSee(observer, enemy, room.map), true);
+  assert.ok(combat.snapshot(room, 50, observer).players.some(player => player.id === enemy.id));
+  observer.x = 1200;
+  assert.equal(combat.canSee(observer, enemy, room.map), false);
 });
 
 test('normalized movement, rock blocking and character collision', () => {

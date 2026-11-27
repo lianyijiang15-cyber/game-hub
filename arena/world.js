@@ -6,6 +6,7 @@ const tileSize = 32;
 const width = columns * tileSize;
 const height = rows * tileSize;
 const defaultSeed = 41729;
+const campOffset = 944;
 const solid = tile => tile === '#' || tile === 'r';
 const impassable = tile => solid(tile) || tile === 'w';
 
@@ -34,6 +35,9 @@ function generateWorld(seed = defaultSeed) {
 
   function terrain(x, y) {
     if (!x || !y || x === columns - 1 || y === rows - 1) return '#';
+    const campColumn = (width / 2 - campOffset) / tileSize - 0.5;
+    if (Math.abs(y - 49.5) <= 8 &&
+        Math.min(Math.abs(x - campColumn), Math.abs(x - (columns - 1 - campColumn))) <= 2) return 'g';
     const center = x >= 32 && x <= 67 && y >= 39 && y <= 60;
     const variation = noise(x, y, 9, 113);
     const roadY = 49.5 + 3.5 * Math.sin((x - 49.5) / 9) + 2 * Math.sin((x - 49.5) / 3.6);
@@ -46,7 +50,8 @@ function generateWorld(seed = defaultSeed) {
     // Two rocky outcrops give the central lanes cover without blocking the crossroads.
     if (Math.hypot((x - 45) / 2.8, (y - 43) / 2) < 1) return 'r';
     if (lake < 1.19 || wet < 0.35) return 'd';
-    return field(x, y, 97) > 0.56 ? 'f' : 'g';
+    if (field(x, y, 131) > (center ? 0.67 : 0.59)) return 'b';
+    return field(x, y, 97) > 0.49 ? 'f' : 'g';
   }
 
   const grid = Array.from({ length: rows }, (_, y) =>
@@ -67,4 +72,4 @@ function generateWorld(seed = defaultSeed) {
   return { width, height, columns, rows, tileSize, tiles, seed };
 }
 
-module.exports = { generateWorld, solid, impassable };
+module.exports = { generateWorld, solid, impassable, campOffset };

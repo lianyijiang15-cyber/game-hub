@@ -1,6 +1,7 @@
 'use strict';
 
-const { map, classes, blocked, clearLine, distance, attack } = require('./combat');
+const { map, classes, blocked, clearLine, distance, attack, canSee } = require('./combat');
+const { campOffset } = require('./world');
 const graphs = new WeakMap();
 function navigation(world) {
   if (graphs.has(world)) return graphs.get(world);
@@ -83,15 +84,23 @@ function steer(player, target) {
 }
 
 function botInput(room, bot, now) {
-  const enemies = room.players.filter(player => player.alive && player.team !== bot.team);
+  const enemies = room.players.filter(player => player.alive && player.team !== bot.team &&
+    canSee(bot, player, room.map));
   enemies.sort((a, b) => distance(bot, a) - distance(bot, b) ||
     ((a.slot + bot.slot) % 5) - ((b.slot + bot.slot) % 5));
-  const target = enemies[0];
-  if (!target) return idle;
+  const enemy = enemies[0];
+  if (enemy) bot.lastSeen = { x: enemy.x, y: enemy.y, until: now + 2000 };
+  const side = bot.team === '紅隊' ? 1 : -1;
+  const patrolPoint = () => ({
+    x: room.map.width / 2 + side * campOffset * (bot.patrolHome ? -1 : 1),
+    y: room.map.height / 2 + side * (bot.slot - 2) * 64
+  });
+  if (distance(bot, patrolPoint()) < 24) bot.patrolHome = !bot.patrolHome;
+  const target = enemy || (bot.lastSeen?.until > now && distance(bot, bot.lastSeen) > 24 ? bot.lastSeen : patrolPoint());
 
   const job = classes[bot.job];
   const gap = distance(bot, target);
-  const visible = gap <= job.range && clearLine(bot, target, 0, room.map);
+  const visible = enemy && gap <= job.range;
   if (visible) {
     attack(room, bot, target.x, target.y, false, now);
     if (now >= bot.skillAt) attack(room, bot, target.x, target.y, true, now);

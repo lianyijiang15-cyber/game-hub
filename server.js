@@ -99,7 +99,11 @@ function runMatch(room) {
   io.to(channel(room)).emit('arenaMap', { id: room.id, map: room.map });
   publish(room);
   let lastTick = now();
-  const broadcast = () => io.to(channel(room)).volatile.emit('arenaState', combat.snapshot(room, now()));
+  const broadcast = time => {
+    for (const player of room.players) {
+      if (!player.bot) io.to(player.id).volatile.emit('arenaState', combat.snapshot(room, time, player));
+    }
+  };
   room.timer = setInterval(() => {
     const time = now();
     if (room.phase === 'playing') combat.tick(room, time, Math.min((time - lastTick) / 1000, 0.05), botInput);
@@ -121,7 +125,7 @@ function runMatch(room) {
       room.expiry.unref();
       return;
     }
-    broadcast();
+    broadcast(time);
   }, 50);
 }
 

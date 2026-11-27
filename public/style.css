@@ -172,3 +172,5 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
   .in-combat .hud > div { padding: 5px; }
   .in-combat #match-chat { width: 43vw; }
 }
+
+#concealed { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); margin: 0; padding: 4px 10px; border: 1px solid #8ab36c; border-radius: 4px; color: #def1bd; background: #1e3225e6; font-size: .86rem; pointer-events: none; }
