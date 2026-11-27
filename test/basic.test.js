@@ -46,11 +46,11 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.match(id, /^[A-F0-9]{6}$/);
   assert.equal((await send(guest, 'join', { id: id.toLowerCase(), name: 'Guest' })).id, id);
   assert.ok((await send(guest, 'fillBots')).error);
-  assert.equal((await send(host, 'addBot')).ok, true);
+  assert.equal((await send(host, 'addBot')).room.players.filter(p => p.bot).length, 1);
   const botId = rooms.get(id).players.find(player => player.bot).id;
   assert.equal((await send(host, 'removeBot', botId)).ok, true);
   const filled = receive(guest, 'room', room => room.players.length === 10);
-  assert.equal((await send(host, 'fillBots')).ok, true);
+  assert.equal((await send(host, 'fillBots')).room.players.length, 10);
   assert.equal((await filled).players.filter(player => player.bot).length, 8);
   assert.equal((await send(host, 'chooseClass', 'archer')).ok, true);
   assert.equal((await send(guest, 'chooseClass', 'mage')).ok, true);

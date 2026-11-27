@@ -18,7 +18,7 @@ function paintDungeon(map) {
   dungeon.width = map.width;
   dungeon.height = map.height;
   const ctx = dungeon.getContext('2d');
-  const palettes = ['#30313d', '#333541', '#353643', '#3a3945', '#373944'];
+  const palettes = ['#302b38', '#393442', '#343240', '#3c3847', '#343744'];
   ctx.fillStyle = '#242630';
   ctx.fillRect(0, 0, map.width, map.height);
   for (let y = 0; y < map.height; y += 24) {
@@ -34,13 +34,37 @@ function paintDungeon(map) {
       }
     }
   }
-  for (const [x, tint] of [[32, '#953e3940'], [map.width - 144, '#36659650']]) {
+  for (const [x, tint, border, light] of [
+    [32, '#5c30384d', '#a85c54', '#e7a078'],
+    [map.width - 144, '#31527a4d', '#577caf', '#90c5e9']
+  ]) {
+    const center = x + 56;
     rect(ctx, tint, x, 44, 112, map.height - 88);
-    for (let y = 72; y < map.height - 50; y += 104) {
-      const accent = x < 100 ? '#a85c54' : '#577caf';
-      rect(ctx, accent, x + 24, y + 20, 14, 2);
-      rect(ctx, accent, x + 76, y + 20, 14, 2);
+    for (const edge of [x + 2, x + 109]) rect(ctx, border, edge, 44, 1, map.height - 88);
+    for (let y = 80; y < map.height - 35; y += 104) {
+      rect(ctx, border, center - 15, y - 15, 30, 2);
+      rect(ctx, border, center - 15, y + 13, 30, 2);
+      for (const edge of [center - 15, center + 13]) rect(ctx, border, edge, y - 11, 2, 22);
+      rect(ctx, light, center - 4, y - 4, 8, 8);
+      rect(ctx, tint, center - 2, y - 2, 4, 4);
     }
+  }
+  // Floor inlays mark the central approaches without adding collision geometry.
+  const centerX = map.width / 2;
+  for (const centerY of [156, map.height - 156]) {
+    const stone = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, 73);
+    stone.addColorStop(0, '#d4a7672d');
+    stone.addColorStop(1, '#d4a76700');
+    rect(ctx, stone, centerX - 73, centerY - 73, 146, 146);
+    for (let step = 0; step < 16; step++) {
+      const offset = step * 3;
+      for (const direction of [-1, 1]) {
+        rect(ctx, '#aa866464', centerX - offset, centerY + direction * (48 - offset), 3, 3);
+        rect(ctx, '#aa866464', centerX + offset, centerY + direction * (48 - offset), 3, 3);
+      }
+    }
+    rect(ctx, '#cfa47455', centerX - 12, centerY - 1, 24, 2);
+    rect(ctx, '#cfa47455', centerX - 1, centerY - 12, 2, 24);
   }
   const bounds = [[0, 0, map.width, map.border], [0, map.height - map.border, map.width, map.border],
     [0, map.border, map.border, map.height - map.border * 2],
@@ -65,9 +89,22 @@ function paintDungeon(map) {
         rect(ctx, '#ffffff22', x + col, y + row, brickWidth, 2);
       }
     }
-    rect(ctx, '#82808d', x, y, w, 3);
+    rect(ctx, '#88818c', x, y, w, 3);
+    rect(ctx, '#ffffff21', x + 2, y + 3, w - 4, 2);
+    if (w >= 48 && h >= 80) {
+      for (const end of [y + 10, y + h - 24]) {
+        rect(ctx, '#29242e', x + 5, end + 3, 14, 15);
+        rect(ctx, '#787181', x + 5, end, 14, 4);
+        rect(ctx, '#4b4353', x + 7, end + 4, 10, 10);
+      }
+    }
     rect(ctx, '#33313e', x, y + h - 4, w, 4);
   }
+  const shade = ctx.createRadialGradient(map.width / 2, map.height / 2, 130, map.width / 2, map.height / 2, 550);
+  shade.addColorStop(0, '#100b1500');
+  shade.addColorStop(0.68, '#100b1520');
+  shade.addColorStop(1, '#100b15b0');
+  rect(ctx, shade, 0, 0, map.width, map.height);
 }
 
 function torches(ctx, map, time) {
@@ -83,6 +120,10 @@ function torches(ctx, map, time) {
     rect(ctx, '#29232a', x - 4, y - 1, 8, 10);
     rect(ctx, '#d57638', x - 4, y - 9 - flicker, 8, 10 + flicker);
     rect(ctx, '#ffdc85', x - 2, y - 10 + flicker, 4, 9);
+    for (let spark = 0; spark < 3; spark++) {
+      const age = (Math.floor(time / 85) + spark * 7 + x) % 23;
+      rect(ctx, age < 13 ? '#ffb86a' : '#f48a4d80', x + spark * 4 - 6 + age / 3, y - 11 - age, 2, 2);
+    }
   }
 }
 

@@ -26,11 +26,15 @@ function list(target = io) {
   })));
 }
 
-function publish(room) {
-  io.to(channel(room)).emit('room', {
+function roomState(room) {
+  return {
     id: room.id, host: room.host, size: seats, phase: room.phase,
     players: room.players.map(({ id, name, job, ready, bot }) => ({ id, name, job, ready, bot }))
-  });
+  };
+}
+
+function publish(room) {
+  io.to(channel(room)).emit('room', roomState(room));
   list();
 }
 
@@ -159,7 +163,7 @@ io.on('connection', socket => {
     const created = { id, host: socket.id, phase: 'lobby', players: [] };
     rooms.set(id, created);
     join(socket, created, name);
-    return { id };
+    return { id, room: roomState(created) };
   });
   command('join', (data, { room }) => {
     if (room) return { error: '請先離開目前房間' };
@@ -171,17 +175,19 @@ io.on('connection', socket => {
       return { error: '房間不存在、已開始或已滿' };
     }
     join(socket, target, name);
-    return { id };
+    return { id, room: roomState(target) };
   });
   command('leave', () => leave(socket), 0);
   hostCommand('addBot', 'lobby', room => {
     if (room.players.length >= seats) return { error: '房間已滿' };
     addBot(room);
     publish(room);
+    return { ok: true, room: roomState(room) };
   });
   hostCommand('fillBots', 'lobby', room => {
     while (room.players.length < seats) addBot(room);
     publish(room);
+    return { ok: true, room: roomState(room) };
   });
   hostCommand('removeBot', 'lobby', (room, id) => {
     if (typeof id !== 'string' || !room.players.some(player => player.id === id && player.bot)) {

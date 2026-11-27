@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜地下城對抗</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 <main>
@@ -83,27 +83,30 @@
       </select>
     </label>
     <p id="job-description" class="muted"></p>
+    <div class="bot-settings">
+    <div><strong id="bot-summary"></strong><p id="bot-help"></p></div>
     <div id="bot-controls" hidden>
-      <button class="secondary" onclick="command('addBot')">加入 AI</button>
-      <button class="secondary" onclick="command('fillBots')">補滿 AI</button>
+      <button id="add-bot" class="secondary">加入一名 AI</button>
+      <button id="fill-bots">一鍵補滿 AI</button>
+    </div>
     </div>
     <button id="ready" onclick="command('ready')">準備</button>
     <button id="start" onclick="command('start')">開始遊戲</button>
   </div>
   <div id="battle" hidden>
     <div class="scoreboard">
-      <span class="red">紅隊 <strong id="red-score">0</strong></span>
-      <strong id="clock">05:00</strong>
-      <span class="blue"><strong id="blue-score">0</strong> 藍隊</span>
+      <span class="red"><span>紅隊</span><strong id="red-score">0</strong></span>
+      <span class="match-clock"><strong id="clock">05:00</strong><small>團隊死鬥</small></span>
+      <span class="blue"><strong id="blue-score">0</strong><span>藍隊</span></span>
     </div>
     <div class="arena-frame">
       <canvas id="arena" width="960" height="576" aria-label="地下城團隊對抗地圖"></canvas>
       <p id="respawn" hidden></p>
     </div>
     <div class="hud">
-      <span id="health"></span>
-      <span id="attack-status"></span>
-      <span id="skill-status"></span>
+      <div class="health-block"><span id="health"></span><progress id="health-bar" max="150" value="0" aria-label="生命值"></progress></div>
+      <div class="ability"><kbd>左鍵</kbd><span id="attack-status"></span></div>
+      <div class="ability"><kbd>Q</kbd><span id="skill-status"></span></div>
     </div>
     <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>Enter</kbd> 聊天</p>
     <ul id="kill-feed" aria-label="擊殺通知"></ul>
@@ -130,7 +133,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js"></script>
-<script src="arena-renderer.js"></script>
+<script src="app.js?v=2"></script>
+<script src="arena-renderer.js?v=2"></script>
 </body>
 </html>

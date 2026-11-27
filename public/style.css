@@ -56,3 +56,40 @@ kbd { border: 1px solid #635c72; background: #181823; color: #faf0ff; padding: 2
 .table-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; text-align: left; }
 th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
+
+#game { --brass: #e7c485; --deep: #141119; }
+#game .room-heading h2 { font-size: clamp(1.25rem, 3vw, 1.8rem); }
+#room-id { padding: .25em .45em; border: 1px solid #725c40; background: #211b20; }
+#room-error:not(:empty) { padding: 10px 14px; background: #3c2028; border-left: 3px solid #f2968c; margin-bottom: 12px; }
+#game .panel { background: linear-gradient(145deg, #25212a, #16141d); border-color: #544451; }
+#game button:not(.ghost):not(.secondary) { background: var(--brass); color: #24180e; }
+#players > div { background: #191923; border-color: #494052; border-radius: 5px; }
+.bot-settings { display:flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 12px 14px; margin: 12px 0; border: 1px solid #69543d; background: #281f23; }
+#bot-summary { color: var(--brass); }
+#bot-help { color: #c9becd; margin: .35rem 0 0; font-size: .88rem; }
+.scoreboard { padding: 0; overflow: hidden; border-color: #685442; border-radius: 9px 9px 0 0; gap: 0; background: var(--deep); }
+.scoreboard > span { display: flex; flex: 1; min-height: 68px; align-items: center; justify-content: center; gap: clamp(6px, 2vw, 24px); }
+.scoreboard .red { background: linear-gradient(90deg, #632b30, #2d1c24); border-top: 3px solid #ee7763; }
+.scoreboard .blue { background: linear-gradient(90deg, #1c2534, #274a69); border-top: 3px solid #70b9ec; }
+.scoreboard .red strong, .scoreboard .blue strong { font-size: clamp(1.6rem, 4vw, 2.6rem); }
+.scoreboard .match-clock { flex: 0 0 clamp(88px, 16vw, 172px); flex-direction: column; gap: 0; color: var(--brass); font-variant-numeric: tabular-nums; }
+.match-clock small { color: #c8bdac; font-family: system-ui, sans-serif; font-size: .66rem; }
+.arena-frame { border-inline: 1px solid #685442; box-shadow: 0 10px 38px #0009; }
+.hud { display: grid; grid-template-columns: minmax(155px, 1.3fr) 1fr 1fr; gap: 0; padding: 0; border-color: #685442; border-radius: 0 0 8px 8px; background: linear-gradient(#28222a, #19151d); }
+.hud span + span { padding-left: 0; border-left: 0; }
+.hud > div { padding: 12px clamp(8px, 2vw, 16px); }
+.hud > div + div { border-left: 1px solid #504151; }
+.health-block { display: flex; flex-direction: column; gap: 7px; }
+#health-bar { width: 100%; height: 8px; appearance: none; border: 0; background: #161118; color: #eca471; }
+#health-bar::-webkit-progress-bar { background: #161118; }
+#health-bar::-webkit-progress-value { background: linear-gradient(90deg, #c35355, #f3b479); }
+#health-bar::-moz-progress-bar { background: #eca471; }
+.ability { display: flex; align-items: center; gap: 8px; }
+.ability kbd { flex: none; border-color: #7a634d; color: var(--brass); }
+#kill-feed:not(:empty) { padding: 10px 12px; list-style: none; background: #18141f; border-left: 2px solid #967247; }
+#kill-feed li + li { margin-top: 3px; }
+@media (max-width: 560px) {
+  .hud { grid-template-columns: 1fr 1fr; }
+  .hud .health-block { grid-column: 1 / -1; border-bottom: 1px solid #504151; }
+  .hud .health-block + .ability { border-left: 0; }
+}

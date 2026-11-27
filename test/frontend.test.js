@@ -35,6 +35,9 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     };
   }
   for (const [, id] of read('index.html').matchAll(/id="([^"]+)"/g)) elements.set(id, element());
+  const hostPlayer = { id: 'self', name: 'Tester', job: 'mage', ready: false, bot: false };
+  const bot = index => ({ id: 'bot-' + index, name: 'AI ' + index, job: 'archer', ready: true, bot: true });
+  const roster = { id: 'ABCDE0', host: 'self', phase: 'lobby', size: 10, players: [hostPlayer] };
   const socket = {
     id: 'self', connected: true,
     on(event, handler) { socketHandlers.set(event, handler); },
@@ -42,7 +45,9 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     timeout() {
       return { emit(event, ...args) {
         emitted.push([event, ...args.slice(0, -1)]);
-        args.at(-1)(null, { id: 'ABCDE0' });
+        if (event === 'addBot') roster.players.push(bot(1));
+        if (event === 'fillBots') while (roster.players.length < 10) roster.players.push(bot(roster.players.length));
+        args.at(-1)(null, { id: 'ABCDE0', room: roster });
       } };
     },
     volatile: { emit(...args) { emitted.push(args); } }
@@ -77,6 +82,14 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   elements.get('nickname').value = 'Tester';
   context.createRoom();
   assert.equal(elements.get('room-id').textContent, 'ABCDE0');
+  assert.equal(elements.get('bot-controls').hidden, false);
+  elements.get('add-bot').onclick();
+  assert.equal(emitted.at(-1)[0], 'addBot');
+  assert.equal(elements.get('bot-summary').textContent, '1 名 AI · 8 個空位');
+  elements.get('fill-bots').onclick();
+  assert.equal(emitted.at(-1)[0], 'fillBots');
+  assert.equal(elements.get('bot-summary').textContent, '9 名 AI · 0 個空位');
+  assert.equal(elements.get('fill-bots').disabled, true);
   const player = {
     id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 80, y: 80, hp: 80, maxHp: 80,
     alive: true, facing: 0, attackAt: 0, skillAt: 0, spawnedAt: 0

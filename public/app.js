@@ -75,7 +75,8 @@ function command(event, ...args) {
     return;
   }
   socket.timeout(3000).emit(event, ...args, (error, result) => {
-    $('room-error').textContent = error ? '操作逾時' : result.error || '';
+    $('room-error').textContent = error ? '伺服器未回應這項操作，請確認已更新並重啟 Game Hub。' : result?.error || '';
+    if (result?.room) renderRoom(result.room);
   });
 }
 
@@ -106,6 +107,7 @@ function enter(event, data) {
     $('waiting').hidden = false;
     $('battle').hidden = $('results').hidden = true;
     show('game');
+    if (result.room) renderRoom(result.room);
   });
 }
 
@@ -139,7 +141,7 @@ socket.on('rooms', entries => {
   if (!$('lobby').hidden) renderRoomList();
 });
 
-socket.on('room', state => {
+function renderRoom(state) {
   if (state.id !== room) return;
   const me = state.players.find(player => player.id === socket.id);
   if (!me) return;
@@ -174,11 +176,19 @@ socket.on('room', state => {
   }
   $('job').value = me.job;
   $('job-description').textContent = descriptions[me.job];
-  $('bot-controls').hidden = !host || state.players.length === state.size;
+  const full = state.players.length === state.size;
+  const bots = state.players.filter(player => player.bot).length;
+  $('bot-controls').hidden = !host;
+  $('add-bot').disabled = $('fill-bots').disabled = full;
+  $('bot-summary').textContent = `${bots} 名 AI · ${state.size - state.players.length} 個空位`;
+  $('bot-help').textContent = host ? '用 AI 補足空位，單人也能開局。' : '由房主加入或移除 AI。';
   $('ready').textContent = me.ready ? '取消準備' : '準備';
   $('start').hidden = !host;
   $('start').disabled = state.players.length !== state.size || !state.players.every(p => p.ready);
-});
+}
+socket.on('room', renderRoom);
+$('add-bot').onclick = () => command('addBot');
+$('fill-bots').onclick = () => command('fillBots');
 $('job').onchange = () => command('chooseClass', $('job').value);
 
 socket.on('chat', message => {
@@ -305,9 +315,11 @@ function renderFrame(time) {
   const me = frame.players.find(player => player.id === socket.id);
   if (me) {
     const cooldown = at => at > serverTime ? ((at - serverTime) / 1000).toFixed(1) + ' 秒' : '就緒';
+    $('health-bar').max = me.maxHp;
+    $('health-bar').value = me.hp;
     $('health').textContent = `${jobNames[me.job]} · HP ${me.hp}/${me.maxHp}`;
     $('attack-status').textContent = '普攻 ' + cooldown(me.attackAt);
-    $('skill-status').textContent = `Q ${skills[me.job]} · ${cooldown(me.skillAt)}`;
+    $('skill-status').textContent = `${skills[me.job]} · ${cooldown(me.skillAt)}`;
     $('respawn').hidden = me.alive;
     if (!me.alive) $('respawn').textContent = `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;
   }
