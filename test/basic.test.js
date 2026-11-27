@@ -113,7 +113,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(mine.job, 'archer');
   const moved = receive(host, 'arenaState', state => state.players.find(p => p.id === host.id)?.x > mine.x);
   host.emit('arenaInput', { x: 1, y: 0, hp: 1 });
-  assert.equal((await moved).players.find(player => player.id === host.id).hp, 100);
+  assert.equal((await moved).players.find(player => player.id === host.id).hp, 600);
   host.emit('arenaInput', { x: 0, y: 0 });
   const stopped = await receive(host, 'arenaState');
   const next = await receive(host, 'arenaState');

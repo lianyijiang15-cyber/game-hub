@@ -52,7 +52,7 @@ test('seeded 100 × 100 worlds contain all terrain, connected land and safe sepa
 test('team camps are out of sight and high grass conceals enemies outside close range', () => {
   const room = match();
   const [observer, enemy] = room.players;
-  assert.equal(observer.hp, 300);
+  assert.equal(observer.hp, 800);
   for (const ally of room.players.filter(player => player.team === observer.team)) {
     for (const foe of room.players.filter(player => player.team !== observer.team)) {
       assert.ok(combat.distance(ally, foe) >= 1888);
@@ -101,7 +101,7 @@ test('ordinary attack, cooldown, whirlwind, death, respawn and 20 kills', () => 
   const room = match();
   const [source, target] = room.players;
   Object.assign(source, { x: 1200, y: 1600 });
-  Object.assign(target, { x: 1240, y: 1600 });
+  Object.assign(target, { x: 1240, y: 1600, hp: 80 });
   combat.attack(room, source, 1240, 1600, false, 50);
   assert.equal(target.hp, 56);
   combat.attack(room, source, 1240, 1600, false, 200);
@@ -114,7 +114,7 @@ test('ordinary attack, cooldown, whirlwind, death, respawn and 20 kills', () => 
   combat.tick(room, 3699, 0.05, idle);
   assert.equal(target.alive, false);
   combat.tick(room, 3700, 0.05, idle);
-  assert.equal(target.hp, 80);
+  assert.equal(target.hp, 580);
   room.score[source.team] = 19;
   Object.assign(target, { x: 1240, y: 1600, hp: 1 });
   combat.attack(room, source, 1240, 1600, false, 3750);
@@ -131,26 +131,26 @@ test('arrows and fireball travel on the server, explode and respect rocks', () =
   combat.attack(room, archer, 1290, 1600, true, 50);
   assert.equal(room.projectiles.length, 3);
   for (let time = 100; time <= 650; time += 50) combat.tick(room, time, 0.05, idle);
-  assert.ok(mage.hp < 80);
+  assert.ok(mage.hp < 580);
   Object.assign(archer, { x: 1350, y: 1392 });
   Object.assign(ally, { x: 1328, y: 1392 });
   Object.assign(mage, { x: 1462, y: 1392 });
   Object.assign(victim, { x: 1700, y: 1500 });
   combat.attack(room, mage, archer.x, archer.y, false, 700);
-  assert.equal(archer.hp, 100);
+  assert.equal(archer.hp, 600);
   combat.attack(room, mage, archer.x, archer.y, true, 750);
   for (let time = 800; time <= 1050; time += 50) combat.tick(room, time, 0.05, idle);
-  assert.equal(archer.hp, 100);
-  assert.equal(ally.hp, 100);
-  assert.equal(victim.hp, 80);
+  assert.equal(archer.hp, 600);
+  assert.equal(ally.hp, 600);
+  assert.equal(victim.hp, 580);
   Object.assign(mage, { x: 1245, y: 1500 });
   Object.assign(archer, { x: 1300, y: 1500 });
   Object.assign(ally, { x: 1300, y: 1535 });
   combat.attack(room, mage, archer.x, archer.y, true, 5750);
   for (let time = 5800; time <= 6150; time += 50) combat.tick(room, time, 0.05, idle);
-  assert.equal(archer.hp, 66);
-  assert.equal(ally.hp, 66);
-  assert.equal(victim.hp, 80);
+  assert.equal(archer.hp, 566);
+  assert.equal(ally.hp, 566);
+  assert.equal(victim.hp, 580);
 });
 
 test('AI navigates around the central rocks and completes a match without Ollama', () => {

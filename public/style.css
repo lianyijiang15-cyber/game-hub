@@ -274,7 +274,7 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 .picker-carousel { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: 4px; width: min(100%, 820px); justify-self: center; }
 #game .class-arrow { margin: 0 0 37px; padding: 0; width: clamp(35px, 5vw, 60px); aspect-ratio: 1; border: 1px solid #f3d79d; border-radius: 50%; background: #2d302be8; color: #fff1cc; line-height: 1; font-size: clamp(1.55rem, 3vw, 2.4rem); }
 .in-selection .class-options { width: 100%; align-items: end; perspective: 700px; }
-.in-selection .class-options button { position: relative; isolation: isolate; align-self: end; }
+#game.in-selection .class-options button { position: relative; isolation: isolate; align-self: end; background: transparent; color: #fff5de; }
 .in-selection .class-options button::before {
   position: absolute;
   z-index: -1;
@@ -293,20 +293,60 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
   transform-origin: center bottom;
   filter: drop-shadow(9px 8px 5px #261b29a6);
 }
-#game.in-selection .class-options [data-position="left"] img { transform: translateY(-14%) rotateY(12deg) scale(.78); }
-#game.in-selection .class-options [data-position="right"] img { transform: translateY(-14%) rotateY(-12deg) scale(.78); }
-#game.in-selection .class-options [data-position="center"] img { transform: translateY(-3%) scale(1.11); filter: drop-shadow(0 0 11px #fff2bcaa) drop-shadow(9px 10px 5px #30211988); }
+#game.in-selection .class-options [data-position="left"] img { transform: scale(.5); }
+#game.in-selection .class-options [data-position="right"] img { transform: scale(.5); }
+#game.in-selection .class-options [data-position="center"] img { transform: none; filter: drop-shadow(0 0 11px #fff2bcaa) drop-shadow(9px 10px 5px #30211988); }
 #game.in-selection .class-options button:disabled { opacity: 1; }
 .in-selection .class-copy { margin: 8px 0 0; align-self: end; justify-self: start; }
 .in-selection .ready-actions { margin-top: 7px; }
 .in-selection .class-sheet { align-self: center; max-height: none; background: #252426e8; }
-.in-selection .class-sheet > img { height: clamp(170px, 38dvh, 365px); object-fit: contain; }
+.in-selection .class-sheet > img {
+  display: block;
+  width: calc(100% + 24px);
+  height: clamp(170px, 42dvh, 480px);
+  margin: -12px -12px 8px;
+  object-fit: cover;
+  object-position: center 29%;
+}
 .in-selection #match-chat { margin: 12px auto; width: min(720px, calc(100% - 24px)); }
+@media (min-width: 901px) {
+  .in-selection #class-profile {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    padding: clamp(85px, 12dvh, 112px) clamp(16px, 2vw, 32px) 18px;
+  }
+  .in-selection .picker-stage {
+    grid-row: 1;
+    grid-column: 1;
+    grid-template-rows: auto 1fr auto auto;
+  }
+  .in-selection .picker-carousel {
+    width: min(54vw, 920px);
+    align-self: center;
+    grid-row: 2;
+    grid-column: 1;
+  }
+  .in-selection .class-copy {
+    position: absolute;
+    bottom: clamp(86px, 13dvh, 130px);
+    left: 0;
+    width: min(22vw, 320px);
+  }
+  .in-selection .class-sheet {
+    grid-row: 1;
+    grid-column: 1;
+    justify-self: end;
+    align-self: start;
+    z-index: 2;
+    width: min(23vw, 420px);
+  }
+  .in-selection .class-chart { width: min(100%, clamp(90px, 20dvh, 176px)); }
+}
 @media (max-width: 700px) {
   .in-selection #class-profile { grid-template-columns: 1fr; }
   .in-selection .picker-stage { padding-top: 26px; min-height: 0; }
   #game.in-selection .class-options img { height: clamp(105px, 26dvh, 235px); }
-  .in-selection .class-sheet > img { height: 174px; }
+  .in-selection .class-sheet > img { width: 100%; height: 174px; margin: 0; border-radius: 5px; }
 }
 
 .in-selection .picker-stage { grid-template-rows: auto 1fr auto auto auto; }

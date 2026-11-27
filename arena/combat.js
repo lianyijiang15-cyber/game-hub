@@ -7,9 +7,9 @@ const visionRadius = 360;
 const grassRevealRadius = 80;
 const sightObstacle = tile => solid(tile) || tile === 'b';
 const classes = {
-  warrior: { hp: 300, speed: 150, range: 52, damage: 24, cooldown: 650 },
-  archer: { hp: 100, speed: 185, range: 240, damage: 17, cooldown: 850 },
-  mage: { hp: 80, speed: 165, range: 190, damage: 20, cooldown: 950 }
+  warrior: { hp: 800, speed: 150, range: 52, damage: 24, cooldown: 650 },
+  archer: { hp: 600, speed: 185, range: 240, damage: 17, cooldown: 850 },
+  mage: { hp: 580, speed: 165, range: 190, damage: 20, cooldown: 950 }
 };
 const jobs = Object.keys(classes);
 const teams = ['紅隊', '藍隊'];

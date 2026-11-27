@@ -144,13 +144,16 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.deepEqual(emitted.at(-1), ['chooseClass', 'archer']);
   assert.equal(elements.get('class-art').src, '/art/archer-key-art.webp');
   assert.equal(elements.get('class-name').textContent, '弓箭手');
+  assert.equal(elements.get('class-hp').textContent, '600 HP');
   assert.equal(elements.get('selection-team').children[0].children[0].src, '/art/archer-avatar.webp');
   assert.equal(elements.get('class-archer').dataset.position, 'center');
   assert.equal(elements.get('class-warrior').dataset.position, 'left');
   elements.get('class-prev').onclick();
   assert.equal(elements.get('class-art').src, '/art/warrior-key-art.webp');
+  assert.equal(elements.get('class-hp').textContent, '800 HP');
   elements.get('class-prev').onclick();
   assert.equal(elements.get('class-art').src, '/art/mage-key-art.webp');
+  assert.equal(elements.get('class-hp').textContent, '580 HP');
   assert.equal(elements.get('class-mage').dataset.position, 'center');
   elements.get('ready').onclick();
   assert.deepEqual(emitted.at(-1), ['ready']);
@@ -164,7 +167,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('loading-red').children.length, 5);
   assert.equal(elements.get('loading-red').children[0].children[0].src, '/art/mage-cutout.webp');
   const player = {
-    id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 1600, y: 1400, hp: 80, maxHp: 80,
+    id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 1600, y: 1400, hp: 580, maxHp: 580,
     alive: true, facing: 0, attackAt: 0, skillAt: 0, spawnedAt: 0
   };
   socketHandlers.get('room')({ id: 'ABCDE0', host: 'self', players: [player], phase: 'playing' });
@@ -177,7 +180,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   });
   frames.shift()(115);
   assert.ok(pixelDraws > 100);
-  assert.match(elements.get('health').textContent, /法師 · HP 80\/80/);
+  assert.match(elements.get('health').textContent, /法師 · HP 580\/580/);
   const arena = elements.get('arena');
   const keyboard = code => ({ code, target: element('BODY'), preventDefault() {} });
   keyHandlers.get('keydown')(keyboard('KeyD'));
