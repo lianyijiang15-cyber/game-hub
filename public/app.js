@@ -36,6 +36,8 @@ const keys = new Set();
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
 let aim = null;
 let worldMap = null;
+let worldChests = [];
+let lootToastUntil = 0;
 const matchKey = 'game-hub-seat';
 
 function show(id) {
@@ -121,6 +123,7 @@ function enter(event, data) {
     show('game');
     if (result.room) renderRoom(result.room);
     if (result.map) worldMap = result.map;
+    worldChests = result.chests || [];
   });
 }
 
@@ -235,7 +238,11 @@ function renderRoom(state) {
     stopMovement();
     if (phase === 'lobby' || waiting || state.phase === 'ended') $('messages').replaceChildren();
     if (state.phase === 'playing' || waiting) frame = previous = null;
-    if (state.phase === 'loading') worldMap = null;
+    if (state.phase === 'loading') {
+      worldMap = null;
+      worldChests = [];
+      lootToastUntil = 0;
+    }
   }
   phase = state.phase;
   $('waiting').hidden = !(waiting || selecting);
@@ -386,6 +393,37 @@ function attack(skill) {
   socket.volatile.emit('arenaAttack', { x, y, skill });
 }
 
+const lootButtons = Array.from({ length: 5 }, (_, index) => $('loot-' + (index + 1)));
+function lootCommand(event, ...args) {
+  if (!room || phase !== 'playing' || !socket.connected) return;
+  const id = room;
+  socket.timeout(2500).emit(event, ...args, (failure, result) => {
+    if (room !== id || phase !== 'playing') return;
+    const reward = result?.reward;
+    $('loot-toast').textContent = failure ? '道具操作逾時' : result?.error ||
+      (event === 'lootOpen' ? `取得 ${reward.label} · 欄位 ${reward.slot + 1}` :
+        reward ? `使用 ${reward.label}${reward.healing ? ' · +' + reward.healing + ' HP' : ''}` : '已施放震波');
+    lootToastUntil = performance.now() + 2500;
+  });
+}
+
+function useLootSlot(slot) {
+  if (frame?.inventory?.[slot]) lootCommand('lootUse', slot);
+}
+
+lootButtons.forEach((button, index) => {
+  button.onclick = () => useLootSlot(index);
+});
+
+function drawLootHud(state, serverTime) {
+  $('chest-prompt').hidden = state.nearbyChest == null;
+  $('loot-toast').hidden = performance.now() >= lootToastUntil;
+  const buffs = (state.buffs || []).filter(buff => buff.until > serverTime);
+  $('buff-status').hidden = !buffs.length;
+  $('buff-status').textContent = buffs.map(buff =>
+    `${buff.label} ${Math.ceil((buff.until - serverTime) / 1000)} 秒`).join(' · ');
+}
+
 window.addEventListener('keydown', event => {
   if (!room || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
   if (event.target.matches?.('input, textarea, select, [contenteditable]')) return;
@@ -405,7 +443,11 @@ window.addEventListener('keydown', event => {
     keys.add(event.code);
     sendMovement();
   }
-  if (event.code === 'KeyQ' && !event.repeat) attack(true);
+  if (event.repeat) return;
+  if (event.code === 'KeyQ') attack(true);
+  if (event.code === 'KeyE' && frame?.nearbyChest != null) lootCommand('lootOpen', frame.nearbyChest);
+  if (event.code === 'KeyR' && frame?.buffs?.some(buff => buff.label === '震波符文 [R]')) lootCommand('lootRune');
+  if (/^Digit[1-5]$/.test(event.code)) useLootSlot(Number(event.code.slice(-1)) - 1);
 });
 window.addEventListener('keyup', event => {
   if (!keys.delete(event.code)) return;
@@ -469,7 +511,10 @@ function renderResults(state) {
 }
 
 socket.on('arenaMap', data => {
-  if (data.id === room) worldMap = data.map;
+  if (data.id === room) {
+    worldMap = data.map;
+    worldChests = data.chests || [];
+  }
 });
 
 socket.on('arenaState', state => {
@@ -481,6 +526,16 @@ socket.on('arenaState', state => {
     renderResults(state);
     return;
   }
+  const alive = state.players.find(player => player.id === socket.id)?.alive;
+  lootButtons.forEach((button, index) => {
+    const item = state.inventory?.[index];
+    if (button.dataset.label !== (item?.label || '')) {
+      button.dataset.label = item?.label || '';
+      button.dataset.quality = item?.quality || '';
+      button.replaceChildren(element('kbd', index + 1), element('span', item?.label || '空欄'));
+    }
+    button.disabled = !alive || !item;
+  });
   $('concealed').hidden = !state.concealed;
   $('red-score').textContent = state.score['紅隊'];
   $('blue-score').textContent = state.score['藍隊'];
@@ -512,6 +567,8 @@ function renderFrame(time) {
     if (!me.alive) $('respawn').textContent = `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;
   }
   const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
+  drawLootHud(frame, serverTime);
   drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time);
+  drawMinimap(frame, worldMap, worldChests, socket.id);
 }
 requestAnimationFrame(renderFrame);

@@ -108,7 +108,7 @@ function runMatch(room) {
   room.loadingUntil = now() + loadingDuration;
   room.endsAt += loadingDuration;
   publish(room);
-  io.to(channel(room)).emit('arenaMap', { id: room.id, map: room.map });
+  io.to(channel(room)).emit('arenaMap', { id: room.id, map: room.map, chests: combat.chestLayout(room) });
   let lastTick = now();
   const broadcast = time => {
     for (const player of room.players) {
@@ -237,7 +237,7 @@ io.on('connection', socket => {
     target.host ??= socket.id;
     socket.join(channel(target));
     socket.data.room = target.id;
-    return { id: target.id, ticket, room: roomState(target, socket.id), map: target.map };
+    return { id: target.id, ticket, room: roomState(target, socket.id), map: target.map, chests: target.chests ? combat.chestLayout(target) : [] };
   });
   command('leave', () => leave(socket), 0);
   hostCommand('addBot', 'lobby', room => {
@@ -308,6 +308,20 @@ io.on('connection', socket => {
     player.input = { x: data.x, y: data.y };
     player.inputAt = now();
   });
+  command('lootOpen', (id, { room, player }) => {
+    if (!room || !Number.isSafeInteger(id)) return { error: '寶箱目前無法開啟' };
+    const reward = combat.openChest(room, player, id, now());
+    return reward.error ? reward : { reward };
+  }, 250);
+  command('lootUse', (slot, { room, player }) => {
+    if (!room || !Number.isInteger(slot) || slot < 0 || slot >= 5) return { error: '無效的道具欄位' };
+    const result = combat.useItem(room, player, slot, now());
+    return result.error ? result : { reward: result };
+  }, 150);
+  command('lootRune', (_, { room, player }) => {
+    if (!room || !combat.castRune(room, player, now())) return { error: '沒有可使用的震波符文' };
+  }, 250);
+
   socket.on('arenaAttack', data => {
     if (!accept('attack', 75)) return;
     const { room, player } = member(socket);

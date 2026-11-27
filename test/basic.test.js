@@ -141,6 +141,23 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(leaked, false);
   assert.equal(outsideFrames, 0);
 
+  const liveRoom = rooms.get(id);
+  const lootChest = liveRoom.chests[0];
+  const hostPlayer = liveRoom.players.find(player => player.id === host.id);
+  const guestPlayer = liveRoom.players.find(player => player.id === guest.id);
+  for (const player of [hostPlayer, guestPlayer]) {
+    player.x = lootChest.x;
+    player.y = lootChest.y;
+  }
+  const synced = [host, guest].map(client => receive(client, 'arenaState',
+    state => state.openedChestIds.includes(lootChest.id)));
+  const claims = await Promise.all([send(host, 'lootOpen', lootChest.id), send(guest, 'lootOpen', lootChest.id)]);
+  assert.equal(claims.filter(result => result.reward).length, 1);
+  const [hostLoot, guestLoot] = await Promise.all(synced);
+  assert.deepEqual(hostLoot.openedChestIds, guestLoot.openedChestIds);
+  assert.equal([...hostLoot.inventory, ...guestLoot.inventory].filter(Boolean).length, 1);
+  assert.ok(!hostLoot.players.some(player => Object.hasOwn(player, 'inventory')));
+
   const replacement = receive(guest, 'room', room => room.host === guest.id);
   host.disconnect();
   assert.equal((await replacement).players.filter(player => player.bot).length, 9);

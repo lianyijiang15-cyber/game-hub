@@ -279,6 +279,74 @@ function sprite(ctx, p, old, blend, time, localId) {
   rect(ctx, color.light, x - 19, y - 48, Math.ceil(38 * p.hp / p.maxHp), 3);
 }
 
+const chestPaint = {
+  common: ['#532d1e', '#a56837', '#e0ad62'],
+  rare: ['#253e59', '#4f7ba4', '#a2dfeb'],
+  legendary: ['#59326e', '#8b4bb0', '#fbc85c']
+};
+
+function drawChest(ctx, chest, time) {
+  const [outline, material, trim] = chestPaint[chest.quality];
+  const { x, y } = chest;
+  const opened = chest.openedAt !== null;
+  const age = opened ? Math.max(0, time - chest.openedAt) : 0;
+  const lift = opened ? Math.min(8, age / 24) : 0;
+  rect(ctx, '#18241ab3', x - 13, y + 6, 26, 5);
+  if (!opened && chest.quality !== 'common') {
+    const glow = ctx.createRadialGradient(x, y, 1, x, y, chest.quality === 'legendary' ? 31 : 20);
+    glow.addColorStop(0, trim + 'ad');
+    glow.addColorStop(1, trim + '00');
+    rect(ctx, glow, x - 32, y - 32, 64, 64);
+  }
+  rect(ctx, outline, x - 12, y - 3, 24, 12);
+  rect(ctx, material, x - 10, y, 20, 6);
+  rect(ctx, opened ? '#211b22' : material, x - 10, y - 4, 20, 5);
+  rect(ctx, outline, x - 12, y - 9 - lift, 24, 6);
+  rect(ctx, material, x - 10, y - 8 - lift, 20, 4);
+  rect(ctx, trim, x - 9, y - 9 - lift, 2, 15 + lift);
+  rect(ctx, trim, x + 7, y - 9 - lift, 2, 15 + lift);
+  if (!opened) rect(ctx, trim, x - 3, y - 4, 6, 5);
+  if (opened && age < 550) {
+    ctx.save();
+    ctx.globalAlpha = 1 - age / 550;
+    for (let spark = -2; spark <= 2; spark++) {
+      rect(ctx, trim, x + spark * (4 + age / 54), y - 9 - age / (15 + Math.abs(spark) * 7), 3, 3);
+    }
+    ctx.restore();
+  }
+}
+
+const minimapGround = document.createElement('canvas');
+let minimapWorld;
+function drawMinimap(state, map, chests, localId) {
+  const canvas = $('minimap');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (minimapWorld !== map) {
+    minimapWorld = map;
+    minimapGround.width = map.columns;
+    minimapGround.height = map.rows;
+    const terrain = minimapGround.getContext('2d');
+    map.tiles.forEach((row, y) => [...row].forEach((tile, x) => rect(terrain, terrainColors[tile][1], x, y, 1, 1)));
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(minimapGround, 0, 0, canvas.width, canvas.height);
+  const x = value => value / map.width * canvas.width;
+  const y = value => value / map.height * canvas.height;
+  const open = new Set(state.openedChestIds);
+  for (const chest of chests) {
+    const mark = open.has(chest.id) ? '#aca996' : chestPaint[chest.quality][2];
+    const size = open.has(chest.id) ? 2 : 3;
+    rect(ctx, mark, x(chest.x) - 1, y(chest.y) - 1, size, size);
+  }
+  const me = state.players.find(player => player.id === localId);
+  if (!me) return;
+  for (const player of state.players) {
+    if (!player.alive || player === me) continue;
+    rect(ctx, player.team === me.team ? '#78d5ff' : '#ff6b71', x(player.x) - 2, y(player.y) - 2, 4, 4);
+  }
+  rect(ctx, '#fff8e3', x(me.x) - 2, y(me.y) - 2, 5, 5);
+}
+
 function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   const ctx = arenaContext;
   const canvas = $('arena');
@@ -293,6 +361,7 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   ctx.save();
   ctx.translate(-arenaCamera.x, -arenaCamera.y);
   paintWorld(ctx, map, width, height);
+  for (const chest of state.chests || []) drawChest(ctx, chest, time);
   for (const p of [...state.players].sort((a, b) => a.y - b.y)) {
     if (p.x < arenaCamera.x - 96 || p.y < arenaCamera.y - 96 ||
         p.x > arenaCamera.x + width + 96 || p.y > arenaCamera.y + height + 96) continue;
@@ -301,10 +370,10 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   for (const effect of state.effects) {
     ctx.save();
     ctx.globalAlpha = Math.min(1, Math.max(0, (effect.until - time) / 240));
-    ctx.strokeStyle = effect.type === 'blast' || effect.type === 'mage' ? '#ffad61' : colors[effect.team].light;
+    ctx.strokeStyle = effect.type === 'rune' ? '#dfb3ff' : effect.type === 'blast' || effect.type === 'mage' ? '#ffad61' : colors[effect.team].light;
     ctx.lineWidth = effect.type === 'blast' ? 8 : 4;
     ctx.beginPath();
-    if (effect.type === 'spin' || effect.type === 'blast') {
+    if (effect.type === 'spin' || effect.type === 'blast' || effect.type === 'rune') {
       ctx.arc(effect.x, effect.y, effect.range, 0, Math.PI * 2);
     } else if (effect.type === 'warrior') {
       ctx.arc(effect.x, effect.y, effect.range - 12, effect.angle - 0.65, effect.angle + 0.65);

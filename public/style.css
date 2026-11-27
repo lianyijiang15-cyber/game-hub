@@ -453,3 +453,36 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 .result-card span { font-size: clamp(.66rem, 1.55vw, .98rem); color: #fff4e0; }
 .results-score { display: flex; justify-content: center; gap: 18px; align-items: center; padding: 5px; font-size: clamp(1.15rem, 4vw, 2rem); font-weight: 700; }
 .in-results #match-chat { max-width: 620px; margin: 10px auto; }
+
+.arena-minimap {
+  position: absolute; top: 10px; left: 10px; z-index: 2;
+  width: clamp(90px, 18vw, 170px); padding: 4px; background: #17232ded;
+  border: 1px solid #8f805f; border-radius: 6px; pointer-events: none;
+}
+#minimap { display: block; width: 100%; height: auto; aspect-ratio: 1; image-rendering: pixelated; }
+.arena-minimap small { display: block; font-size: .58rem; color: #f8e7ca; text-align: center; }
+#chest-prompt {
+  position: absolute; z-index: 2; left: 50%; bottom: 34%; transform: translateX(-50%);
+  margin: 0; padding: 5px 9px; border-radius: 5px; background: #29232beb; color: #ffe3a4; pointer-events: none;
+}
+.loot-bar {
+  position: absolute; z-index: 3; bottom: 8px; left: 50%; transform: translateX(-50%);
+  width: min(430px, 96vw); text-align: center; pointer-events: none;
+}
+#loot-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+#game #loot-slots button {
+  display: grid; justify-items: center; align-content: center; gap: 3px;
+  min-width: 0; min-height: 51px; padding: 3px; margin: 0; font-size: .73rem;
+  border: 1px solid #8d7955; border-radius: 5px; background: #26232de9; color: #ffecca; pointer-events: auto;
+}
+#game #loot-slots button:disabled { opacity: .8; pointer-events: none; }
+#game #loot-slots button[data-quality="rare"] { border-color: #85c9eb; color: #c5eaff; }
+#game #loot-slots button[data-quality="legendary"] { border-color: #f0be63; color: #ffda8e; background: #51344dee; }
+#loot-slots kbd { padding: 0 4px; }
+#loot-toast, #buff-status { width: fit-content; max-width: 100%; margin: 0 auto 4px; padding: 4px 7px; border-radius: 4px; background: #211d28eb; color: #ffe5a6; font-size: .79rem; }
+.in-combat #match-chat, .in-combat .controls { bottom: 68px; }
+.in-combat .hud { bottom: 104px; }
+@media (max-width: 640px) {
+  .in-combat .hud { bottom: 68px; }
+  .arena-minimap { top: 64px; }
+}

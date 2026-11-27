@@ -2,6 +2,7 @@
 
 const { generateWorld, solid, impassable, campOffset } = require('./world');
 const { terrainBlocked, playerBlocked, movePlayer } = require('./collision');
+const loot = require('./loot');
 const map = generateWorld();
 const visionRadius = 360;
 const grassRevealRadius = 80;
@@ -84,7 +85,7 @@ function spawn(room, player, now) {
     Object.assign(player, position, {
       hp: classes[player.job].hp, alive: true, input: { x: 0, y: 0 }, inputAt: 0,
       angle: side === 1 ? 0 : Math.PI, facing: side === 1 ? 0 : Math.PI, moving: false,
-      contributors: new Map(), attackAt: 0, skillAt: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
+      contributors: new Map(), buffs: new Map(), attackAt: 0, skillAt: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
     });
     return;
   }
@@ -105,10 +106,12 @@ function start(room, now, seed) {
     phase: 'playing', map: seed === undefined ? map : generateWorld(seed), score: { [teams[0]]: 0, [teams[1]]: 0 }, effects: [],
     projectiles: [], kills: [], sequence: 0, endsAt: now + 300000, winner: null
   });
+  room.chests = loot.generateChests(room.map);
   room.roster = [...room.players];
   room.roster.forEach(player => {
     Object.assign(player, {
       alive: false,
+      inventory: Array(loot.inventorySize).fill(null),
       kills: 0, deaths: 0, assists: 0, damage: 0, route: null, routeAt: 0, lastSeen: null, patrolHome: false
     });
   });
@@ -123,13 +126,16 @@ function finish(room) {
 
 function hit(room, source, target, damage, now) {
   if (room.phase !== 'playing' || !target.alive || source.team === target.team) return;
-  const actual = Math.min(target.hp, Math.round(damage * 100 / (100 + classes[target.job].defense)));
+  const defense = loot.modifiers(target, now);
+  if (defense.immune) return;
+  const actual = Math.min(target.hp, Math.round(damage * 100 / (100 + classes[target.job].defense + defense.defense)));
   target.contributors.set(source, now);
   target.hp -= actual;
   source.damage += actual;
   target.hurtAt = now;
   if (target.hp > 0) return;
   target.alive = false;
+  target.buffs.clear();
   target.moving = false;
   target.input = { x: 0, y: 0 };
   target.respawnAt = now + 3000;
@@ -154,6 +160,7 @@ function attack(room, player, x, y, skill, now) {
   const key = skill ? 'skillAt' : 'attackAt';
   if (now < player[key]) return;
   const job = classes[player.job];
+  const attackBoost = loot.modifiers(player, now).attack;
   const angle = Math.atan2(y - player.y, x - player.x);
   player[key] = now + (skill ? 5000 : job.cooldown);
   Object.assign(player, { angle, facing: angle, action: { skill, until: now + 240 } });
@@ -164,7 +171,7 @@ function attack(room, player, x, y, skill, now) {
       room.projectiles.push({
         id: ++room.sequence, source: player, type: arrows ? 'arrow' : 'fireball',
         x: player.x, y: player.y, angle: angle + spread,
-        damage: job.skillDamage, speed: arrows ? 480 : 330, remaining: arrows ? 265 : 225
+        damage: job.skillDamage * attackBoost, speed: arrows ? 480 : 330, remaining: arrows ? 265 : 225
       });
     }
     return;
@@ -175,7 +182,7 @@ function attack(room, player, x, y, skill, now) {
     distance(player, other) <= range && clearLine(player, other, 0, room.map) &&
     (skill || Math.cos(Math.atan2(other.y - player.y, other.x - player.x) - angle) >= Math.cos(0.30)));
   enemies.sort((a, b) => distance(player, a) - distance(player, b));
-  for (const enemy of skill ? enemies : enemies.slice(0, 1)) hit(room, player, enemy, skill ? job.skillDamage : job.damage, now);
+  for (const enemy of skill ? enemies : enemies.slice(0, 1)) hit(room, player, enemy, (skill ? job.skillDamage : job.damage) * attackBoost, now);
   effect(room, skill ? 'spin' : player.job, player, angle, range, player.team, now);
 }
 
@@ -212,9 +219,9 @@ function advanceProjectile(room, projectile, dt, now) {
   return false;
 }
 
-function move(room, player, vector, dt) {
+function move(room, player, vector, dt, now) {
   const length = Math.max(1, Math.hypot(vector.x, vector.y));
-  const step = classes[player.job].speed * dt / length;
+  const step = classes[player.job].speed * loot.modifiers(player, now).speed * dt / length;
   player.moving = movePlayer(room.map, room.players, player, vector.x * step, vector.y * step);
   if (player.moving) player.facing = Math.atan2(vector.y, vector.x);
 }
@@ -229,11 +236,38 @@ function tick(room, now, dt, botInput) {
     }
     const vector = player.bot ? botInput(room, player, now) :
       now - player.inputAt < 350 ? player.input : { x: 0, y: 0 };
-    move(room, player, vector, dt);
+    move(room, player, vector, dt, now);
   }
   room.projectiles = room.projectiles.filter(projectile =>
     room.phase === 'playing' && advanceProjectile(room, projectile, dt, now));
   room.effects = room.effects.filter(item => item.until > now);
+}
+
+function openChest(room, player, id, now) {
+  return loot.openChest(room, player, id, now,
+    (from, to) => clearLine(from, to, 2, room.map));
+}
+
+function useItem(room, player, slot, now) {
+  if (room.phase !== 'playing' || !player.alive || now >= room.endsAt) return { error: '目前無法使用道具' };
+  return loot.useItem(player, slot, classes[player.job].hp, now);
+}
+
+function chestLayout(room) {
+  return room.chests.map(({ id, x, y, quality }) => ({ id, x, y, quality }));
+}
+
+function castRune(room, player, now) {
+  if (room.phase !== 'playing' || !player.alive || now >= room.endsAt ||
+      !loot.consumeRune(player, now)) return false;
+  const damage = loot.shockwave.damage * loot.modifiers(player, now).attack;
+  for (const enemy of room.players) {
+    if (loot.inRange(player, enemy, loot.shockwave.range) && clearLine(player, enemy, 0, room.map)) {
+      hit(room, player, enemy, damage, now);
+    }
+  }
+  effect(room, 'rune', player, 0, loot.shockwave.range, player.team, now);
+  return true;
 }
 
 function matchMvp(results, winner) {
@@ -253,9 +287,17 @@ function snapshot(room, now, viewer = null) {
   const attackRange = local && viewer.alive ? classes[viewer.job].range : 0;
   const targetInRange = attackRange > 0 && players.some(player => player.alive && player.team !== viewer.team &&
     distance(viewer, player) <= attackRange && clearLine(viewer, player, 0, room.map));
+  const chests = room.chests.filter(chest => sees(chest) ||
+    (local && loot.inRange(viewer, chest, loot.interactRange) && clearLine(viewer, chest, 2, room.map)));
+  const nearbyChest = local && viewer.alive ? chests.filter(chest => chest.openedAt === null &&
+    loot.inRange(viewer, chest, loot.interactRange) && clearLine(viewer, chest, 2, room.map))
+    .sort((a, b) => distance(viewer, a) - distance(viewer, b))[0]?.id ?? null : null;
   return {
     id: room.id, phase: room.phase, winner: room.winner, score: room.score, now,
     remaining: Math.max(0, room.endsAt - now), effects: room.effects.filter(sees), kills: room.kills,
+    chests, nearbyChest, openedChestIds: room.chests.filter(chest => chest.openedAt !== null).map(chest => chest.id),
+    inventory: local ? viewer.inventory.map(item => item && { label: item.label, quality: item.quality }) : [],
+    buffs: local ? loot.activeBuffs(viewer, now).map(({ label, until }) => ({ label, until })) : [],
     attackRange, targetInRange, visionRadius, concealed: !!local && inTallGrass(viewer, room.map),
     projectiles: room.projectiles.filter(sees).map(({ id, x, y, angle, type }) => ({ id, x, y, angle, type })),
     players: players.map(({ id, x, y, name, team, job, hp, bot, alive, moving, angle, facing,
@@ -266,4 +308,4 @@ function snapshot(room, now, viewer = null) {
   };
 }
 
-module.exports = { map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams };
+module.exports = { map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };

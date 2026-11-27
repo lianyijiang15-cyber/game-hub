@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜開放世界對抗</title>
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 <main>
@@ -151,12 +151,28 @@
       <p id="respawn" hidden></p>
       <p id="concealed" hidden>高草隱蔽中</p>
     </div>
+    <aside class="arena-minimap" aria-label="小地圖">
+      <canvas id="minimap" width="160" height="160" aria-label="地形、寶箱和可見敵人"></canvas>
+      <small>白：自己　紅：敵人　金：寶箱</small>
+    </aside>
+    <p id="chest-prompt" hidden><kbd>E</kbd> 開啟寶箱</p>
+    <div class="loot-bar">
+      <p id="loot-toast" role="status" hidden></p>
+      <p id="buff-status" hidden></p>
+      <div id="loot-slots" aria-label="道具欄">
+        <button id="loot-1" type="button" disabled><kbd>1</kbd><span>空欄</span></button>
+        <button id="loot-2" type="button" disabled><kbd>2</kbd><span>空欄</span></button>
+        <button id="loot-3" type="button" disabled><kbd>3</kbd><span>空欄</span></button>
+        <button id="loot-4" type="button" disabled><kbd>4</kbd><span>空欄</span></button>
+        <button id="loot-5" type="button" disabled><kbd>5</kbd><span>空欄</span></button>
+      </div>
+    </div>
     <div class="hud">
       <div class="health-block"><span id="health"></span><progress id="health-bar" max="800" value="0" aria-label="生命值"></progress></div>
       <div class="ability"><kbd>左鍵</kbd><span id="attack-status"></span></div>
       <div class="ability"><kbd>Q</kbd><span id="skill-status"></span></div>
     </div>
-    <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>Enter</kbd> 聊天</p>
+    <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>E</kbd> 開箱 · <kbd>Enter</kbd> 聊天</p>
     <ul id="kill-feed" aria-label="擊殺通知"></ul>
   </div>
   <section id="results" class="panel" aria-labelledby="winner" hidden>
@@ -185,7 +201,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=12"></script>
-<script src="arena-renderer.js?v=12"></script>
+<script src="app.js?v=13"></script>
+<script src="arena-renderer.js?v=13"></script>
 </body>
 </html>
