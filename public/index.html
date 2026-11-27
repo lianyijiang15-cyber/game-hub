@@ -6,8 +6,8 @@
 <title>PIXEL CLASH 像素衝突</title>
 <link rel="stylesheet" href="style.css?v=22">
 <link rel="stylesheet" href="menu.css?v=3">
-<link rel="stylesheet" href="account.css?v=2">
-<link rel="stylesheet" href="casebook.css?v=3">
+<link rel="stylesheet" href="account.css?v=3">
+<link rel="stylesheet" href="casebook.css?v=4">
 </head>
 <body>
 <main>
@@ -52,7 +52,7 @@
       <div class="menu-social">
         <button class="menu-tile menu-history" id="menu-history" type="button" aria-haspopup="dialog">
           <span class="menu-social-icon menu-trophy" aria-hidden="true"></span>
-          <span>歷史戰績</span>
+          <span>成就圖鑑</span>
         </button>
         <button class="menu-tile menu-friends" id="menu-friends" type="button" aria-haspopup="dialog">
           <span class="menu-social-icon menu-party" aria-hidden="true"></span>
@@ -134,12 +134,21 @@
     <button id="player-close" class="ghost" type="button" aria-label="關閉視窗">✕</button>
   </div>
   <p id="player-message" role="status"></p>
+  <section id="player-achievements" hidden>
+    <div class="achievement-heading">
+      <p id="achievement-summary"></p>
+      <button class="menu-back" id="achievement-history" type="button">對局紀錄</button>
+    </div>
+    <h3>像素衝突</h3><ul class="achievement-grid" id="arena-achievements"></ul>
+    <h3>海龜湯</h3><ul class="achievement-grid" id="soup-achievements"></ul>
+  </section>
   <section id="player-history" hidden>
+    <button class="menu-back" id="history-catalog" type="button">← 成就圖鑑</button>
     <h3>像素衝突</h3><ul id="arena-history"></ul>
     <h3>海龜湯</h3><ul id="soup-history"></ul>
   </section>
   <section id="history-detail" hidden>
-    <button class="menu-back" id="history-back" type="button">← 歷史戰績</button>
+    <button class="menu-back" id="history-back" type="button">← 對局紀錄</button>
     <div id="history-detail-content"></div>
   </section>
   <section id="player-friends" hidden>
@@ -219,6 +228,11 @@
           <button class="menu-back" id="soup-next-case" type="button">換一題</button>
         </div>
         <p id="soup-end" role="status"></p>
+        <section class="soup-transcript" aria-labelledby="soup-log-heading">
+          <h4 id="soup-log-heading">提問紀錄</h4>
+          <p id="soup-no-questions">還沒有提問。</p>
+          <ol id="soup-question-log"></ol>
+        </section>
       </section>
       <aside class="soup-reference" aria-labelledby="soup-reference-title">
         <h3 id="soup-reference-title">劇情漫畫</h3>
@@ -454,11 +468,11 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=4"></script>
 <script src="heroes.js?v=4"></script>
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 <script src="arena-renderer.js?v=22"></script>
 <script src="menu-art.js?v=5"></script>
 <script src="arena-guide.js?v=2"></script>
-<script src="account.js?v=2"></script>
-<script src="player-panel.js?v=3"></script>
+<script src="account.js?v=3"></script>
+<script src="player-panel.js?v=4"></script>
 </body>
 </html>

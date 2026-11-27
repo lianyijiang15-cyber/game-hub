@@ -18,6 +18,29 @@ function playerId(accounts) {
   return id;
 }
 
+function achievementProgress(account) {
+  const arena = account.arenaHistory ?? [];
+  const wins = arena.filter(record => record.result === 'win');
+  const solved = (account.soupHistory ?? []).filter(record => record.result === 'solved');
+  const achievement = (id, title, description, count, goal = 1) => ({ id, title, description, count, goal });
+  return {
+    arena: [
+      achievement('first-match', '初入戰場', '完成一場像素衝突對局。', arena.length),
+      achievement('first-win', '旗開得勝', '贏得一場像素衝突對局。', wins.length),
+      achievement('flag-win', '拔旗先鋒', '在拔旗戰中獲勝。', wins.filter(record => record.mode === 'flag').length),
+      achievement('survival-win', '生存專家', '在生存戰中獲勝。', wins.filter(record => record.mode === 'survival').length),
+      achievement('control-win', '據點守衛', '在據點戰中獲勝。', wins.filter(record => record.mode === 'control').length),
+      achievement('assists', '並肩作戰', '累計取得 20 次助攻。', arena.reduce((sum, record) => sum + (record.assists ?? 0), 0), 20)
+    ],
+    soup: [
+      achievement('first-case', '初露鋒芒', '找齊任一題的全部線索。', solved.length),
+      achievement('three-cases', '連環解謎', '完成 3 次推理。', solved.length, 3),
+      achievement('hard-case', '疑案剋星', '完成一題困難推理。', solved.filter(record => record.difficulty === '困難').length),
+      achievement('no-hints', '獨立推理', '完成推理且沒有使用提示。', solved.filter(record => record.hints === 0).length)
+    ]
+  };
+}
+
 function mountPlayerRoutes(router, store, session, setSessionProfile) {
   function route(method, path, action, needsProfile = true) {
     router[method](path, (req, res, next) => {
@@ -47,6 +70,11 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
     setSessionProfile(user.key, result.profile);
     return res.json(result);
   }, false);
+
+  route('get', '/achievements', async (_req, res, user) => {
+    const account = (await store.read())[user.key];
+    res.json(achievementProgress(account));
+  });
 
   route('get', '/history', async (_req, res, user) => {
     const account = (await store.read())[user.key];

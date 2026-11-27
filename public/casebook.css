@@ -99,3 +99,10 @@
 @media (max-width: 650px) {
   #soup-investigation-layout { grid-template-columns: minmax(0, 1fr); }
 }
+
+.soup-transcript { margin-top: 1.4rem; padding-top: .85rem; border-top: 1px solid #a5cfb053; }
+.soup-transcript h4 { margin: 0; color: var(--room-accent); }
+#soup-question-log { display: grid; gap: .65rem; padding-inline-start: 1.7rem; }
+#soup-question-log li { padding: .65rem .8rem; background: #253843; overflow-wrap: anywhere; }
+#soup-question-log li::marker { color: var(--room-accent); }
+#soup-question-log p { margin: .3rem 0 0; }

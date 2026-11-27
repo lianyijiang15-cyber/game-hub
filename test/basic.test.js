@@ -219,6 +219,9 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
     assert.equal(arena[0][metric], official[metric]);
   }
   assert.equal(arena[0].result, 'draw');
+  const catalog = await (await fetch(base + '/api/account/achievements', { headers: { Cookie: cookie } })).json();
+  assert.equal(catalog.arena.find(item => item.id === 'first-match').count, 1);
+  assert.equal(catalog.arena.find(item => item.id === 'first-win').count, 0);
   const detailPath = base + '/api/account/history/' + arena[0].id;
   const detail = await (await fetch(detailPath, { headers: { Cookie: cookie } })).json();
   assert.equal(detail.detail.players.length, 10);

@@ -114,6 +114,8 @@ function prepareComic(view) {
     return panel;
   }));
   $('question').value = '';
+  $('soup-question-log').replaceChildren();
+  $('soup-no-questions').hidden = false;
   renderSoup(view);
   showComicPage(0);
   showSoupStage('comic');
@@ -196,6 +198,15 @@ $('soup-question-form').onsubmit = event => {
   return askSoup();
 };
 
+function renderSoupAction(view, action, question) {
+  renderSoup(view);
+  if (action !== 'ask') return;
+  const row = element('li', '');
+  row.append(element('strong', question), element('p', view.reply));
+  $('soup-question-log').append(row);
+  $('soup-no-questions').hidden = true;
+}
+
 async function submitSoupAction(action, question) {
   if (soupStage !== 'investigation' || !soup || soupPending) return;
   const sequence = soupSequence;
@@ -214,14 +225,15 @@ async function submitSoupAction(action, question) {
     }
     if (sequence !== soupSequence) return false;
     playSoup(game, action, question, verdict);
-    renderSoup(soupView(game));
+    renderSoupAction(soupView(game), action, question);
     return true;
   }
   soupPending = true;
   $('soup-record').textContent = '';
   try {
     const view = await accountRequest('soup/action', { id: soup, action, question });
-    if (sequence === soupSequence) renderSoup(view);
+    if (sequence !== soupSequence) return false;
+    renderSoupAction(view, action, question);
     return true;
   } catch (error) {
     if (sequence === soupSequence) $('soup-record').textContent = error.message;
@@ -1103,8 +1115,9 @@ socket.on('arenaState', state => {
       children.push(label);
       button.replaceChildren(...children);
       button.setAttribute('aria-label', `欄位 ${index + 1}：${item?.label ?? '空欄'}`);
-      button.title = item?.label ?? '';
     }
+    const title = item?.description ? `${item.label}｜${item.description}` : item?.label ?? '';
+    if (button.title !== title) button.title = title;
     button.disabled = !alive || !item;
   });
   $('battle-mode-name').textContent = modeNames[state.mode ?? 'deathmatch'];

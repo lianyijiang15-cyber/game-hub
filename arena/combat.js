@@ -362,7 +362,9 @@ function chestLayout(room) {
 function castRune(room, player, now) {
   if (room.phase !== 'playing' || !player.alive || now >= room.endsAt ||
       !loot.consumeRune(player, now)) return false;
-  const damage = loot.shockwave.damage * loot.modifiers(player, now).attack;
+  const base = stats(player);
+  const damage = (base.hp * loot.shockwave.healthRatio + base.damage * loot.shockwave.attackRatio) *
+    loot.modifiers(player, now).attack;
   for (const enemy of attackTargets(room)) {
     if (canTarget(player, enemy, now) && loot.inRange(player, enemy, loot.shockwave.range) && clearLine(player, enemy, 0, room.map)) {
       hit(room, player, enemy, damage, now);
@@ -417,7 +419,8 @@ function snapshot(room, now, viewer = null) {
       (!local || !room.players.some(player => (player.id === item.actor || player.id === item.target) &&
         !canTarget(viewer, player, now)))), kills: room.kills,
     chests, nearbyChest, openedChestIds: room.chests.filter(chest => chest.openedAt !== null).map(chest => chest.id),
-    inventory: local ? viewer.inventory.map(item => item && { id: item.id, label: item.label, quality: item.quality }) : [],
+    inventory: local ? viewer.inventory.map(item => item && { id: item.id, label: item.label, quality: item.quality,
+      description: loot.describeItem(item, stats(viewer).hp) }) : [],
     buffs: local ? loot.activeBuffs(viewer, now).map(({ label, until }) => ({ label, until })) : [],
     attackRange, targetInRange,
     teammates: local ? room.roster.filter(player => player !== viewer && player.team === viewer.team)

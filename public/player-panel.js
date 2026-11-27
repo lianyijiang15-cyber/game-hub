@@ -14,6 +14,23 @@ const showPlayerPanel = (() => {
     $(id).replaceChildren(...entries);
   }
 
+  function renderAchievements({ arena, soup }) {
+    const entries = [...arena, ...soup];
+    const unlocked = entries.filter(item => item.count >= item.goal).length;
+    $('achievement-summary').textContent = `已解鎖 ${unlocked} / ${entries.length}`;
+    const card = item => {
+      const unlocked = item.count >= item.goal;
+      const row = element('li', '');
+      row.setAttribute('data-unlocked', String(unlocked));
+      const status = unlocked ? '✓ 已解鎖' : '未解鎖';
+      row.append(element('strong', item.title), element('span', item.description),
+        element('small', `${status} · ${Math.min(item.count, item.goal)} / ${item.goal}`));
+      return row;
+    };
+    rows('arena-achievements', arena, '目前沒有對戰成就。', card);
+    rows('soup-achievements', soup, '目前沒有推理成就。', card);
+  }
+
   function historyRow(item, title, summary) {
     const row = element('li', '');
     const button = element('button', '');
@@ -135,7 +152,8 @@ const showPlayerPanel = (() => {
     try {
       const result = await accountRequest(section);
       if (!panel.open || request !== activeRead) return;
-      if (section === 'history') renderHistory(result);
+      if (section === 'achievements') renderAchievements(result);
+      else if (section === 'history') renderHistory(result);
       else renderFriends(result);
       message.textContent = notice;
     } catch (error) {
@@ -167,18 +185,32 @@ const showPlayerPanel = (() => {
       result => '已送出邀請給 ' + result.player.name + '。', () => { input.value = ''; });
   };
 
+  function selectPanel(section) {
+    $('player-title').textContent = section === 'friends' ? '好友' : '成就圖鑑';
+    $('history-detail').hidden = true;
+    for (const name of ['achievements', 'history', 'friends']) $('player-' + name).hidden = section !== name;
+  }
+
+  $('achievement-history').onclick = () => {
+    selectPanel('history');
+    $('history-catalog').focus();
+    return refresh('history');
+  };
+  $('history-catalog').onclick = () => {
+    selectPanel('achievements');
+    $('achievement-history').focus();
+    return refresh('achievements');
+  };
+
   $('player-close').onclick = () => panel.close();
   return section => {
     if (panel.open) return;
     if (section !== activePanel) $('friend-query').value = '';
     activePanel = section;
-    $('player-title').textContent = section === 'history' ? '歷史戰績' : '好友';
-    $('history-detail').hidden = true;
-    $('player-history').hidden = section !== 'history';
-    $('player-friends').hidden = section !== 'friends';
-    for (const id of ['arena-history', 'soup-history', 'friend-list', 'friend-sent', 'friend-incoming']) {
-      $(id).replaceChildren();
-    }
+    selectPanel(section);
+    $('achievement-summary').textContent = '';
+    for (const id of ['arena-achievements', 'soup-achievements', 'arena-history', 'soup-history',
+      'friend-list', 'friend-sent', 'friend-incoming']) $(id).replaceChildren();
     panel.showModal();
     return refresh(section);
   };

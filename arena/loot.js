@@ -9,25 +9,38 @@ const chestSpacing = 160;
 const interactRange = 54;
 const campClearance = 320;
 const objectiveClearance = 112;
-const shockwave = { range: 112, damage: 128 };
+const shockwave = { range: 112, healthRatio: .05, attackRatio: .80 };
 
 const loot = {
   common: [
-    { id: 'potion', label: '生命藥水', heal: 120 },
-    { id: 'haste', label: '速度藥水', duration: 10000, speed: 1.22 },
-    { id: 'minorPower', label: '小型攻擊增益', duration: 10000, attack: 1.15 }
+    { id: 'potion', label: '生命藥水', healRatio: .15 },
+    { id: 'haste', label: '速度藥水', duration: 8000, speed: 1.18 },
+    { id: 'minorPower', label: '小型攻擊增益', duration: 8000, attack: 1.18 }
   ],
   rare: [
-    { id: 'guard', label: '防禦提升', duration: 12000, defense: 40 },
-    { id: 'greaterPotion', label: '強效治療', heal: 260 },
-    { id: 'power', label: '攻擊強化', duration: 12000, attack: 1.30 }
+    { id: 'guard', label: '防禦提升', duration: 10000, defense: 30 },
+    { id: 'greaterPotion', label: '強效治療', healRatio: .30 },
+    { id: 'power', label: '攻擊強化', duration: 10000, attack: 1.30 }
   ],
   legendary: [
-    { id: 'shield', label: '無敵護盾', duration: 4000, immune: true },
-    { id: 'fury', label: '狂暴效果', duration: 8000, attack: 1.40, speed: 1.30 },
+    { id: 'shield', label: '無敵護盾', duration: 3000, immune: true },
+    { id: 'fury', label: '狂暴效果', duration: 7000, attack: 1.35, speed: 1.22 },
     { id: 'rune', label: '震波符文 [R]', duration: 18000, skill: true }
   ]
 };
+
+function describeItem(item, maxHp) {
+  if (item.healRatio) return `立即回復最大生命值的 ${Math.round(item.healRatio * 100)}%（${Math.round(maxHp * item.healRatio)} HP，上限為滿血）`;
+  const duration = item.duration / 1000;
+  if (item.skill) return `${duration} 秒內可按 R 施放一次震波，半徑 ${shockwave.range} px，基礎傷害為自身最大生命值的 ${shockwave.healthRatio * 100}% 加基礎普攻的 ${shockwave.attackRatio * 100}%`;
+  const effects = [];
+  if (item.attack) effects.push(`傷害 +${Math.round((item.attack - 1) * 100)}%`);
+  if (item.speed) effects.push(`移速 +${Math.round((item.speed - 1) * 100)}%`);
+  if (item.defense) effects.push(`防禦 +${item.defense}`);
+  if (item.immune) effects.push('免疫傷害');
+  return `${duration} 秒內${effects.join('、')}`;
+}
+
 const inRange = (a, b, range) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2 <= range ** 2;
 
 function quality(roll) {
@@ -93,10 +106,10 @@ function openChest(room, player, id, now, canReach, random = Math.random) {
 function useItem(player, slot, maxHp, now) {
   const item = player.inventory[slot];
   if (!item) return { error: '這個欄位沒有道具' };
-  if (item.heal && player.hp >= maxHp) return { error: '生命值已滿' };
+  if (item.healRatio && player.hp >= maxHp) return { error: '生命值已滿' };
   player.inventory[slot] = null;
-  if (item.heal) {
-    const healing = Math.min(item.heal, maxHp - player.hp);
+  if (item.healRatio) {
+    const healing = Math.min(Math.round(maxHp * item.healRatio), maxHp - player.hp);
     player.hp += healing;
     return { label: item.label, healing };
   }
@@ -110,4 +123,4 @@ function consumeRune(player, now) {
 }
 
 module.exports = { generateChests, quality, activeBuffs, modifiers, openChest, consumeRune,
-  interactRange, objectiveClearance, inRange, shockwave, inventorySize, useItem };
+  interactRange, objectiveClearance, inRange, shockwave, inventorySize, useItem, describeItem };

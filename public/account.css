@@ -85,3 +85,10 @@
 .history-table table { width: 100%; border-collapse: collapse; text-align: left; }
 .history-table th, .history-table td { padding: 6px 8px; border-bottom: 1px solid #665974; }
 .history-table td:first-child { overflow-wrap: anywhere; }
+
+.achievement-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#achievement-summary { color: #edd7aa; }
+#player-dialog .achievement-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 9px; }
+#player-dialog .achievement-grid li { padding: 11px; border: 1px solid #55627b; }
+#player-dialog .achievement-grid li[data-unlocked="true"] { border-color: #d6ae6b; background: #30283a; }
+#player-dialog .achievement-grid li[data-unlocked="true"] small { color: #ffdf99; }

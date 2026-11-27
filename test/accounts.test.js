@@ -128,6 +128,9 @@ test('account validation, persistence, login, cookie and revocation', async t =>
   for (let i = 0; i < 2; i++) {
     assert.equal((await request('soup/action', { id: puzzle.id, action: 'reveal' }, headers)).status, 200);
   }
+  assert.equal((await request('achievements')).status, 401);
+  const catalog = await (await request('achievements', undefined, headers)).json();
+  assert.deepEqual(catalog.soup.map(item => item.count), [0, 0, 0, 0]);
   const history = await (await request('history', undefined, headers)).json();
   assert.equal(history.soup.length, 1);
   assert.equal(history.soup[0].title, puzzle.title);

@@ -64,18 +64,40 @@ test('attack, speed, defense, immunity and one-use rune affect combat and expire
   combat.useItem(room, attacker, 1, 100);
   combat.useItem(room, enemy, 0, 100);
   combat.attack(room, attacker, enemy.x, enemy.y, false, 100);
-  assert.equal(enemy.hp, 490); // round(90 × 1.15 / 1.48)
+  assert.equal(enemy.hp, 483); // round(90 × 1.18 / 1.38)
   combat.useItem(room, enemy, 1, 200);
   combat.attack(room, attacker, enemy.x, enemy.y, false, 800);
-  assert.equal(enemy.hp, 490);
+  assert.equal(enemy.hp, 483);
   const y = attacker.y;
   attacker.input = { x: 0, y: 1 };
   attacker.inputAt = 900;
   combat.tick(room, 900, .05, () => ({ x: 0, y: 0 }));
-  assert.ok(Math.abs(attacker.y - y - 9.15) < 1e-6);
-  assert.deepEqual(loot.modifiers(attacker, 10100), { attack: 1, speed: 1, defense: 0, immune: false });
+  assert.ok(Math.abs(attacker.y - y - 8.85) < 1e-6);
+  assert.deepEqual(loot.modifiers(attacker, 8100), { attack: 1, speed: 1, defense: 0, immune: false });
   combat.useItem(room, attacker, 2, 13000);
   assert.equal(combat.castRune(room, attacker, 13100), true);
   assert.equal(combat.castRune(room, attacker, 13101), false);
-  assert.equal(enemy.hp, 371); // The defense and shield have both expired.
+  assert.equal(enemy.hp, 379); // round((800 × .05 + 90 × .8) / 1.08)
+});
+
+
+test('hero healing follows the active max HP and cannot overfill or waste a potion at full health', () => {
+  const room = match();
+  const [player] = room.players;
+  room.chests = [
+    { id: 1, x: 1200, y: 1600, quality: 'common', openedAt: null },
+    { id: 2, x: 1200, y: 1600, quality: 'rare', openedAt: null }
+  ];
+  Object.assign(player, { hero: 'beta', form: 0, hp: 10000 });
+  loot.openChest(room, player, 1, 50, () => true, () => 0);
+  assert.match(combat.snapshot(room, 60, player).inventory[0].description, /15%.*1500 HP/);
+  assert.ok(combat.useItem(room, player, 0, 60).error);
+  player.hp = 5000;
+  assert.equal(combat.useItem(room, player, 0, 70).healing, 1500);
+
+  loot.openChest(room, player, 2, 80, () => true, () => .5);
+  Object.assign(player, { form: 1, hp: 4000 });
+  assert.match(combat.snapshot(room, 90, player).inventory[0].description, /30%.*1500 HP/);
+  assert.equal(combat.useItem(room, player, 0, 90).healing, 1000);
+  assert.equal(player.hp, 5000);
 });

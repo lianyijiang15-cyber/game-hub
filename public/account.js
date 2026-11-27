@@ -169,7 +169,7 @@ async function accountRequest(route, body) {
     });
   };
 
-  $('menu-history').onclick = () => openPlayerPanel('history');
+  $('menu-history').onclick = () => openPlayerPanel('achievements');
   $('menu-friends').onclick = () => openPlayerPanel('friends');
   async function openPlayerPanel(panel) {
     await initialSession;

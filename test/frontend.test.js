@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-test('frontend scripts preserve soup and route Canvas controls to the arena protocol', () => {
+test('frontend scripts preserve soup and route Canvas controls to the arena protocol', async () => {
   const read = name => fs.readFileSync(path.join(__dirname, '../public', name), 'utf8');
   const elements = new Map();
   const socketHandlers = new Map();
@@ -188,6 +188,15 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.deepEqual(Array.from(panels, panel => panel.children[0].dataset.page), ['0', '1']);
   assert.ok(panels.every(panel => panel.children[1].textContent.length > 0));
   assert.equal(panels[1].children[1].textContent, elements.get('comic-caption').textContent);
+  const questions = ['這件事發生在晚上嗎？', '人物是獨自一人嗎？'];
+  const log = elements.get('soup-question-log');
+  for (const question of questions) {
+    elements.get('question').value = question;
+    await context.askSoup();
+    assert.equal(log.children.at(-1).children[1].textContent, elements.get('answer').textContent);
+  }
+  assert.deepEqual(log.children.map(row => row.children[0].textContent), questions);
+  assert.equal(elements.get('soup-no-questions').hidden, true);
   context.hint();
   assert.match(elements.get('answer').textContent, /提示/);
   assert.equal(elements.get('hints').textContent, 2);
@@ -198,7 +207,9 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   elements.get('comic-next').onclick();
   elements.get('comic-start').onclick();
   assert.equal(elements.get('hints').textContent, 2);
+  assert.equal(log.children.length, 2);
   elements.get('soup-next-case').onclick();
+  assert.equal(log.children.length, 0);
   assert.equal(elements.get('soup-comic').hidden, false);
   assert.equal(elements.get('soup-difficulty').textContent, '困難');
   elements.get('soup-level-back').onclick();
@@ -405,7 +416,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
 
 });
 
-test('account menu presents registration, mandatory naming, history and friends', async () => {
+test('account menu presents registration, achievements, detailed records and friends', async () => {
   const read = name => fs.readFileSync(path.join(__dirname, '../public', name), 'utf8');
   function node() {
     return {
@@ -427,6 +438,10 @@ test('account menu presents registration, mandatory naming, history and friends'
     register: { ok: true },
     login: { username: 'Player7', profile: null },
     profile: { profile },
+    achievements: {
+      arena: [{ title: '初入戰場', description: '完成一局', count: 0, goal: 1 }],
+      soup: [{ title: '初露鋒芒', description: '解開一題', count: 1, goal: 1 }]
+    },
     history: { arena: [], soup: [{ id: 'saved-soup', title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' }] },
     'history/saved-soup': { kind: 'soup', title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' },
     friends: { friends: [], incoming: [], sent: [opponent] },
@@ -472,6 +487,12 @@ test('account menu presents registration, mandatory naming, history and friends'
   assert.equal(openedArena, true);
 
   await find('menu-history').onclick();
+  assert.equal(find('player-title').textContent, '成就圖鑑');
+  assert.equal(find('player-history').hidden, true);
+  assert.equal(find('achievement-summary').textContent, '已解鎖 1 / 2');
+  assert.equal(find('arena-achievements').children[0]['data-unlocked'], 'false');
+  assert.equal(find('soup-achievements').children[0]['data-unlocked'], 'true');
+  await find('achievement-history').onclick();
   const historyButton = find('soup-history').children[0].children[0];
   assert.equal(historyButton.children[0].textContent, '第一題');
   await historyButton.onclick();
@@ -479,6 +500,8 @@ test('account menu presents registration, mandatory naming, history and friends'
   assert.equal(find('history-detail-content').children[0].textContent, '第一題');
   find('history-back').onclick();
   assert.equal(find('player-history').hidden, false);
+  await find('history-catalog').onclick();
+  assert.equal(find('player-achievements').hidden, false);
   find('player-dialog').close();
   await find('menu-friends').onclick();
   find('friend-by').value = 'id';
