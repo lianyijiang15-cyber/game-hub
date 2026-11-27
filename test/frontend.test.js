@@ -54,7 +54,11 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
           hostPlayer.ready = false;
         }
         if (event === 'ready') hostPlayer.ready = !hostPlayer.ready;
-        if (event === 'start') roster.phase = 'playing';
+        if (event === 'start') {
+          roster.phase = 'loading';
+          roster.loadingRemaining = 3500;
+          roster.players.forEach((p, i) => { p.team = i < 5 ? '紅隊' : '藍隊'; });
+        }
         args.at(-1)(null, { id: 'ABCDE0', room: roster });
       } };
     },
@@ -127,23 +131,29 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('start').disabled, true);
   elements.get('class-archer').onclick();
   assert.deepEqual(emitted.at(-1), ['chooseClass', 'archer']);
-  assert.equal(elements.get('class-art').src, '/art/archer.webp');
+  assert.equal(elements.get('class-art').src, '/art/archer-cutout.webp');
   assert.equal(elements.get('class-name').textContent, '弓箭手');
   assert.equal(elements.get('players').children[0].children[0].src, '/art/archer-avatar.webp');
   elements.get('class-mage').onclick();
-  assert.equal(elements.get('class-art').src, '/art/mage.webp');
+  assert.equal(elements.get('class-art').src, '/art/mage-cutout.webp');
   elements.get('ready').onclick();
   assert.deepEqual(emitted.at(-1), ['ready']);
   assert.equal(elements.get('start').disabled, false);
   elements.get('start').onclick();
   assert.deepEqual(emitted.at(-1), ['start']);
-  assert.equal(elements.get('battle').hidden, false);
+  assert.equal(elements.get('match-loading').hidden, false);
+  assert.equal(elements.get('battle').hidden, true);
+  assert.equal(elements.get('loading-blue').children.length, 5);
+  assert.equal(elements.get('loading-red').children.length, 5);
+  assert.equal(elements.get('loading-red').children[0].children[0].src, '/art/mage-cutout.webp');
   const player = {
     id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 1600, y: 1400, hp: 80, maxHp: 80,
     alive: true, facing: 0, attackAt: 0, skillAt: 0, spawnedAt: 0
   };
   socketHandlers.get('room')({ id: 'ABCDE0', host: 'self', players: [player], phase: 'playing' });
   socketHandlers.get('arenaMap')({ id: 'ABCDE0', map: require('../arena/world').generateWorld() });
+  assert.equal(elements.get('match-loading').hidden, true);
+  assert.equal(elements.get('battle').hidden, false);
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', now: 100, phase: 'playing', remaining: 299900, players: [player],
     effects: [], kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }

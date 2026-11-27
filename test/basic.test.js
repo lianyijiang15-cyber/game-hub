@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
 const { io: connect } = require('socket.io-client');
+process.env.NODE_ENV = 'test';
 const { server, io, rooms } = require('../server');
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -41,7 +42,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal((await fetch(base + '/soup-bank.js')).status, 200);
   assert.equal((await fetch(base + '/arena-renderer.js')).status, 200);
   for (const job of ['warrior', 'archer', 'mage']) {
-    for (const suffix of ['', '-avatar']) {
+    for (const suffix of ['', '-avatar', '-cutout']) {
       const image = await fetch(`${base}/art/${job}${suffix}.webp`, { method: 'HEAD' });
       assert.equal(image.status, 200);
       assert.equal(image.headers.get('content-type'), 'image/webp');
@@ -59,12 +60,17 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const filled = receive(guest, 'room', room => room.players.length === 10);
   assert.equal((await send(host, 'fillBots')).room.players.length, 10);
   assert.equal((await filled).players.filter(player => player.bot).length, 8);
+  const guestView = receive(guest, 'room');
+  const hostView = receive(host, 'room');
   assert.equal((await send(host, 'chooseClass', 'archer')).ok, true);
+  assert.equal((await hostView).players.find(p => p.id === host.id).job, 'archer');
+  assert.ok((await guestView).players.every(p => p.id === guest.id || !Object.hasOwn(p, 'job')));
   assert.equal((await send(guest, 'chooseClass', 'mage')).ok, true);
   assert.ok((await send(host, 'start')).error);
   await Promise.all([send(host, 'ready'), send(guest, 'ready')]);
   await wait(160);
 
+  const loading = receive(host, 'room', state => state.phase === 'loading');
   const hostMap = receive(host, 'arenaMap');
   const guestMap = receive(guest, 'arenaMap');
   const hostFrame = receive(host, 'arenaState');
@@ -72,6 +78,11 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   let outsideFrames = 0;
   outsider.on('arenaState', () => outsideFrames++);
   assert.equal((await send(host, 'start')).ok, true);
+  const revealed = await loading;
+  assert.equal(revealed.players.filter(p => p.team === '紅隊').length, 5);
+  assert.equal(revealed.players.find(p => p.id === guest.id).job, 'mage');
+  assert.ok(revealed.loadingRemaining > 0);
+  assert.equal(rooms.get(id).phase, 'loading');
   const [initial, shared, firstMap, sharedMap] = await Promise.all([hostFrame, guestFrame, hostMap, guestMap]);
   assert.deepEqual(firstMap, sharedMap);
   assert.equal(firstMap.map.tiles.length, 100);

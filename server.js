@@ -18,6 +18,8 @@ const rooms = new Map();
 const seats = 10;
 const maxRooms = 50;
 const reconnectWindow = 45000;
+const loadingDuration = process.env.NODE_ENV === 'test' ? 200 : 3500;
+const matchActive = room => room.phase === 'loading' || room.phase === 'playing';
 const channel = room => 'arena:' + room.id;
 const now = () => Math.floor(performance.now());
 
@@ -27,15 +29,20 @@ function list(target = io) {
   })));
 }
 
-function roomState(room) {
+function roomState(room, viewerId) {
   return {
     id: room.id, host: room.host, size: seats, phase: room.phase,
-    players: room.players.map(({ id, name, job, ready, bot }) => ({ id, name, job, ready, bot }))
+    loadingRemaining: Math.max(0, (room.loadingUntil ?? 0) - now()),
+    players: room.players.map(({ id, name, job, ready, bot, team }) => ({
+      id, name, ready, bot, ...(room.phase === 'loading' ? { job, team } : id === viewerId ? { job } : {})
+    }))
   };
 }
 
 function publish(room) {
-  io.to(channel(room)).emit('room', roomState(room));
+  for (const player of room.players) {
+    if (!player.bot) io.to(player.id).emit('room', roomState(room, player.id));
+  }
   list();
 }
 
@@ -68,7 +75,7 @@ function leave(socket, reconnect = false) {
   socket.leave(channel(room));
   socket.data.room = null;
   const successor = room.players.find(entry => entry !== player && !entry.bot);
-  const active = room.phase === 'playing';
+  const active = matchActive(room);
   if (!successor && !(active && reconnect)) {
     closeRoom(room);
     return;
@@ -96,8 +103,11 @@ function runMatch(room) {
   clearTimeout(room.expiry);
   for (const player of room.players) if (player.bot) player.ticket = null;
   combat.start(room, now(), crypto.randomBytes(4).readUInt32LE());
-  io.to(channel(room)).emit('arenaMap', { id: room.id, map: room.map });
+  room.phase = 'loading';
+  room.loadingUntil = now() + loadingDuration;
+  room.endsAt += loadingDuration;
   publish(room);
+  io.to(channel(room)).emit('arenaMap', { id: room.id, map: room.map });
   let lastTick = now();
   const broadcast = time => {
     for (const player of room.players) {
@@ -106,6 +116,15 @@ function runMatch(room) {
   };
   room.timer = setInterval(() => {
     const time = now();
+    if (room.phase === 'loading') {
+      lastTick = time;
+      if (time < room.loadingUntil) return;
+      room.phase = 'playing';
+      for (const player of room.players) player.spawnedAt = time;
+      publish(room);
+      broadcast(time);
+      return;
+    }
     if (room.phase === 'playing') combat.tick(room, time, Math.min((time - lastTick) / 1000, 0.05), botInput);
     lastTick = time;
     if (room.phase === 'ended') {
@@ -181,7 +200,7 @@ io.on('connection', socket => {
     const created = { id, host: socket.id, phase: 'lobby', players: [] };
     rooms.set(id, created);
     const ticket = join(socket, created, name);
-    return { id, ticket, room: roomState(created) };
+    return { id, ticket, room: roomState(created, socket.id) };
   });
   command('join', (data, { room }) => {
     if (room) return { error: '請先離開目前房間' };
@@ -193,14 +212,14 @@ io.on('connection', socket => {
       return { error: '房間不存在、已開始或已滿' };
     }
     const ticket = join(socket, target, name);
-    return { id, ticket, room: roomState(target) };
+    return { id, ticket, room: roomState(target, socket.id) };
   });
   command('resume', (data, { room }) => {
     if (room || typeof data?.id !== 'string' || typeof data?.ticket !== 'string') {
       return { error: '無法恢復席位' };
     }
     const target = rooms.get(data.id);
-    if (!target || target.phase !== 'playing') return { error: '原本的對戰已結束或已關閉' };
+    if (!target || !matchActive(target)) return { error: '原本的對戰已結束或已關閉' };
     const player = target.players.find(entry => entry.ticket === data.ticket);
     if (player && !player.bot) {
       const previous = io.of('/').sockets.get(player.id);
@@ -217,19 +236,19 @@ io.on('connection', socket => {
     target.host ??= socket.id;
     socket.join(channel(target));
     socket.data.room = target.id;
-    return { id: target.id, ticket, room: roomState(target), map: target.map };
+    return { id: target.id, ticket, room: roomState(target, socket.id), map: target.map };
   });
   command('leave', () => leave(socket), 0);
   hostCommand('addBot', 'lobby', room => {
     if (room.players.length >= seats) return { error: '房間已滿' };
     addBot(room);
     publish(room);
-    return { ok: true, room: roomState(room) };
+    return { ok: true, room: roomState(room, socket.id) };
   });
   hostCommand('fillBots', 'lobby', room => {
     while (room.players.length < seats) addBot(room);
     publish(room);
-    return { ok: true, room: roomState(room) };
+    return { ok: true, room: roomState(room, socket.id) };
   });
   hostCommand('removeBot', 'lobby', (room, id) => {
     if (typeof id !== 'string' || !room.players.some(player => player.id === id && player.bot)) {
@@ -239,7 +258,7 @@ io.on('connection', socket => {
     publish(room);
   });
   command('chooseClass', (job, { room, player }) => {
-    if (room?.phase !== 'lobby' || !combat.jobs.includes(job)) return { error: '目前無法選擇此職業' };
+    if (room?.phase !== 'lobby' || player.ready || !combat.jobs.includes(job)) return { error: '目前無法選擇此職業' };
     player.job = job;
     player.ready = false;
     publish(room);

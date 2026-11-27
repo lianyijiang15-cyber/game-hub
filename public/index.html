@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜開放世界對抗</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <main>
@@ -73,25 +73,42 @@
   </div>
   <p id="room-error" role="status"></p>
   <div id="waiting" class="panel">
-    <section class="class-select" aria-label="選擇職業">
-      <div id="class-options" class="class-options" role="group" aria-label="職業">
-        <button type="button" id="class-warrior" data-job="warrior" aria-pressed="true">戰士</button>
-        <button type="button" id="class-archer" data-job="archer" aria-pressed="false">弓箭手</button>
-        <button type="button" id="class-mage" data-job="mage" aria-pressed="false">法師</button>
-      </div>
-      <div id="class-profile" data-job="warrior">
-        <div class="class-portrait"><img id="class-art" src="/art/warrior.webp" alt="戰士立繪" width="512" height="1024" fetchpriority="high"></div>
+    <section id="class-profile" class="class-select" data-job="warrior" aria-label="個人選角">
+      <div class="picker-stage">
+        <h3 class="picker-title">選擇出戰職業</h3>
+        <div id="class-options" class="class-options" role="group" aria-label="職業">
+          <button type="button" id="class-warrior" data-job="warrior" aria-pressed="true"><img src="/art/warrior-cutout.webp" alt="" width="220" height="310"><span>戰士</span></button>
+          <button type="button" id="class-archer" data-job="archer" aria-pressed="false"><img src="/art/archer-cutout.webp" alt="" width="220" height="310"><span>弓箭手</span></button>
+          <button type="button" id="class-mage" data-job="mage" aria-pressed="false"><img src="/art/mage-cutout.webp" alt="" width="220" height="310"><span>法師</span></button>
+        </div>
         <div class="class-copy" aria-live="polite">
           <p id="class-role"></p>
           <h3 id="class-name">戰士</h3>
           <p id="job-description"></p>
-          <dl class="class-stats">
-            <div><dt>生命值</dt><dd id="class-hp"></dd></div>
-            <div><dt>普攻距離</dt><dd id="class-range"></dd></div>
-          </dl>
           <p class="class-skill"><kbd>Q</kbd> <strong id="class-skill"></strong></p>
         </div>
+        <div class="ready-actions">
+          <button id="ready">遊戲開始</button>
+          <button id="start" hidden>遊戲開始</button>
+          <button id="unlock" class="ghost" hidden>重新選角</button>
+          <p id="start-help" role="status"></p>
+        </div>
       </div>
+      <aside class="class-sheet" aria-label="職業美術與能力">
+        <img id="class-art" src="/art/warrior-cutout.webp" alt="戰士立繪" width="220" height="310" fetchpriority="high">
+        <div id="class-chart" class="class-chart" role="img" aria-label="職業能力雷達圖">
+          <span class="axis-hp">生命</span><span class="axis-speed">速度</span>
+          <span class="axis-range">射程</span><span class="axis-damage">傷害</span><span class="axis-rate">攻速</span>
+          <div id="chart-shape" class="chart-shape"></div>
+        </div>
+        <dl class="class-stats">
+          <div><dt>生命值</dt><dd id="class-hp"></dd></div>
+          <div><dt>速度</dt><dd id="class-speed"></dd></div>
+          <div><dt>普攻距離</dt><dd id="class-range"></dd></div>
+          <div><dt>普攻傷害</dt><dd id="class-damage"></dd></div>
+          <div><dt>普攻冷卻</dt><dd id="class-cooldown"></dd></div>
+        </dl>
+      </aside>
     </section>
     <h3 id="seat-count"></h3>
     <div id="players" aria-label="玩家席位"></div>
@@ -102,12 +119,15 @@
         <button id="fill-bots">一鍵補滿 AI</button>
       </div>
     </div>
-    <div class="ready-actions">
-      <button id="ready">準備</button>
-      <button id="start">開始遊戲</button>
-      <p id="start-help" role="status"></p>
-    </div>
   </div>
+  <section id="match-loading" class="match-loading" aria-labelledby="loading-title" hidden>
+    <h2 id="loading-title">即將進入對戰</h2>
+    <div class="loading-team blue"><h3>藍隊</h3><div id="loading-blue" class="loading-roster"></div></div>
+    <div class="loading-versus" aria-hidden="true">VS</div>
+    <div class="loading-team red"><h3>紅隊</h3><div id="loading-red" class="loading-roster"></div></div>
+    <progress id="loading-progress" max="3500" value="0" aria-label="對戰載入倒數"></progress>
+    <p id="loading-status" role="status">正在同步本場隨機地圖…</p>
+  </section>
   <div id="battle" hidden>
     <div class="scoreboard">
       <span class="red"><span>紅隊</span><strong id="red-score">0</strong></span>
@@ -149,7 +169,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=6"></script>
-<script src="arena-renderer.js?v=6"></script>
+<script src="app.js?v=7"></script>
+<script src="arena-renderer.js?v=7"></script>
 </body>
 </html>

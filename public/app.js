@@ -20,11 +20,12 @@ function hint(){if(hintCount>=3)return;$('answer').textContent='提示：'+soup.
 const jobNames = { warrior: '戰士', archer: '弓箭手', mage: '法師' };
 const skills = { warrior: '旋風斬', archer: '三重箭', mage: '火球術' };
 const classDetails = {
-  warrior: { role: '近戰前排', hp: 300, range: 52, description: '以盾甲扛住第一波攻勢，逼近敵人後用長劍封住狹窄通道。敵人圍上來時，旋風斬能同時攻擊周圍目標。' },
-  archer: { role: '遠距游擊', hp: 100, range: 240, description: '利用長弓和最快的移動速度，從遠處牽制敵人。三重箭向不同角度飛出，適合封住通道或在近距離打中多支。' },
-  mage: { role: '遠程範圍傷害', hp: 80, range: 190, description: '靠隊友掩護尋找施法角度。火球撞擊後會爆炸，適合攻擊聚在一起的敵人。' }
+  warrior: { role: '近戰前排', hp: 300, range: 52, speed: 150, damage: 24, cooldown: 650, description: '以盾甲扛住第一波攻勢，逼近敵人後用長劍封住狹窄通道。敵人圍上來時，旋風斬能同時攻擊周圍目標。' },
+  archer: { role: '遠距游擊', hp: 100, range: 240, speed: 185, damage: 17, cooldown: 850, description: '利用長弓和最快的移動速度，從遠處牽制敵人。三重箭向不同角度飛出，適合封住通道或在近距離打中多支。' },
+  mage: { role: '遠程範圍傷害', hp: 80, range: 190, speed: 165, damage: 20, cooldown: 950, description: '靠隊友掩護尋找施法角度。火球撞擊後會爆炸，適合攻擊聚在一起的敵人。' }
 };
 let phase = 'lobby';
+let loadingDeadline = 0;
 let frame = null;
 let previous = null;
 let receivedAt = 0;
@@ -107,7 +108,7 @@ function enter(event, data) {
     }
     room = result.id;
     if (result.ticket) sessionStorage.setItem(matchKey, JSON.stringify({ id: room, ticket: result.ticket }));
-    worldMap = result.map || null;
+    worldMap = null;
     phase = 'lobby';
     frame = previous = null;
     $('messages').replaceChildren();
@@ -115,9 +116,10 @@ function enter(event, data) {
     $('room-error').textContent = '';
     $('room-id').textContent = room;
     $('waiting').hidden = false;
-    $('battle').hidden = $('results').hidden = true;
+    $('match-loading').hidden = $('battle').hidden = $('results').hidden = true;
     show('game');
     if (result.room) renderRoom(result.room);
+    if (result.map) worldMap = result.map;
   });
 }
 
@@ -134,7 +136,7 @@ function renderRoomList() {
   list.replaceChildren();
   if (!listedRooms.length) list.append(element('p', '目前沒有房間'));
   for (const entry of listedRooms) {
-    const label = { lobby: '等待中', playing: '對戰中', ended: '已結束' }[entry.phase];
+    const label = { lobby: '等待中', loading: '載入中', playing: '對戰中', ended: '已結束' }[entry.phase];
     const row = element('p', `${entry.id} · ${entry.count}/${entry.size} · ${label} `);
     if (entry.phase === 'lobby' && entry.count < entry.size) {
       const join = element('button', '加入');
@@ -156,7 +158,7 @@ function renderClass(job) {
   const profile = $('class-profile');
   if (profile.dataset.job !== job || !$('class-role').textContent) {
     const art = $('class-art');
-    art.src = `/art/${job}.webp`;
+    art.src = `/art/${job}-cutout.webp`;
     art.alt = jobNames[job] + '立繪';
   }
   profile.dataset.job = job;
@@ -165,6 +167,16 @@ function renderClass(job) {
   $('job-description').textContent = details.description;
   $('class-hp').textContent = details.hp + ' HP';
   $('class-range').textContent = details.range + ' px';
+  $('class-speed').textContent = details.speed + ' px/s';
+  $('class-damage').textContent = details.damage;
+  $('class-cooldown').textContent = details.cooldown + ' ms';
+  const values = [details.hp / 300, details.speed / 185, details.range / 240,
+    details.damage / 24, 650 / details.cooldown];
+  const points = values.map((value, index) => {
+    const angle = index * Math.PI * 2 / values.length - Math.PI / 2;
+    return `${50 + 42 * value * Math.cos(angle)}% ${50 + 42 * value * Math.sin(angle)}%`;
+  });
+  $('chart-shape').setAttribute('style', `clip-path: polygon(${points.join(',')})`);
   $('class-skill').textContent = skills[job];
   for (const [id, button] of Object.entries(classButtons)) {
     button.setAttribute('aria-pressed', String(id === job));
@@ -180,6 +192,25 @@ for (const [job, button] of Object.entries(classButtons)) {
   };
 }
 
+function renderLoading(state) {
+  loadingDeadline = performance.now() + state.loadingRemaining;
+  for (const [team, id] of [['藍隊', 'loading-blue'], ['紅隊', 'loading-red']]) {
+    const roster = $(id);
+    roster.replaceChildren();
+    for (const player of state.players.filter(entry => entry.team === team)) {
+      const card = element('div', '');
+      card.className = 'loading-card';
+      card.dataset.local = String(player.id === socket.id);
+      const art = element('img', '');
+      art.src = `/art/${player.job}-cutout.webp`;
+      art.alt = '';
+      card.append(art, element('strong', player.name),
+        element('small', jobNames[player.job] + (player.bot ? ' · AI' : '')));
+      roster.append(card);
+    }
+  }
+}
+
 function renderRoom(state) {
   if (state.id !== room) return;
   const me = state.players.find(player => player.id === socket.id);
@@ -190,9 +221,12 @@ function renderRoom(state) {
     stopMovement();
     $('messages').replaceChildren();
     if (state.phase === 'playing' || waiting) frame = previous = null;
+    if (state.phase === 'loading') worldMap = null;
   }
   phase = state.phase;
   $('waiting').hidden = !waiting;
+  $('match-loading').hidden = phase !== 'loading';
+  if (phase === 'loading') renderLoading(state);
   $('battle').hidden = phase !== 'playing';
   $('game').classList.toggle('in-combat', phase === 'playing');
   $('results').hidden = phase !== 'ended';
@@ -206,13 +240,20 @@ function renderRoom(state) {
     const tile = element('div', '');
     tile.className = 'player-tile';
     tile.dataset.ready = String(player.ready);
-    const avatar = element('img', '');
-    avatar.className = 'player-avatar';
-    avatar.src = `/art/${player.job}-avatar.webp`;
-    avatar.alt = '';
-    avatar.width = avatar.height = 88;
-    tile.append(avatar, element('strong', player.name),
-      element('small', `${player.bot ? 'AI' : '真人'} · ${jobNames[player.job]} · ${player.ready ? '已準備' : '未準備'}${player.id === state.host ? ' · 房主' : ''}`));
+    if (player.id === me.id) {
+      const avatar = element('img', '');
+      avatar.className = 'player-avatar';
+      avatar.src = `/art/${me.job}-avatar.webp`;
+      avatar.alt = '';
+      avatar.width = avatar.height = 88;
+      tile.append(avatar);
+    } else {
+      const badge = element('span', player.bot ? 'AI' : '?');
+      badge.className = 'private-avatar';
+      tile.append(badge);
+    }
+    tile.append(element('strong', player.name),
+      element('small', `${player.id === me.id ? '你 · ' : ''}${player.ready ? '已準備' : '選角中'}${player.id === state.host ? ' · 房主' : ''}`));
     if (host && player.bot) {
       const remove = element('button', '移除 AI');
       remove.className = 'ghost';
@@ -228,23 +269,27 @@ function renderRoom(state) {
     $('players').append(empty);
   }
   renderClass(me.job);
+  for (const button of Object.values(classButtons)) button.disabled = me.ready;
   const full = state.players.length === state.size;
   const bots = state.players.filter(player => player.bot).length;
   $('bot-controls').hidden = !host;
   $('add-bot').disabled = $('fill-bots').disabled = full;
   $('bot-summary').textContent = `${bots} 名 AI · ${state.size - state.players.length} 個空位`;
   $('bot-help').textContent = host ? '用 AI 補足空位，單人也能開局。' : '由房主加入或移除 AI。';
-  $('ready').textContent = me.ready ? '取消準備' : '準備';
-  $('start').hidden = !host;
   const unready = state.players.filter(player => !player.ready).length;
+  $('ready').hidden = me.ready;
+  $('unlock').hidden = !me.ready;
+  $('start').hidden = !host || !me.ready;
   $('start').disabled = !full || unready > 0;
   $('start-help').textContent = !full ? `還有 ${state.size - state.players.length} 個空位` :
-    unready ? `等待 ${unready} 名玩家準備` : host ? '全員就緒，可以開局。' : '全員就緒，等待房主開局。';
+    !me.ready ? '按「遊戲開始」確認職業' :
+    unready ? `等待 ${unready} 名玩家準備` : host ? '全員就緒，可以開局' : '全員就緒，等待房主開局';
 }
 socket.on('room', renderRoom);
 $('add-bot').onclick = () => sendRoomCommand('addBot');
 $('fill-bots').onclick = () => sendRoomCommand('fillBots');
 $('ready').onclick = () => sendRoomCommand('ready');
+$('unlock').onclick = () => sendRoomCommand('ready');
 $('start').onclick = () => sendRoomCommand('start');
 $('return-lobby').onclick = () => sendRoomCommand('returnLobby');
 $('rematch').onclick = () => sendRoomCommand('rematch');
@@ -381,6 +426,12 @@ socket.on('arenaState', state => {
 
 function renderFrame(time) {
   requestAnimationFrame(renderFrame);
+  if (phase === 'loading') {
+    const remaining = Math.max(0, loadingDeadline - time);
+    $('loading-progress').value = worldMap ? 3500 - Math.min(3500, remaining) : 0;
+    $('loading-status').textContent = worldMap ? (remaining ? `${Math.ceil(remaining / 1000)} 秒後進入戰場` : '正在進入戰場…') : '正在同步本場隨機地圖…';
+    return;
+  }
   if (!worldMap || !frame || phase !== 'playing' || frame.phase !== 'playing') return;
   const elapsed = Math.min(150, Math.max(0, time - receivedAt));
   const serverTime = frame.now + elapsed;
