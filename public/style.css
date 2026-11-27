@@ -351,16 +351,16 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 }
 
 .in-selection .picker-stage { grid-template-rows: auto 1fr auto auto auto; }
-.in-selection #match-chat {
+#game:is(.in-selection, .in-lobby, .in-loading) #match-chat {
   position: absolute; z-index: 3; top: 72px; left: 16px; width: min(306px, 28vw); margin: 0;
   padding: 8px; background: #232329e8; border-color: #9c8567;
 }
-.in-selection #chat-title { margin: 0 0 5px; font-size: .84rem; }
-.in-selection #messages { max-height: min(85px, 12dvh); padding: 0 4px; background: none; border: 0; font-size: .8rem; }
-.in-selection #messages p { padding: 2px 0; }
-.in-selection #chat-form { display: flex; gap: 4px; }
-.in-selection #chat-input { min-width: 0; min-height: 32px; flex: 1; margin: 0; padding: 3px 7px; }
-.in-selection #chat-form button { min-height: 32px; padding: 3px 8px; margin: 0; }
+#game:is(.in-selection, .in-lobby, .in-loading) #chat-title { margin: 0 0 5px; font-size: .84rem; }
+#game:is(.in-selection, .in-lobby, .in-loading) #messages { max-height: min(85px, 12dvh); padding: 0 4px; background: none; border: 0; font-size: .8rem; }
+#game:is(.in-selection, .in-lobby, .in-loading) #messages p { padding: 2px 0; }
+#game:is(.in-selection, .in-lobby, .in-loading) #chat-form { display: flex; gap: 4px; }
+#game:is(.in-selection, .in-lobby, .in-loading) #chat-input { min-width: 0; min-height: 32px; flex: 1; margin: 0; padding: 3px 7px; }
+#game:is(.in-selection, .in-lobby, .in-loading) #chat-form button { min-height: 32px; padding: 3px 8px; margin: 0; }
 .selection-team { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; width: min(100%, 585px); justify-self: center; margin-top: 9px; }
 .selection-teammate { min-width: 0; display: grid; justify-items: center; padding: 4px 2px; background: #232329ec; border: 1px solid #9c8567; border-radius: 5px; text-align: center; }
 .selection-teammate[data-ready="true"] { border-color: #92ba7a; }
@@ -377,46 +377,51 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
   inset: 0;
   z-index: 10;
   overflow: auto;
-  padding: clamp(14px, 3vw, 36px) max(clamp(14px, 3vw, 36px), (100vw - 1320px) / 2);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, .36fr);
-  grid-template-rows: auto auto 1fr;
-  gap: 12px 18px;
-  align-items: start;
-  background: radial-gradient(ellipse at 80% 9%, #394b5b 0%, transparent 54%),
-    radial-gradient(ellipse at 9% 92%, #3b333b 0%, transparent 52%), #171d28;
+  background: linear-gradient(#10223035, #101a2160),
+    url('/art/ravine-city.webp') center / cover fixed, #142729;
 }
-#game:is(.in-lobby, .in-loading) .room-heading { grid-column: 1 / -1; }
-#game:is(.in-lobby, .in-loading) .room-heading h2 { margin: 0; }
-#game:is(.in-lobby, .in-loading) #room-error { grid-column: 1 / -1; }
-#game.in-lobby #waiting, #game.in-lobby #match-chat {
-  margin: 0;
-  background: linear-gradient(145deg, #282832ed, #171d27ed);
-  border-color: #837253;
-}
-.in-lobby #waiting-title { margin: 0 0 4px; font-size: clamp(1.25rem, 3vw, 1.8rem); }
-.in-lobby #seat-count { margin: 0 0 14px; font-size: .92rem; color: #d7c8af; }
-.in-lobby #chat-title { margin-top: 0; }
-.in-lobby #chat-form { display: flex; align-items: center; gap: 6px; }
-.in-lobby #chat-input { min-width: 0; flex: 1; margin: 0; }
 #game.in-loading {
-  grid-template-columns: minmax(0, 1fr);
-  background: radial-gradient(ellipse at 16% 28%, #27466a80, transparent 52%),
-    radial-gradient(ellipse at 89% 88%, #73354273, transparent 52%), #121822;
+  background-image: linear-gradient(#102a4740, #311d2970), url('/art/ravine-city.webp');
 }
-.in-loading .match-loading {
-  width: 100%;
-  min-height: min(600px, calc(100dvh - 110px));
-  align-self: center;
+#game:is(.in-lobby, .in-loading) .room-heading {
+  position: absolute; z-index: 3; inset: 8px 16px auto; pointer-events: none;
+}
+#game:is(.in-lobby, .in-loading) .room-heading h2 {
+  margin: 0; padding: 4px 8px; border-radius: 6px; background: #231e27df;
+}
+#game:is(.in-lobby, .in-loading) .room-heading button {
+  pointer-events: auto; color: #f8ead3; background: #211a20de;
+}
+#game:is(.in-lobby, .in-loading) #room-error {
+  position: absolute; z-index: 5; top: 72px; right: 16px;
+}
+#game.in-lobby #waiting, #game.in-loading .match-loading {
   display: grid;
   align-content: center;
-  background: linear-gradient(130deg, #26314469, #12192438);
+  min-height: 100dvh;
+  margin: 0;
+  padding: clamp(174px, 22dvh, 215px) clamp(12px, 4vw, 56px) 20px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
-.in-loading .loading-card img { height: clamp(78px, 21dvh, 215px); }
+.in-lobby #room-waiting {
+  width: min(1060px, 100%);
+  justify-self: center;
+  padding: clamp(12px, 2vw, 24px);
+  border: 1px solid #aa9579a0;
+  border-radius: 10px;
+  background: #1a242bd1;
+}
+.in-lobby #waiting-title { margin: 0 0 4px; font-size: clamp(1.25rem, 3vw, 1.8rem); }
+.in-lobby #seat-count { margin: 0 0 14px; font-size: .92rem; color: #e1cfaf; }
+.in-loading .loading-team { width: min(100%, 1200px); justify-self: center; }
+.in-loading .loading-card img { height: clamp(74px, 20dvh, 226px); }
 .in-loading #loading-progress { justify-self: center; }
-.in-loading #match-chat { grid-column: 1; margin: 0 auto; width: min(100%, 620px); }
 @media (max-width: 760px) {
-  #game.in-lobby { grid-template-columns: minmax(0, 1fr); }
-  #game.in-lobby #players { grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); }
+  #game:is(.in-lobby, .in-loading) #match-chat { width: min(270px, calc(100% - 32px)); }
+  .in-lobby #players { grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); }
   .in-loading .loading-card img { height: clamp(60px, 14dvh, 140px); }
 }
