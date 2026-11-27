@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
 <link rel="stylesheet" href="style.css?v=16">
-<link rel="stylesheet" href="menu.css?v=1">
+<link rel="stylesheet" href="menu.css?v=2">
+<link rel="stylesheet" href="account.css?v=1">
 </head>
 <body>
 <main>
@@ -47,22 +48,80 @@
         <canvas id="menu-mystery-art" width="96" height="84" aria-hidden="true"></canvas>
       </button>
       <div class="menu-social">
-        <button class="menu-tile menu-history" type="button" disabled>
+        <button class="menu-tile menu-history" id="menu-history" type="button" aria-haspopup="dialog">
           <span class="menu-social-icon menu-trophy" aria-hidden="true"></span>
-          <span>歷史戰績</span><small>籌備中</small>
+          <span>歷史戰績</span>
         </button>
-        <button class="menu-tile menu-friends" type="button" disabled>
+        <button class="menu-tile menu-friends" id="menu-friends" type="button" aria-haspopup="dialog">
           <span class="menu-social-icon menu-party" aria-hidden="true"></span>
-          <span>好友</span><small>籌備中</small>
+          <span>好友</span>
         </button>
       </div>
-      <button class="menu-tile menu-profile" type="button" disabled>
+      <button class="menu-tile menu-profile" id="menu-profile" type="button" aria-haspopup="dialog">
         <span class="menu-avatar" aria-hidden="true"><canvas id="menu-avatar" width="32" height="32"></canvas></span>
-        <span>登入／註冊</span><small>頭像設定 · 籌備中</small>
+        <span id="profile-name">登入／註冊</span><small id="profile-status">玩家帳號</small>
       </button>
     </div>
   </div>
 </section>
+<dialog id="account-dialog" aria-labelledby="account-title">
+  <div class="account-heading">
+    <h2 id="account-title">玩家登入</h2>
+    <button id="account-close" class="ghost" type="button" aria-label="關閉帳號視窗">✕</button>
+  </div>
+  <div id="account-modes" class="account-modes" aria-label="帳號操作">
+    <button id="account-login" type="button" aria-pressed="true">登入</button>
+    <button id="account-register" type="button" aria-pressed="false">註冊</button>
+  </div>
+  <form id="account-form" method="post" action="/api/account/login">
+    <label for="account-username">帳號</label>
+    <input id="account-username" name="username" required minlength="3" maxlength="24"
+      pattern="(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{3,24}" autocomplete="username"
+      autocapitalize="none" spellcheck="false" aria-describedby="account-username-help">
+    <small id="account-username-help">3–24 個英數字元，至少各有一個英文字母和數字。</small>
+    <label for="account-password">密碼</label>
+    <input id="account-password" name="password" type="password" required minlength="15" maxlength="128"
+      autocomplete="current-password" aria-describedby="account-password-help">
+    <small id="account-password-help">15–128 個字元，可使用空白及符號。</small>
+    <label id="account-confirm-label" for="account-confirm" hidden>再輸入一次密碼</label>
+    <input id="account-confirm" type="password" autocomplete="new-password" maxlength="128" hidden disabled>
+    <button id="account-submit" type="submit">登入</button>
+  </form>
+  <div id="account-signed-in" hidden>
+    <p id="account-profile-info" hidden><strong id="account-current"></strong> · 玩家 ID <code id="account-player-id"></code></p>
+    <form id="account-name-form" method="post" action="/api/account/profile" hidden>
+      <label for="account-player-name">自訂玩家名稱</label>
+      <input id="account-player-name" name="name" required minlength="2" maxlength="20"
+        placeholder="輸入尚未被使用的名稱">
+      <button id="account-save-name" type="submit">儲存名稱</button>
+    </form>
+    <button id="account-logout" type="button">登出</button>
+  </div>
+  <p id="account-message" role="status"></p>
+</dialog>
+<dialog id="player-dialog" aria-labelledby="player-title">
+  <div class="account-heading">
+    <h2 id="player-title"></h2>
+    <button id="player-close" class="ghost" type="button" aria-label="關閉視窗">✕</button>
+  </div>
+  <p id="player-message" role="status"></p>
+  <section id="player-history" hidden>
+    <h3>像素戰爭</h3><ul id="arena-history"></ul>
+    <h3>海龜湯</h3><ul id="soup-history"></ul>
+  </section>
+  <section id="player-friends" hidden>
+    <form id="friend-form" method="post" action="/api/account/friends/request">
+      <label for="friend-by">搜尋方式</label>
+      <select id="friend-by" name="by"><option value="name">玩家名稱</option><option value="id">玩家 ID</option></select>
+      <label for="friend-query">名稱或 ID</label>
+      <input id="friend-query" name="query" maxlength="50" required>
+      <button type="submit">送出邀請</button>
+    </form>
+    <h3>收到的邀請</h3><ul id="friend-incoming"></ul>
+    <h3>已送出的邀請</h3><ul id="friend-sent"></ul>
+    <h3>好友名單</h3><ul id="friend-list"></ul>
+  </section>
+</dialog>
 <section id="soup" hidden>
 <button class="ghost" onclick="home()">← 返回大廳</button>
 <h2>🐢 海龜湯</h2>
@@ -74,7 +133,7 @@
 </p>
 <p id="soup-progress">
 </p>
-<input id="question" placeholder="例如：他喝的是海龜湯嗎？">
+<input id="question" maxlength="300" placeholder="例如：他喝的是海龜湯嗎？">
 <button onclick="askSoup()">提問</button>
 <p id="answer">
 </p>
@@ -83,6 +142,7 @@
 <button class="secondary" onclick="newSoup()">換一題</button>
 <p id="soup-end">
 </p>
+<p id="soup-record" role="status"></p>
 </div>
 </section>
 <section id="lobby" hidden>
@@ -251,9 +311,11 @@
 </section>
 </main>
 <script src="/socket.io/socket.io.js"></script>
-<script src="soup-bank.js"></script>
-<script src="app.js?v=17"></script>
+<script src="soup-bank.js?v=2"></script>
+<script src="app.js?v=18"></script>
 <script src="arena-renderer.js?v=17"></script>
 <script src="menu-art.js?v=1"></script>
+<script src="account.js?v=1"></script>
+<script src="player-panel.js?v=1"></script>
 </body>
 </html>

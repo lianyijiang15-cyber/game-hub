@@ -251,6 +251,7 @@
   background: radial-gradient(ellipse at 50% 30%, #5d4969 0%, #31273b 64%, #252235 100%);
   font-size: clamp(1rem, 2.15vw, 2rem);
 }
+#profile-name { overflow-wrap: anywhere; }
 .menu-avatar {
   width: min(76%, 140px);
   border-color: #d6bde9;

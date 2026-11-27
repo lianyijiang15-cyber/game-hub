@@ -3,8 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
+const { mkdtempSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const path = require('node:path');
 const { io: connect } = require('socket.io-client');
 process.env.NODE_ENV = 'test';
+const accountDir = mkdtempSync(path.join(tmpdir(), 'pixel-clash-arena-'));
+process.env.PIXEL_CLASH_ACCOUNTS_FILE = path.join(accountDir, 'accounts.json');
 const { server, io, rooms } = require('../server');
 const combat = require('../arena/combat');
 
@@ -27,10 +32,24 @@ function receive(client, event, match = () => true) {
 }
 
 test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
+  t.after(() => rmSync(accountDir, { recursive: true, force: true }));
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const base = 'http://127.0.0.1:' + server.address().port;
-  const clients = Array.from({ length: 3 }, () => connect(base, { transports: ['websocket'] }));
+  const credentials = { username: 'ClashHost17', password: 'A castle with 7 rooms!' };
+  const accountAction = (action, body, cookie) => fetch(base + '/api/account/' + action, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+    body: JSON.stringify(body)
+  });
+  assert.equal((await accountAction('register', credentials)).status, 201);
+  const login = await accountAction('login', credentials);
+  const cookie = login.headers.get('set-cookie').split(';')[0];
+  const named = await accountAction('profile', { name: 'Registered Host' }, cookie);
+  assert.equal(named.status, 200);
+  const clients = [cookie, null, null].map(value => connect(base, {
+    transports: ['websocket'], extraHeaders: value ? { Cookie: value } : {}
+  }));
   t.after(async () => {
     clients.forEach(client => client.disconnect());
     await io.close();
@@ -66,7 +85,8 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(backdrop.status, 200);
   assert.equal(backdrop.headers.get('content-type'), 'image/webp');
   assert.ok((await send(outsider, 'create', null)).error);
-  const { id } = await send(host, 'create', { type: 'arena', size: 10, name: 'Host' });
+  const { id, room: created } = await send(host, 'create', { type: 'arena', size: 10, name: 'Host' });
+  assert.equal(created.players[0].name, 'Registered Host');
   assert.match(id, /^[A-F0-9]{6}$/);
   assert.equal((await send(guest, 'join', { id: id.toLowerCase(), name: 'Guest' })).id, id);
   assert.ok((await send(guest, 'fillBots')).error);
@@ -170,6 +190,14 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const result = await final;
   assert.equal(result.winner, null);
   assert.equal(result.results.length, 10);
+  const history = await fetch(base + '/api/account/history', { headers: { Cookie: cookie } });
+  const { arena } = await history.json();
+  assert.equal(arena.length, 1);
+  const official = result.results.find(player => player.id === host.id);
+  for (const metric of ['team', 'job', 'kills', 'deaths', 'assists', 'damage']) {
+    assert.equal(arena[0][metric], official[metric]);
+  }
+  assert.equal(arena[0].result, 'draw');
   const retainedPlayers = liveRoom.players.map(({ id, name, bot, job }) => ({ id, name, bot, job }));
   const waiting = [host, guest].map(client => receive(client, 'room', state => state.id === id && state.phase === 'lobby'));
   assert.ok((await send(guest, 'rematch')).error);

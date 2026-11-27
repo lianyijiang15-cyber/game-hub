@@ -4,18 +4,88 @@ const socket = io();
 const $ = id => document.getElementById(id);
 let room = null;
 let soup = null;
-let hintCount = 0;
-let progress = 0;
+let onlineSoup = false;
+let soupSequence = 0;
+let soupPending = false;
 
-const stories=[
- {title:'餐廳裡的海龜湯',intro:'一名男子在餐廳喝了一口海龜湯，回家後卻做出了令人震驚的決定。為什麼？',clues:['他以前曾遭遇船難。','他當年吃過一碗被稱作海龜湯的湯。','餐廳的味道與記憶不同，讓他發現當年吃的不是海龜。'],hints:['想想男子過去的經歷。','關鍵在於兩次湯的味道。','當年的湯其實不是海龜肉。'],keys:['船','海龜','味道'],answer:'經典版本中，男子曾在船難後喝下被謊稱為海龜湯的湯。多年後嚐到真正的海龜湯，才察覺當年的真相。'},
- {title:'關燈的人',intro:'一個人晚上關燈睡覺，隔天得知許多人因此喪命。為什麼？',clues:['他住在靠海的地方。','這盞燈不是普通房間的照明。','他是燈塔管理員，關燈導致船隻迷航。'],hints:['注意這盞燈的位置。','燈光可能是給別人看的。','想想燈塔。'],keys:['海','燈','船'],answer:'他是燈塔管理員，誤關了指引船隻的燈，造成船難。'}
-];
-stories.push(...extraStories);
-function openSoup(){show('soup');newSoup();}function newSoup(){soup=stories[Math.floor(Math.random()*stories.length)];hintCount=0;progress=0;$('soup-title').textContent=soup.title;$('soup-story').textContent=soup.intro;$('soup-end').textContent='';$('answer').textContent='';updateSoup();}
-function updateSoup(){$('hints').textContent=3-hintCount;$('soup-progress').textContent=`已解鎖線索：${progress}/${soup.clues.length}`;}
-function askSoup(){const q=$('question').value.trim();if(!q)return;$('question').value='';if(soup.keys.some(k=>q.includes(k))){$('answer').textContent='是。 '+(soup.clues[progress]||'線索已全部揭曉。');progress=Math.min(progress+1,soup.clues.length);}else if(/沒有|不是|不會|無法/.test(q))$('answer').textContent='不是。';else $('answer').textContent='無關（原型判斷；請嘗試詢問故事關鍵字）。';updateSoup();if(progress===soup.clues.length)$('soup-end').textContent='你已解鎖所有線索！可按「揭曉答案」。';}
-function hint(){if(hintCount>=3)return;$('answer').textContent='提示：'+soup.hints[hintCount++];updateSoup();}function reveal(){$('soup-end').textContent=soup.answer;}
+function renderSoup(view) {
+  $('soup-title').textContent = view.title;
+  $('soup-story').textContent = view.intro;
+  $('hints').textContent = 3 - view.hints;
+  $('soup-progress').textContent = `已解鎖線索：${view.progress}/${view.clues}`;
+  $('answer').textContent = view.reply;
+  $('soup-end').textContent = view.end;
+}
+
+function openSoup() {
+  show('soup');
+  return newSoup();
+}
+
+async function newSoup() {
+  if (soupPending) return;
+  const sequence = ++soupSequence;
+  onlineSoup = typeof playerAccount !== 'undefined' && Boolean(playerAccount.profile);
+  soup = null;
+  soupPending = false;
+  $('soup-record').textContent = '';
+  if (!onlineSoup) {
+    soup = startSoupGame();
+    renderSoup(soupView(soup));
+    return;
+  }
+  $('soup-title').textContent = '載入題目中…';
+  soupPending = true;
+  for (const id of ['soup-story', 'soup-progress', 'answer', 'soup-end']) $(id).textContent = '';
+  try {
+    const view = await accountRequest('soup/start', {});
+    if (sequence !== soupSequence) return;
+    soup = view.id;
+    renderSoup(view);
+  } catch (error) {
+    if (sequence === soupSequence) $('soup-record').textContent = error.message;
+  } finally {
+    if (sequence === soupSequence) soupPending = false;
+  }
+}
+
+async function submitSoupAction(action, question) {
+  if (!soup || soupPending) return;
+  if (!onlineSoup) {
+    playSoup(soup, action, question);
+    renderSoup(soupView(soup));
+    return;
+  }
+  const sequence = soupSequence;
+  soupPending = true;
+  $('soup-record').textContent = '';
+  try {
+    const view = await accountRequest('soup/action', { id: soup, action, question });
+    if (sequence === soupSequence) renderSoup(view);
+    return true;
+  } catch (error) {
+    if (sequence === soupSequence) $('soup-record').textContent = error.message;
+    return false;
+  } finally {
+    if (sequence === soupSequence) soupPending = false;
+  }
+}
+
+function askSoup() {
+  const input = $('question');
+  const question = input.value.trim();
+  if (!question || !soup || soupPending) return;
+  if (!onlineSoup) {
+    input.value = '';
+    return submitSoupAction('ask', question);
+  }
+  const submitted = input.value;
+  return submitSoupAction('ask', question).then(ok => {
+    if (ok && input.value === submitted) input.value = '';
+  });
+}
+function hint() { return submitSoupAction('hint'); }
+function reveal() { return submitSoupAction('reveal'); }
 
 const jobNames = { warrior: '戰士', archer: '弓箭手', mage: '法師' };
 const skills = { warrior: '旋風斬', archer: '三重箭', mage: '火球術' };
@@ -81,6 +151,9 @@ function home() {
 
 function openLobby() {
   $('error').textContent = '';
+  const name = typeof playerAccount === 'undefined' ? '' : playerAccount.profile?.name;
+  $('nickname').readOnly = Boolean(name);
+  if (name) $('nickname').value = name;
   show('lobby');
   renderRoomList();
   if (socket.connected) socket.emit('list');

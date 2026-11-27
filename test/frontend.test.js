@@ -252,3 +252,85 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('results-blue').children[1].dataset.lowestKda, 'true');
 
 });
+
+test('account menu presents registration, mandatory naming, history and friends', async () => {
+  const read = name => fs.readFileSync(path.join(__dirname, '../public', name), 'utf8');
+  function node() {
+    return {
+      value: '', children: [], focus() {},
+      setAttribute(name, value) { this[name] = value; },
+      showModal() { this.open = true; },
+      close() { this.open = false; this.onclose?.(); },
+      append(...children) { this.children.push(...children); },
+      replaceChildren(...children) { this.children = children; }
+    };
+  }
+  const elements = new Map([...read('index.html').matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, node()]));
+  const find = id => elements.get(id);
+  const calls = [];
+  const profile = { id: 'AB123456', name: '冒險者' };
+  const opponent = { id: 'CD654321', name: '弓箭手' };
+  const responses = {
+    session: { username: null, profile: null },
+    register: { ok: true },
+    login: { username: 'Player7', profile: null },
+    profile: { profile },
+    history: { arena: [], soup: [{ title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' }] },
+    friends: { friends: [], incoming: [], sent: [opponent] },
+    'friends/request': { player: opponent },
+    logout: { ok: true }
+  };
+  let openedArena = false;
+  const context = vm.createContext({
+    $: find, AbortSignal, openLobby() { openedArena = true; }, openSoup() {},
+    socket: { disconnect() { return this; }, connect() {} },
+    element(_tag, text) { return { ...node(), textContent: text }; },
+    async fetch(url, options) {
+      const route = url.replace('/api/account/', '');
+      calls.push([route, options.body && JSON.parse(options.body)]);
+      return { ok: true, json: async () => responses[route] };
+    }
+  });
+  for (const script of ['account.js', 'player-panel.js']) vm.runInContext(read(script), context);
+
+  await find('menu-history').onclick();
+  assert.equal(find('account-dialog').open, true);
+  find('account-register').onclick();
+  find('account-username').value = 'Player7';
+  find('account-password').value = 'My pixel adventure!';
+  const event = { preventDefault() {} };
+  await find('account-form').onsubmit(event);
+  assert.match(find('account-message').textContent, /不一致/);
+  find('account-confirm').value = 'My pixel adventure!';
+  await find('account-form').onsubmit(event);
+  assert.match(find('account-message').textContent, /註冊成功/);
+  find('account-password').value = 'My pixel adventure!';
+  await find('account-form').onsubmit(event);
+  assert.equal(find('account-name-form').hidden, false);
+  find('account-dialog').close();
+  await find('menu-arena').onclick();
+  assert.equal(openedArena, false);
+  find('account-player-name').value = profile.name;
+  await find('account-name-form').onsubmit(event);
+  assert.equal(find('account-player-id').textContent, profile.id);
+  assert.equal(find('profile-name').textContent, profile.name);
+  find('account-dialog').close();
+  await find('menu-arena').onclick();
+  assert.equal(openedArena, true);
+
+  await find('menu-history').onclick();
+  assert.equal(find('soup-history').children[0].children[0].textContent, '第一題');
+  find('player-dialog').close();
+  await find('menu-friends').onclick();
+  find('friend-by').value = 'id';
+  find('friend-query').value = opponent.id;
+  await find('friend-form').onsubmit(event);
+  assert.ok(calls.some(([route, body]) =>
+    route === 'friends/request' && body.by === 'id' && body.query === opponent.id));
+  assert.match(find('player-message').textContent, /已送出邀請/);
+  assert.match(find('friend-sent').children[0].textContent, /CD654321/);
+  find('player-dialog').close();
+  find('menu-profile').onclick();
+  await find('account-logout').onclick();
+  assert.equal(find('profile-name').textContent, '登入／註冊');
+});

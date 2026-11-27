@@ -265,3 +265,42 @@ const extraStories=[
     ]
   }
 ];
+
+const stories=[
+ {title:'餐廳裡的海龜湯',intro:'一名男子在餐廳喝了一口海龜湯，回家後卻做出了令人震驚的決定。為什麼？',clues:['他以前曾遭遇船難。','他當年吃過一碗被稱作海龜湯的湯。','餐廳的味道與記憶不同，讓他發現當年吃的不是海龜。'],hints:['想想男子過去的經歷。','關鍵在於兩次湯的味道。','當年的湯其實不是海龜肉。'],keys:['船','海龜','味道'],answer:'經典版本中，男子曾在船難後喝下被謊稱為海龜湯的湯。多年後嚐到真正的海龜湯，才察覺當年的真相。'},
+ {title:'關燈的人',intro:'一個人晚上關燈睡覺，隔天得知許多人因此喪命。為什麼？',clues:['他住在靠海的地方。','這盞燈不是普通房間的照明。','他是燈塔管理員，關燈導致船隻迷航。'],hints:['注意這盞燈的位置。','燈光可能是給別人看的。','想想燈塔。'],keys:['海','燈','船'],answer:'他是燈塔管理員，誤關了指引船隻的燈，造成船難。'}
+];
+stories.push(...extraStories);
+
+function startSoupGame(random = Math.random) {
+  return { story: stories[Math.floor(random() * stories.length)], hints: 0, progress: 0,
+    reply: '', result: null, revealed: false };
+}
+
+function playSoup(game, action, question) {
+  const { story } = game;
+  if (action === 'ask') {
+    if (story.keys.some(key => question.includes(key))) {
+      game.reply = '是。 ' + (story.clues[game.progress] || '線索已全部揭曉。');
+      game.progress = Math.min(game.progress + 1, story.clues.length);
+      if (game.progress === story.clues.length) game.result ??= 'solved';
+    } else {
+      game.reply = /沒有|不是|不會|無法/.test(question) ? '不是。' : '無關（原型判斷；請嘗試詢問故事關鍵字）。';
+    }
+  }
+  if (action === 'hint' && game.hints < 3) game.reply = '提示：' + story.hints[game.hints++];
+  if (action === 'reveal') {
+    game.result ??= 'revealed';
+    game.revealed = true;
+  }
+}
+
+function soupView(game) {
+  return {
+    title: game.story.title, intro: game.story.intro, hints: game.hints,
+    progress: game.progress, clues: game.story.clues.length, reply: game.reply,
+    end: game.revealed ? game.story.answer : game.result === 'solved' ? '你已解鎖所有線索！可按「揭曉答案」。' : ''
+  };
+}
+
+if (typeof module !== 'undefined') module.exports = { startSoupGame, playSoup, soupView };

@@ -8,10 +8,13 @@ const { performance } = require('node:perf_hooks');
 const { Server } = require('socket.io');
 const combat = require('./arena/combat');
 const { botInput } = require('./arena/bots');
+const { createAccountRouter } = require('./accounts/router');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 8192 });
+const accounts = createAccountRouter(process.env.PIXEL_CLASH_ACCOUNTS_FILE || path.join(__dirname, 'data', 'accounts.json'));
+app.use('/api/account', accounts.router);
 app.get('/title-map', (_, response) => {
   response.set('Cache-Control', 'public, max-age=3600').json(combat.map);
 });
@@ -88,6 +91,7 @@ function leave(socket, reconnect = false) {
     if (reconnect) player.reconnectUntil = now() + reconnectWindow;
     else player.ticket = null;
     player.originalName = player.name;
+    if (room.matchId && player.accountKey) player.statsAtDeparture = playerStats(player);
     Object.assign(player, {
       id: 'bot-' + crypto.randomUUID(), name: player.name.slice(0, 18) + ' · AI',
       bot: true, ready: true, input: { x: 0, y: 0 }, route: null, routeAt: 0
@@ -107,6 +111,8 @@ function runMatch(room) {
   clearTimeout(room.expiry);
   for (const player of room.players) if (player.bot) player.ticket = null;
   combat.start(room, now(), crypto.randomBytes(4).readUInt32LE());
+  room.matchId = crypto.randomUUID();
+  for (const player of room.roster) player.statsAtDeparture = null;
   room.phase = 'loading';
   room.loadingUntil = now() + loadingDuration;
   room.endsAt += loadingDuration;
@@ -124,7 +130,10 @@ function runMatch(room) {
       lastTick = time;
       if (time < room.loadingUntil) return;
       room.phase = 'playing';
-      for (const player of room.players) player.spawnedAt = time;
+      for (const player of room.players) {
+        player.spawnedAt = time;
+        if (!player.bot) player.playedMatch = room.matchId;
+      }
       publish(room);
       broadcast(time);
       return;
@@ -134,7 +143,13 @@ function runMatch(room) {
     if (room.phase === 'ended') {
       clearInterval(room.timer);
       room.timer = null;
-      io.to(channel(room)).emit('arenaState', combat.snapshot(room, time));
+      const result = combat.snapshot(room, time);
+      const participants = new Map(room.roster.filter(player => player.accountKey && player.playedMatch === room.matchId)
+        .map(player => [player.accountKey, player.statsAtDeparture ?? playerStats(player)]));
+      accounts.saveArena(room.matchId, participants, result).catch(error => {
+        console.error('Could not save arena history:', error.code ?? error.name);
+      });
+      io.to(channel(room)).emit('arenaState', result);
       publish(room);
       room.expiry = setTimeout(() => {
         io.to(channel(room)).emit('roomClosed', '結算已保留 10 分鐘，房間已關閉');
@@ -152,9 +167,13 @@ function runMatch(room) {
   }, 50);
 }
 
-function join(socket, room, name) {
+function playerStats({ team, job, kills, deaths, assists, damage }) {
+  return { team, job, kills, deaths, assists, damage };
+}
+
+function join(socket, room, name, accountKey) {
   const ticket = crypto.randomUUID();
-  room.players.push({ id: socket.id, name, job: 'warrior', ready: false, bot: false, ticket });
+  room.players.push({ id: socket.id, name, accountKey, job: 'warrior', ready: false, bot: false, ticket });
   socket.join(channel(room));
   socket.data.room = room.id;
   return ticket;
@@ -196,26 +215,36 @@ io.on('connection', socket => {
   socket.on('list', () => { if (accept('list', 300)) list(socket); });
   command('create', (data, { room }) => {
     if (room) return { error: '請先離開目前房間' };
-    const name = validName(data?.name);
+    const account = accounts.session(socket.request);
+    if (account && !account.profile) return { error: '請先設定玩家名稱' };
+    const name = account?.profile?.name ?? validName(data?.name);
     if (data?.type !== 'arena' || data.size !== seats || !name) return { error: '請輸入暱稱並建立 10 人對戰房間' };
     if (rooms.size >= maxRooms) return { error: '房間已達上限' };
     let id;
     do { id = crypto.randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(id));
     const created = { id, host: socket.id, phase: 'lobby', players: [] };
     rooms.set(id, created);
-    const ticket = join(socket, created, name);
+    const ticket = join(socket, created, name, account?.key);
     return { id, ticket, room: roomState(created, socket.id) };
   });
   command('join', (data, { room }) => {
     if (room) return { error: '請先離開目前房間' };
-    const name = validName(data?.name);
+    const account = accounts.session(socket.request);
+    if (account && !account.profile) return { error: '請先設定玩家名稱' };
+    const name = account?.profile?.name ?? validName(data?.name);
     const id = typeof data?.id === 'string' ? data.id.trim().toUpperCase() : '';
     if (!name || !/^[A-F0-9]{6}$/.test(id)) return { error: '請輸入暱稱與 6 碼房間代碼' };
     const target = rooms.get(id);
     if (!target || target.phase !== 'lobby' || target.players.length >= seats) {
       return { error: '房間不存在、已開始或已滿' };
     }
-    const ticket = join(socket, target, name);
+    if (account && target.players.some(player => player.accountKey === account.key)) {
+      return { error: '這個帳號已在房間內' };
+    }
+    if (target.players.some(player => player.name.toLowerCase() === name.toLowerCase())) {
+      return { error: '房間內已有相同玩家名稱' };
+    }
+    const ticket = join(socket, target, name, account?.key);
     return { id, ticket, room: roomState(target, socket.id) };
   });
   command('resume', (data, { room }) => {
@@ -225,6 +254,9 @@ io.on('connection', socket => {
     const target = rooms.get(data.id);
     if (!target || !matchActive(target)) return { error: '原本的對戰已結束或已關閉' };
     const player = target.players.find(entry => entry.ticket === data.ticket);
+    if (player?.accountKey && player.accountKey !== accounts.session(socket.request)?.key) {
+      return { error: '請使用原本的玩家帳號恢復席位' };
+    }
     if (player && !player.bot) {
       const previous = io.of('/').sockets.get(player.id);
       if (previous) {
@@ -236,7 +268,8 @@ io.on('connection', socket => {
     clearTimeout(target.vacancyTimer);
     const ticket = crypto.randomUUID();
     Object.assign(player, { id: socket.id, name: player.originalName, bot: false, ticket, reconnectUntil: 0,
-      input: { x: 0, y: 0 }, inputAt: 0 });
+      input: { x: 0, y: 0 }, inputAt: 0, statsAtDeparture: null });
+    if (target.phase === 'playing') player.playedMatch = target.matchId;
     target.host ??= socket.id;
     socket.join(channel(target));
     socket.data.room = target.id;
@@ -291,7 +324,11 @@ io.on('connection', socket => {
   });
   function returnToLobby(room) {
     clearTimeout(room.expiry);
-    for (const player of room.players) if (player.bot) player.ticket = null;
+    for (const player of room.players) {
+      if (!player.bot) continue;
+      player.ticket = null;
+      player.accountKey = null;
+    }
     room.phase = 'lobby';
     room.players.forEach(player => { player.ready = player.bot; });
     publish(room);

@@ -1,0 +1,71 @@
+#account-dialog, #player-dialog {
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: clamp(16px, 4vw, 28px);
+  border: 2px solid #bda9d9;
+  background: linear-gradient(145deg, #382e49, #202535 74%);
+  color: #fff1db;
+  box-shadow: 6px 7px #10131d;
+}
+
+#account-dialog::backdrop, #player-dialog::backdrop { background: #0b1421b8; }
+
+.account-heading, .account-modes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.account-heading h2 { margin: 0; }
+#account-close, #player-close { margin: 0; padding: 6px 10px; }
+.account-modes { margin: 14px 0 12px; }
+.account-modes button {
+  flex: 1;
+  margin: 0;
+  border: 1px solid #8d80a4;
+  border-radius: 0;
+  background: #242537;
+  color: #eee4f5;
+}
+.account-modes button[aria-pressed="true"] { background: #cdb5ec; color: #231b31; }
+
+#account-form { display: grid; gap: 5px; }
+#account-form label { margin: 7px 0 0; font-weight: 700; }
+#account-form input {
+  width: 100%;
+  margin: 0;
+  border-color: #8d80a4;
+  border-radius: 2px;
+  font-size: 1rem;
+}
+#account-form small { color: #e4d9ee; }
+#account-submit, #account-logout {
+  justify-self: start;
+  margin: 13px 0 0;
+  border-radius: 0;
+  border: 1px solid #f4d68f;
+  background: #f4d68f;
+  color: #262136;
+}
+#account-dialog :focus-visible, #player-dialog :focus-visible { outline: 2px solid #ffe6a3; outline-offset: 3px; }
+#account-message { margin: 12px 0 0; color: #fae0b3; }
+#account-message:empty { display: none; }
+#account-current { overflow-wrap: anywhere; }
+
+#player-dialog { width: min(640px, calc(100% - 32px)); }
+#account-name-form, #friend-form { display: grid; gap: 8px; margin-top: 14px; }
+#account-name-form input, #friend-form input, #friend-form select { width: 100%; margin: 0; }
+#account-name-form button, #friend-form button { justify-self: start; }
+#account-player-id { color: #ffdf99; }
+#player-dialog ul { display: grid; gap: 6px; padding: 0; list-style: none; }
+#player-dialog li {
+  display: grid;
+  gap: 3px;
+  padding: 8px 11px;
+  border-left: 2px solid #ad9bc9;
+  background: #162030;
+  overflow-wrap: anywhere;
+}
+#player-dialog li small { color: #ddd3e6; }
+#player-message:empty { display: none; }
