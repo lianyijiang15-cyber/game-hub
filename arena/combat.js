@@ -1,6 +1,7 @@
 'use strict';
 
 const { generateWorld, solid, impassable, campOffset } = require('./world');
+const { terrainBlocked, playerBlocked, movePlayer } = require('./collision');
 const map = generateWorld();
 const visionRadius = 360;
 const grassRevealRadius = 80;
@@ -78,8 +79,8 @@ function spawn(room, player, now) {
   const side = player.team === teams[0] ? 1 : -1;
   for (const offset of [0, -28, 28, -56, 56]) {
     const position = { x: width / 2 - side * campOffset, y: height / 2 + side * ((player.slot - 2) * 72 + offset) };
-    if (blocked(position.x, position.y, radius, room.map) || room.players.some(other =>
-      other !== player && other.alive && distance(position, other) < radius * 2)) continue;
+    if (terrainBlocked(room.map, position.x, position.y) ||
+        playerBlocked(room.players, player, position.x, position.y)) continue;
     Object.assign(player, position, {
       hp: classes[player.job].hp, alive: true, input: { x: 0, y: 0 }, inputAt: 0,
       angle: side === 1 ? 0 : Math.PI, facing: side === 1 ? 0 : Math.PI, moving: false,
@@ -202,19 +203,7 @@ function advanceProjectile(room, projectile, dt, now) {
 function move(room, player, vector, dt) {
   const length = Math.max(1, Math.hypot(vector.x, vector.y));
   const step = classes[player.job].speed * dt / length;
-  const x = player.x + vector.x * step;
-  const y = player.y + vector.y * step;
-  const occupied = (nextX, nextY) => room.players.some(other => other !== player && other.alive &&
-    Math.hypot(nextX - other.x, nextY - other.y) < radius * 2);
-  player.moving = false;
-  if (x !== player.x && !blocked(x, player.y, radius, room.map) && !occupied(x, player.y)) {
-    player.x = x;
-    player.moving = true;
-  }
-  if (y !== player.y && !blocked(player.x, y, radius, room.map) && !occupied(player.x, y)) {
-    player.y = y;
-    player.moving = true;
-  }
+  player.moving = movePlayer(room.map, room.players, player, vector.x * step, vector.y * step);
   if (player.moving) player.facing = Math.atan2(vector.y, vector.x);
 }
 

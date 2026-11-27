@@ -4,7 +4,36 @@ const arenaContext = $('arena').getContext('2d', { alpha: false });
 const terrainChunks = new Map();
 let paintedMap;
 const chunkTiles = 8;
-const arenaCamera = { x: 0, y: 0 };
+function createArenaCamera() {
+  let world;
+  let playerId;
+  let spawnedAt;
+  let lastTime;
+  let x = 0;
+  let y = 0;
+  const clamp = (value, max) => Math.max(0, Math.min(max, value));
+  return {
+    x: 0, y: 0,
+    follow(position, player, map, width, height, time) {
+      const maxX = Math.max(0, map.width - width);
+      const maxY = Math.max(0, map.height - height);
+      const targetX = clamp(position.x - width / 2, maxX);
+      const targetY = clamp(position.y - height / 2, maxY);
+      const reset = world !== map || player.id !== playerId || player.spawnedAt !== spawnedAt;
+      const elapsed = Math.min(100, Math.max(0, time - lastTime));
+      const blend = reset ? 1 : 1 - Math.exp(-elapsed / 65);
+      x = clamp(x + (targetX - x) * blend, maxX);
+      y = clamp(y + (targetY - y) * blend, maxY);
+      this.x = Math.round(x);
+      this.y = Math.round(y);
+      world = map;
+      playerId = player.id;
+      spawnedAt = player.spawnedAt;
+      lastTime = time;
+    }
+  };
+}
+const arenaCamera = createArenaCamera();
 const colors = {
   '紅隊': { light: '#fb8d74', mid: '#bb453d', dark: '#672939' },
   '藍隊': { light: '#87d4f8', mid: '#3d78ad', dark: '#284669' }
@@ -19,6 +48,7 @@ function rect(ctx, color, x, y, width, height) {
 const terrainColors = {
   g: ['#587c45', '#60854a', '#64894b'],
   f: ['#395c3d', '#416841', '#456c42'],
+  t: ['#365b39', '#3a613d', '#406541'],
   b: ['#587948', '#62824a', '#617e48'],
   r: ['#60675e', '#666d64', '#73796c'],
   w: ['#306c83', '#32738a', '#34788c'],
@@ -58,15 +88,22 @@ function paintTile(ctx, map, col, row, x, y) {
     rect(ctx, '#838984', x + 5, y + 5, 21, 17);
     rect(ctx, '#a3a799', x + 7, y + 6, 16, 3);
     rect(ctx, '#58635d', x + 13, y + 15, 13, 9);
+  } else if (tile === 't') {
+    rect(ctx, '#233e29', x + 1, y + 23, 30, 8);
+    rect(ctx, '#816346', x + 12, y + 15, 8, 14);
+    rect(ctx, '#30523b', x + 1, y + 8, 30, 16);
+    rect(ctx, '#426e42', x + 3, y + 5, 26, 15);
+    rect(ctx, '#59854a', x + 7, y + 2, 18, 12);
+    rect(ctx, '#84a658', x + 10, y + 3, 10, 4);
   } else if (tile === 'f') {
-    const tree = x + 13 + hash % 6;
-    rect(ctx, '#23432da0', tree - 10, y + 22, 23, 7);
-    rect(ctx, '#5d4932', tree - 2, y + 13, 5, 14);
-    rect(ctx, '#244b37', tree - 9, y + 7, 20, 15);
-    rect(ctx, '#2e6140', tree - 11, y + 9, 24, 9);
-    rect(ctx, '#4b7949', tree - 8, y + 5, 17, 10);
-    rect(ctx, '#619452', tree - 4, y + 3, 10, 6);
-    rect(ctx, '#8bab60', tree - 4, y + 4, 6, 2);
+    for (let fern = 0; fern < 3; fern++) {
+      const stem = tileVariation(col * 7 + fern, row);
+      const sx = x + 4 + stem % 22;
+      const sy = y + 5 + ((stem >>> 6) % 23);
+      rect(ctx, '#294f36', sx - 3, sy, 7, 2);
+      rect(ctx, '#729657', sx - 1, sy - 3, 3, 4);
+      rect(ctx, '#83a460', sx + 1, sy - 1, 3, 1);
+    }
   } else if (tile === 'b') {
     for (let stem = 0; stem < 11; stem++) {
       const blade = tileVariation(col * 13 + stem, row);
@@ -242,7 +279,7 @@ function sprite(ctx, p, old, blend, time, localId) {
   rect(ctx, color.light, x - 19, y - 48, Math.ceil(38 * p.hp / p.maxHp), 3);
 }
 
-function drawArena(state, old, blend, time, aim, localId, map) {
+function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   const ctx = arenaContext;
   const canvas = $('arena');
   const width = Math.min(map.width, canvas.clientWidth || canvas.width);
@@ -252,10 +289,7 @@ function drawArena(state, old, blend, time, aim, localId, map) {
   const older = new Map(old?.players.map(p => [p.id, p]));
   const player = state.players.find(p => p.id === localId);
   const position = player && displayPosition(player, older.get(localId), blend);
-  if (position) {
-    arenaCamera.x = Math.round(Math.max(0, Math.min(map.width - width, position.x - width / 2)));
-    arenaCamera.y = Math.round(Math.max(0, Math.min(map.height - height, position.y - height / 2)));
-  }
+  if (position) arenaCamera.follow(position, player, map, width, height, frameTime);
   ctx.save();
   ctx.translate(-arenaCamera.x, -arenaCamera.y);
   paintWorld(ctx, map, width, height);

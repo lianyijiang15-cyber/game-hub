@@ -77,6 +77,31 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     setInterval() {}
   });
   for (const script of ['soup-bank.js', 'app.js', 'arena-renderer.js']) vm.runInContext(read(script), context);
+  // Separate cameras own their positions, even when driven by the same map and clock.
+  vm.runInContext(`
+    const cameraMap = { width: 3200, height: 3200 };
+    const firstCamera = createArenaCamera();
+    const secondCamera = createArenaCamera();
+    const firstPlayer = { id: 'first', spawnedAt: 0 };
+    const secondPlayer = { id: 'second', spawnedAt: 0 };
+    firstCamera.follow({ x: 1000, y: 1200 }, firstPlayer, cameraMap, 960, 600, 100);
+    secondCamera.follow({ x: 2200, y: 2000 }, secondPlayer, cameraMap, 960, 600, 100);
+    firstCamera.follow({ x: 1300, y: 1200 }, firstPlayer, cameraMap, 960, 600, 116);
+  `, context);
+  assert.ok(vm.runInContext('firstCamera.x > 520 && firstCamera.x < 820', context));
+  assert.equal(vm.runInContext('secondCamera.x', context), 1720);
+  assert.equal(vm.runInContext('secondCamera.y', context), 1700);
+  vm.runInContext(`
+    firstCamera.follow({ x: 3190, y: 3190 }, { ...firstPlayer, spawnedAt: 200 }, cameraMap, 800, 500, 200);
+    secondCamera.follow({ x: 1, y: 1 }, { ...secondPlayer, spawnedAt: 200 }, cameraMap, 800, 500, 200);
+  `, context);
+  assert.equal(vm.runInContext('firstCamera.x', context), 2400);
+  assert.equal(vm.runInContext('firstCamera.y', context), 2700);
+  assert.equal(vm.runInContext('secondCamera.x + secondCamera.y', context), 0);
+  assert.equal(vm.runInContext(`
+    firstCamera.follow({ x: 3190, y: 3190 }, { ...firstPlayer, spawnedAt: 200 }, cameraMap, 3200, 3200, 216);
+    firstCamera.x + firstCamera.y;
+  `, context), 0);
   assert.equal(vm.runInContext("stories.length", context), vm.runInContext("extraStories.length + 2", context));
   context.openSoup();
   assert.equal(elements.get('soup').hidden, false);

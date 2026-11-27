@@ -22,7 +22,7 @@ test('seeded 100 × 100 worlds contain all terrain, connected land and safe sepa
     assert.notDeepEqual(map.tiles, generateWorld(seed + 1).tiles);
     assert.deepEqual([map.width, map.height, map.tileSize, map.tiles.length], [3200, 3200, 32, 100]);
     assert.ok(map.tiles.every(row => row.length === 100 && row[0] === '#' && row[99] === '#'));
-    for (const tile of 'gfrwdpb') assert.ok(map.tiles.some(row => row.includes(tile)), tile);
+    for (const tile of 'gfrwdpbt') assert.ok(map.tiles.some(row => row.includes(tile)), tile);
     assert.equal(map.tiles[0], '#'.repeat(100));
     assert.equal(map.tiles[99], '#'.repeat(100));
     const waterRow = map.tiles.findIndex(row => row.includes('w'));
@@ -38,7 +38,7 @@ test('seeded 100 × 100 worlds contain all terrain, connected land and safe sepa
         if (!impassable(map.tiles[Math.floor(next / 100)][next % 100])) seen.add(next);
       }
     }
-    assert.equal(seen.size, map.tiles.join('').replace(/[rw#]/g, '').length);
+    assert.equal(seen.size, map.tiles.join('').replace(/[rwt#]/g, '').length);
     const room = match();
     combat.start(room, 0, seed);
     assert.deepEqual(room.map, map);

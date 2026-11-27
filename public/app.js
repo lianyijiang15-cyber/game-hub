@@ -398,6 +398,6 @@ function renderFrame(time) {
     if (!me.alive) $('respawn').textContent = `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;
   }
   const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
-  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap);
+  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time);
 }
 requestAnimationFrame(renderFrame);

@@ -7,7 +7,7 @@ const width = columns * tileSize;
 const height = rows * tileSize;
 const defaultSeed = 41729;
 const campOffset = 944;
-const solid = tile => tile === '#' || tile === 'r';
+const solid = tile => tile === '#' || tile === 'r' || tile === 't';
 const impassable = tile => solid(tile) || tile === 'w';
 
 function generateWorld(seed = defaultSeed) {
@@ -51,7 +51,8 @@ function generateWorld(seed = defaultSeed) {
     if (Math.hypot((x - 45) / 2.8, (y - 43) / 2) < 1) return 'r';
     if (lake < 1.19 || wet < 0.35) return 'd';
     if (field(x, y, 131) > (center ? 0.67 : 0.59)) return 'b';
-    return field(x, y, 97) > 0.49 ? 'f' : 'g';
+    if (field(x, y, 97) <= 0.49) return 'g';
+    return !center && random(x, y, 177) < 0.16 ? 't' : 'f';
   }
 
   const grid = Array.from({ length: rows }, (_, y) =>
