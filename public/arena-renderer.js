@@ -11,6 +11,7 @@ function createArenaCamera() {
   let lastTime;
   let x = 0;
   let y = 0;
+  let watching = false;
   const clamp = (value, max) => Math.max(0, Math.min(max, value));
   return {
     x: 0, y: 0,
@@ -19,7 +20,7 @@ function createArenaCamera() {
       const maxY = Math.max(0, map.height - height);
       const targetX = clamp(position.x - width / 2, maxX);
       const targetY = clamp(position.y - height / 2, maxY);
-      const reset = world !== map || player.id !== playerId || player.spawnedAt !== spawnedAt || player.warped !== this.warped;
+      const reset = watching || world !== map || player.id !== playerId || player.spawnedAt !== spawnedAt || player.warped !== this.warped;
       const elapsed = Math.min(100, Math.max(0, time - lastTime));
       const blend = reset ? 1 : 1 - Math.exp(-elapsed / 65);
       x = clamp(x + (targetX - x) * blend, maxX);
@@ -31,6 +32,25 @@ function createArenaCamera() {
       spawnedAt = player.spawnedAt;
       this.warped = player.warped;
       lastTime = time;
+      watching = false;
+    },
+    pan(position, map, width, height, time, direction) {
+      const maxX = Math.max(0, map.width - width);
+      const maxY = Math.max(0, map.height - height);
+      const fresh = world !== map || !watching;
+      if (fresh) {
+        x = position.x - width / 2;
+        y = position.y - height / 2;
+      }
+      const dt = fresh ? 0 : Math.min(60, Math.max(0, time - lastTime)) / 1000;
+      const distance = 530 * dt / Math.max(1, Math.hypot(direction.x, direction.y));
+      x = clamp(x + direction.x * distance, maxX);
+      y = clamp(y + direction.y * distance, maxY);
+      this.x = Math.min(maxX, Math.round(x));
+      this.y = Math.min(maxY, Math.round(y));
+      world = map;
+      lastTime = time;
+      watching = true;
     }
   };
 }
@@ -358,7 +378,9 @@ function minimapView(map, center) {
 function drawMinimap(state, old, blend, map, chests, localId, tactical = null) {
   const me = state.players.find(player => player.id === localId);
   if (!me) return;
-  const center = displayPosition(me, old?.players.find(player => player.id === localId), blend);
+  const arena = $('arena');
+  const center = me.alive ? displayPosition(me, old?.players.find(player => player.id === localId), blend) :
+    { x: arenaCamera.x + arena.width / arenaZoom / 2, y: arenaCamera.y + arena.height / arenaZoom / 2 };
   const view = tactical ? { x: 0, y: 0, width: map.width, height: map.height } : minimapView(map, center);
   const canvas = tactical ?? $('minimap');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -437,7 +459,45 @@ function drawBeast(ctx, beast, time) {
   ctx.fillText(['苔牙狼', '棘背獸', '幽光靈'][species], x, top - 10);
 }
 
-function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
+function drawSkillEffect(ctx, { x, y, tint, appearance, until }, now) {
+  const progress = Math.max(0, 1 - (until - now) / 720);
+  if (progress >= 1) return;
+  const centerY = y - 16;
+  ctx.save();
+  ctx.globalAlpha = 1 - progress;
+  ctx.strokeStyle = tint;
+  ctx.lineWidth = appearance === 'shield' ? 3 : 2;
+  ctx.beginPath();
+  if (appearance === 'strike' || appearance === 'speed') {
+    for (let i = -1; i <= 1; i++) {
+      const offset = i * 11;
+      const spread = progress * (appearance === 'speed' ? 50 : 32);
+      ctx.moveTo(x - 21 - spread, centerY + offset + 10);
+      ctx.lineTo(x + 20 + spread, centerY + offset - (appearance === 'strike' ? 14 : -10));
+    }
+  } else {
+    const radius = appearance === 'shield' ? 25 + progress * 8 : 13 + progress * 27;
+    ctx.arc(x, centerY, radius, 0, Math.PI * 2);
+    if (appearance === 'bind') {
+      ctx.moveTo(x - radius, centerY);
+      ctx.lineTo(x + radius, centerY);
+      ctx.moveTo(x, centerY - radius);
+      ctx.lineTo(x, centerY + radius);
+    }
+  }
+  ctx.stroke();
+  for (let i = 0; i < 6; i++) {
+    const angle = i * Math.PI / 3 + progress;
+    const spread = 12 + progress * 35;
+    const px = x + Math.cos(angle) * spread;
+    const py = centerY + Math.sin(angle) * spread - progress * 12;
+    rect(ctx, tint, px - 2, py - 2, appearance === 'heal' ? 7 : 4, 3);
+    if (appearance === 'heal') rect(ctx, tint, px, py - 4, 3, 7);
+  }
+  ctx.restore();
+}
+
+function drawArena(state, old, blend, time, aim, localId, map, frameTime, direction = { x: 0, y: 0 }) {
   const ctx = arenaContext;
   const canvas = $('arena');
   const width = Math.min(map.width, canvas.clientWidth || canvas.width);
@@ -450,7 +510,8 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   arenaZoom = Math.max(1.38, width / 980, height / 700);
   const worldWidth = width / arenaZoom;
   const worldHeight = height / arenaZoom;
-  if (position) arenaCamera.follow(position, player, map, worldWidth, worldHeight, frameTime);
+  if (player?.alive) arenaCamera.follow(position, player, map, worldWidth, worldHeight, frameTime);
+  else if (position) arenaCamera.pan(position, map, worldWidth, worldHeight, frameTime, direction);
   ctx.save();
   ctx.scale(arenaZoom, arenaZoom);
   ctx.translate(-arenaCamera.x, -arenaCamera.y);
@@ -469,6 +530,10 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
     sprite(ctx, p, older.get(p.id), blend, time, localId);
   }
   for (const effect of state.effects) {
+    if (effect.type === 'hero-skill') {
+      drawSkillEffect(ctx, effect, time);
+      continue;
+    }
     ctx.save();
     ctx.globalAlpha = Math.min(1, Math.max(0, (effect.until - time) / 240));
     ctx.strokeStyle = effect.type === 'rune' ? '#dfb3ff' : effect.type === 'blast' || effect.type === 'mage' ? '#ffad61' : colors[effect.team].light;
@@ -510,6 +575,7 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
     ctx.stroke();
     ctx.restore();
   }
+  if (!player?.alive) return;
   const cursor = aim || { x: width / 2 + 45, y: height / 2 };
   rect(ctx, '#fff0c2', cursor.x - 6, cursor.y, 4, 1);
   rect(ctx, '#fff0c2', cursor.x + 3, cursor.y, 4, 1);

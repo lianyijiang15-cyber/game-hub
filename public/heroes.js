@@ -24,52 +24,53 @@ if (typeof module !== 'undefined') module.exports = { heroes, heroAtlasOrder };
 
 // Previous characters remain available to old match records.
 const playableHeroes = {
-  sky: { job: 'warrior', role: 'commander', name: '斯蓋', color: '#e75953', hp: 8000, speed: 600, damage: 100, skills: [
+  sky: { defense: 35, job: 'warrior', role: 'commander', name: '斯蓋', color: '#e75953', hp: 8000, speed: 600, damage: 100, skills: [
     ['反彈護盾', 10, '持續 5 秒，減傷 40% 並反彈 10% 傷害。'],
     ['速度強化', 8, '3 秒內移速增加 25%。'],
     ['隱身', 12, '5 秒內敵方看不見或鎖定你，每秒回復最大生命值的 4%。']
   ] },
-  oshi: { job: 'mage', role: 'commander', name: '歐希', color: '#85a6f9', hp: 10000, speed: 530, damage: 100, skills: [
+  oshi: { defense: 28, job: 'mage', role: 'commander', name: '歐希', color: '#85a6f9', hp: 10000, speed: 530, damage: 100, skills: [
     ['定身敵人', 15, '指定敵人並定身 2 秒。', 'enemy'],
     ['速度強化', 5, '2 秒內移速增加 30%。'],
     ['虛無', 35, '2 秒內免疫所有傷害。']
   ] },
-  frost: { job: 'warrior', role: 'commander', name: '福瑞斯', color: '#7be3df', hp: 6800, speed: 650, damage: 150, skills: [
+  frost: { defense: 24, job: 'warrior', role: 'commander', name: '福瑞斯', color: '#7be3df', hp: 6800, speed: 650, damage: 150, skills: [
     ['護盾', 13, '4 秒內減傷 30%。'],
     ['擊退中斷', 15, '指定附近最近三名敵人之一，擊退並中斷技能。', 'enemy'],
     ['隊友瞬移', 15, '瞬移到指定隊友身旁。', 'ally']
   ] },
-  sain: { job: 'mage', role: 'support', name: '塞恩', color: '#ffd491', hp: 6000, speed: 800, damage: 90, skills: [
+  sain: { defense: 22, job: 'mage', role: 'support', name: '塞恩', color: '#ffd491', hp: 6000, speed: 800, damage: 90, skills: [
     ['雙人護盾', 10, '為自己與指定隊友提供 3 秒、30% 減傷。', 'ally'],
     ['治療', 9, '回復指定隊友最大生命值的 15%。', 'ally'],
     ['牽引', 25, '拉近附近最近三名敵人之一，並使其免傷 1 秒。', 'enemy']
   ] },
-  kosain: { job: 'mage', role: 'support', name: '科賽恩', color: '#be7ad3', hp: 5300, speed: 700, damage: 160, skills: [
+  kosain: { defense: 12, job: 'mage', role: 'support', name: '科賽恩', color: '#be7ad3', hp: 5300, speed: 700, damage: 160, skills: [
     ['群體治療', 25, '3 秒內每秒為自己與附近三位隊友回復各自最大生命值的 5%。'],
     ['攻擊提升', 9, '指定隊友在 2 秒內提升 11% 攻擊。', 'ally'],
     ['消減增益', 25, '移除附近最近三名敵人之一身上的輔助增益。', 'enemy']
   ] },
-  tanjun: { job: 'warrior', role: 'support', name: '探菌', color: '#eca05e', hp: 11000, speed: 500, damage: 250, skills: [
+  tanjun: { defense: 38, job: 'warrior', role: 'support', name: '探菌', color: '#eca05e', hp: 11000, speed: 500, damage: 250, skills: [
     ['群體加速', 6, '附近最近三位隊友移速增加 25%，持續 3 秒。'],
     ['免疫控制', 15, '指定隊友免控 2 秒。期間若生命低於 15%，回復 10%，觸發一次。', 'ally'],
     ['短暫定身', 5, '定身附近最近三名敵人之一 0.7 秒。', 'enemy']
   ] },
-  alpha: { job: 'warrior', role: 'fighter', name: '阿爾法', color: '#f16043', hp: 6500, speed: 1000, damage: 500, skills: [
+  alpha: { defense: 15, job: 'warrior', role: 'fighter', name: '阿爾法', color: '#f16043', hp: 6500, speed: 1000, damage: 500, skills: [
     ['攻擊爆發', 14, '下一次普攻傷害增加 50%。'],
     ['生命燃燒', 30, '3 秒內每秒扣 200 生命，當前攻擊逐秒乘以 1.3。'],
     ['速度增強', 5, '2 秒內移速增加 30%。']
   ] },
-  beta: { job: 'warrior', role: 'fighter', name: '貝塔', color: '#ac95ec', hp: 10000, speed: 460, damage: 650, skills: [
+  beta: { defense: 44, job: 'warrior', role: 'fighter', name: '貝塔', color: '#ac95ec', hp: 10000, speed: 460, damage: 650, skills: [
     ['吸收反彈', 20, '選隊友後再指定敵人，2 秒內替隊友承擔 90% 傷害，反彈吸收量的 20%。', 'dual'],
     ['瞬間強擊', 10, '對附近最近三名敵人之一造成目前攻擊力的 130%。', 'enemy'],
-    ['切換形態', 45, '第二形態生命 5000、速度 670、攻擊 500。生命分開記錄，任何形態歸零即淘汰。']
+    ['切換形態', 45, '第二形態生命 5000、速度 340、防禦 22、攻擊 500。生命分開記錄，任何形態歸零即淘汰。']
   ] },
-  gamma: { job: 'archer', role: 'fighter', name: '伽瑪', color: '#ffcb48', hp: 8000, speed: 650, damage: 570, skills: [
+  gamma: { defense: 26, job: 'archer', role: 'fighter', name: '伽瑪', color: '#ffcb48', hp: 8000, speed: 650, damage: 570, skills: [
     ['換位', 25, '與指定敵人交換位置並定身對方 1 秒，自身獲得 2 秒、50% 減傷護盾。', 'enemy'],
     ['全面增益', 12, '2 秒內增加 12% 攻擊與速度，並減傷 12%。'],
     ['範圍攻擊', 13, '對周圍最近三名敵人各造成目前攻擊力的 50%。']
   ] }
 };
+function adjustedSpeed(speed) { return Math.ceil(speed / 20) * 10; }
 const playableOrder = Object.keys(playableHeroes);
 Object.assign(heroes, playableHeroes);
-if (typeof module !== 'undefined') Object.assign(module.exports, { playableHeroes, playableOrder });
+if (typeof module !== 'undefined') Object.assign(module.exports, { playableHeroes, playableOrder, adjustedSpeed });

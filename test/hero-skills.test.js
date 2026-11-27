@@ -35,8 +35,8 @@ test('Sky shields, reflects, accelerates and is invisible with five healing puls
   const enemyHp = foe.hp;
   assert.ok(cast(room, self, 0, 100).ok);
   strike(room, foe, self, 110);
-  assert.equal(self.hp, hp - 342);
-  assert.equal(foe.hp, enemyHp - 57);
+  assert.equal(self.hp, hp - 253);
+  assert.equal(foe.hp, enemyHp - 45);
   assert.ok(cast(room, self, 0, 111).error);
   assert.ok(cast(room, self, 1, 120).ok);
   assert.equal(skills.speedMultiplier(self, 130), 1.25);
@@ -68,7 +68,7 @@ test('Frost reduces damage, interrupts a channel on knockback, and teleports nex
   const { room, self, foe, friend } = setup('frost', 'alpha');
   cast(room, self, 0, 100);
   strike(room, foe, self, 110);
-  assert.equal(self.hp, 6450);
+  assert.equal(self.hp, 6518);
   cast(room, foe, 1, 120);
   const before = foe.x;
   assert.ok(cast(room, self, 1, 130, { enemy: foe }).ok);
@@ -127,9 +127,9 @@ test('Alpha primes one attack and burns 200 HP per pulse for compounding attack'
   const { room, self, foe } = setup('alpha');
   assert.ok(cast(room, self, 0, 100).ok);
   strike(room, self, foe, 110);
-  assert.equal(foe.hp, 7250);
+  assert.equal(foe.hp, 7405);
   strike(room, self, foe, 900);
-  assert.equal(foe.hp, 6750);
+  assert.equal(foe.hp, 7008);
   assert.ok(cast(room, self, 1, 1000).ok);
   for (const [now, damage] of [[2000, 650], [3000, 845], [4000, 1098]]) {
     combat.tick(room, now, 0, idle);
@@ -145,18 +145,18 @@ test('Beta splits damage 90/10, reflects 20% of absorption, and remembers form h
   place(foe, 1040, 1050);
   assert.ok(cast(room, self, 0, 100, { ally: friend, enemy: foe }).ok);
   strike(room, foe, friend, 110);
-  assert.equal(self.hp, 9487);
-  assert.equal(friend.hp, 7943);
-  assert.equal(foe.hp, 7897);
+  assert.equal(self.hp, 9620);
+  assert.equal(friend.hp, 7958);
+  assert.equal(foe.hp, 7940);
   assert.ok(cast(room, self, 1, 120, { enemy: foe }).ok);
-  assert.equal(foe.hp, 7052);
+  assert.equal(foe.hp, 7269);
   self.powers.set('root', { until: 500 });
   assert.ok(cast(room, self, 2, 130).ok);
-  assert.deepEqual([self.hp, combat.stats(self).speed, combat.stats(self).damage], [5000, 670, 500]);
+  assert.deepEqual([self.hp, combat.stats(self).speed, combat.stats(self).damage], [5000, 340, 500]);
   assert.equal(skills.active(self, 'root', 131), null);
   self.hp = 3690;
   assert.ok(cast(room, self, 2, 45130).ok);
-  assert.equal(self.hp, 9487);
+  assert.equal(self.hp, 9620);
   assert.ok(cast(room, self, 2, 90130).ok);
   assert.equal(self.hp, 3690);
 });
@@ -175,5 +175,28 @@ test('Gamma swaps, grants a two-second shield and hits only the closest three vi
   place(far, 1190, 1000);
   const before = [foe, second, third, far].map(p => p.hp);
   assert.ok(cast(room, self, 2, 120).ok);
-  assert.deepEqual([foe, second, third, far].map((p, i) => before[i] - p.hp), [319, 319, 319, 0]);
+  assert.deepEqual([foe, second, third, far].map((p, i) => before[i] - p.hp), [253, 236, 222, 0]);
+});
+
+test('live armor and rounded speeds are shared and crew health includes distant wiped teammates', () => {
+  const speeds = { sky: 300, oshi: 270, frost: 330, sain: 400, kosain: 350, tanjun: 250, alpha: 500, beta: 230, gamma: 330 };
+  for (const [hero, speed] of Object.entries(speeds)) {
+    assert.equal(combat.stats({ hero }).speed, speed);
+    assert.equal(combat.stats({ hero }).defense, combat.playableHeroes[hero].defense);
+  }
+  assert.equal(combat.stats({ hero: 'beta', form: 1 }).defense, 22);
+  const { room, self, foe, friend } = setup('sky');
+  place(friend, 2900, 2900);
+  friend.alive = false;
+  friend.hp = 0;
+  assert.equal(combat.snapshot(room, 10, self).players.some(p => p.id === friend.id), false);
+  const status = combat.snapshot(room, 10, self).teammates.find(p => p.id === friend.id);
+  assert.deepEqual([status.alive, status.hp, status.maxHp], [false, 0, 8000]);
+  assert.ok(cast(room, self, 0, 100).ok);
+  assert.ok(combat.snapshot(room, 110, foe).effects.some(effect => effect.appearance === 'shield'));
+  assert.ok(cast(room, self, 2, 200).ok);
+  assert.equal(combat.snapshot(room, 210, foe).effects.some(effect => effect.actor === self.id), false);
+  self.alive = false;
+  place(foe, 2950, 2950);
+  assert.ok(combat.snapshot(room, 220, self).players.some(p => p.id === foe.id));
 });

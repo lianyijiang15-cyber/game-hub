@@ -5,7 +5,7 @@ const { terrainBlocked, playerBlocked, movePlayer } = require('./collision');
 const loot = require('./loot');
 const modes = require('./modes');
 const skill = require('./hero-skills');
-const { heroes, playableHeroes } = require('../public/heroes');
+const { heroes, playableHeroes, adjustedSpeed } = require('../public/heroes');
 const map = generateWorld();
 const visionRadius = 360;
 const grassRevealRadius = 80;
@@ -17,11 +17,11 @@ const classes = {
 };
 const jobs = Object.keys(classes);
 const heroStats = Object.fromEntries(Object.entries(heroes).map(([id, hero]) =>
-  [id, playableHeroes[id] ? { ...classes[hero.job], hp: hero.hp, speed: hero.speed, damage: hero.damage, defense: 0 } :
+  [id, playableHeroes[id] ? { ...classes[hero.job], hp: hero.hp, speed: adjustedSpeed(hero.speed), damage: hero.damage, defense: hero.defense } :
     { ...classes[hero.job], ...hero.stats }]));
 function stats(player) {
   const base = heroStats[player.hero] ?? classes[player.job];
-  return player.hero === 'beta' && player.form === 1 ? { ...base, hp: 5000, speed: 670, damage: 500 } : base;
+  return player.hero === 'beta' && player.form === 1 ? { ...base, hp: 5000, speed: adjustedSpeed(670), damage: 500, defense: 22 } : base;
 }
 const teams = ['紅隊', '藍隊'];
 const radius = 12;
@@ -379,7 +379,7 @@ function teamAwards(results) {
 function snapshot(room, now, viewer = null) {
   const local = viewer && room.phase === 'playing';
   // The client draws the visible camera rectangle. Keep distant opponents out of its feed.
-  const sees = point => !local || Math.abs(viewer.x - point.x) <= 1010 && Math.abs(viewer.y - point.y) <= 730;
+  const sees = point => !local || !viewer.alive || Math.abs(viewer.x - point.x) <= 1010 && Math.abs(viewer.y - point.y) <= 730;
   const players = local ? room.players.filter(player => player === viewer ||
     canTarget(viewer, player, now) && sees(player)) : room.players;
   const results = room.phase === 'ended' ? room.roster.map(player => {
@@ -401,11 +401,15 @@ function snapshot(room, now, viewer = null) {
   return {
     id: room.id, mode: modes.modeOf(room), scenario: modes.view(room, local ? viewer : null, now, sees, clearLine, canTarget), phase: room.phase, winner: room.winner, score: room.score, now,
     remaining: Math.max(0, room.endsAt - now), effects: room.effects.filter(item => sees(item) &&
-      (!local || !room.players.some(player => player.id === item.actor && !canTarget(viewer, player, now)))), kills: room.kills,
+      (!local || !room.players.some(player => (player.id === item.actor || player.id === item.target) &&
+        !canTarget(viewer, player, now)))), kills: room.kills,
     chests, nearbyChest, openedChestIds: room.chests.filter(chest => chest.openedAt !== null).map(chest => chest.id),
     inventory: local ? viewer.inventory.map(item => item && { label: item.label, quality: item.quality }) : [],
     buffs: local ? loot.activeBuffs(viewer, now).map(({ label, until }) => ({ label, until })) : [],
     attackRange, targetInRange,
+    teammates: local ? room.roster.filter(player => player !== viewer && player.team === viewer.team)
+      .map(player => ({ id: player.id, slot: player.slot, name: player.name, hero: player.hero, job: player.job,
+        hp: player.hp, maxHp: stats(player).hp, alive: player.alive, respawnAt: player.respawnAt })) : [],
     skillAllies: local ? room.players.filter(player => player !== viewer && player.alive && player.team === viewer.team)
       .map(({ id, name, x, y }) => ({ id, name, x, y })) : [],
     skillTimes: local ? viewer.skillTimes : [],

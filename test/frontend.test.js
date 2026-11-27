@@ -228,6 +228,31 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   keyHandlers.get('keydown')(keyboard('Enter'));
   assert.equal(emitted.at(-1)[0], 'arenaInput');
   assert.equal(emitted.at(-1)[1].x, 0);
+  const ally = { id: 'ally', name: '遠方隊友', job: 'warrior', hero: 'sky', hp: 4300, maxHp: 8000, alive: true };
+  socketHandlers.get('arenaState')({
+    id: 'ABCDE0', now: 120, phase: 'playing', remaining: 299880,
+    players: [{ ...player, alive: false, hp: 0 }], teammates: [ally],
+    effects: [{ type: 'hero-skill', appearance: 'heal', x: 1600, y: 1400, tint: '#91ffb2', until: 810 }],
+    kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }
+  });
+  elements.get('map-preview').onclick();
+  assert.equal(elements.get('tactical-overlay').hidden, false);
+  elements.get('map-close').onclick();
+  assert.equal(elements.get('tactical-overlay').hidden, true);
+  elements.get('map-toggle').onclick();
+  keyHandlers.get('keydown')(keyboard('Escape'));
+  assert.equal(elements.get('tactical-overlay').hidden, true);
+  const vitals = elements.get('team-vitals').children[0];
+  assert.equal(vitals.children[0].src, '/art/heroes/sky-portrait.webp');
+  assert.equal(vitals.children[1].children[1].value, 4300);
+  frames.shift()(130);
+  const initialCamera = vm.runInContext('arenaCamera.x', context);
+  const initialMessages = emitted.length;
+  keyHandlers.get('keydown')(keyboard('ArrowRight'));
+  frames.shift()(150);
+  keyHandlers.get('keyup')(keyboard('ArrowRight'));
+  assert.ok(vm.runInContext('arenaCamera.x', context) > initialCamera);
+  assert.equal(emitted.length, initialMessages);
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', phase: 'ended', winner: '紅隊', mvp: 'self', score: { 紅隊: 7, 藍隊: 2 },
     teamAwards: { 紅隊: { mvp: 'self', lowestKda: 'red-low' }, 藍隊: { mvp: 'blue-mvp', lowestKda: 'blue-low' } },

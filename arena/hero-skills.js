@@ -182,6 +182,12 @@ const runners = {
   ]
 };
 
+const visuals = {
+  sky: ['shield', 'speed', 'shift'], oshi: ['bind', 'speed', 'shift'], frost: ['shield', 'strike', 'shift'],
+  sain: ['shield', 'heal', 'bind'], kosain: ['heal', 'speed', 'strike'], tanjun: ['speed', 'shield', 'bind'],
+  alpha: ['strike', 'strike', 'speed'], beta: ['shield', 'strike', 'shift'], gamma: ['shift', 'speed', 'strike']
+};
+
 function cast(room, self, request, now, hooks) {
   const skill = request?.slot;
   const hero = playableHeroes[self.hero];
@@ -197,10 +203,20 @@ function cast(room, self, request, now, hooks) {
   const ranged = (self.hero === 'oshi' || self.hero === 'gamma') && skill === 0;
   const candidates = ranged ? enemies(room, self, now, hooks.clearLine, lockRange) : nearEnemies;
   const enemy = candidates.find(player => player.id === request.enemy);
+  const origin = { x: self.x, y: self.y };
+  const targets = new Set();
   const context = {
     room, self, ally, enemy, now, nearAllies, nearEnemies, ...hooks,
-    grant(target, key, duration, details) { give(target, key, self, now, duration, details); },
+    hit(source, target, damage) {
+      targets.add(target);
+      hooks.hit(source, target, damage);
+    },
+    grant(target, key, duration, details) {
+      targets.add(target);
+      give(target, key, self, now, duration, details);
+    },
     pulse(target, key, count, details) {
+      targets.add(target);
       give(target, key, self, now, count * 1000 + (details.tail ?? 1), {
         ...details, channel: true, remaining: count, next: now + 1000
       });
@@ -208,12 +224,23 @@ function cast(room, self, request, now, hooks) {
     control(target, apply) {
       if (!target) return failure('請指定範圍內的敵人');
       if (active(target, 'controlImmune', now)) return failure('對手目前免疫控制');
+      targets.add(target);
       return apply(target);
     }
   };
   const result = runners[self.hero][skill](context);
   if (result?.error) return result;
   self.skillTimes[skill] = now + hero.skills[skill][1] * 1000;
+  if (ally) targets.add(ally);
+  if (enemy) targets.add(enemy);
+  targets.add(self);
+  const appearance = visuals[self.hero][skill];
+  const emit = (point, target) => room.effects.push({
+    type: 'hero-skill', appearance, x: point.x, y: point.y, actor: self.id, target,
+    tint: appearance === 'heal' ? '#91ffb2' : hero.color, until: now + 720
+  });
+  if (distance(origin, self) > 1) emit(origin, self.id);
+  for (const target of targets) emit(target, target.id);
   if (self.alive) self.action = { skill: true, until: now + 240 };
   return { ok: true, message: hero.skills[skill][0] };
 }

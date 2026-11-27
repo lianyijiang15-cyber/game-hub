@@ -96,7 +96,7 @@ const baseStats = {
 };
 const classDetails = Object.fromEntries(playableOrder.map(id => {
   const hero = playableHeroes[id];
-  return [id, { ...baseStats[hero.job], ...hero, defense: 0 }];
+  return [id, { ...baseStats[hero.job], ...hero, speed: adjustedSpeed(hero.speed) }];
 }));
 const heroSkillKeys = ['Q', 'C', 'V'];
 function heroName(player) { return heroes[player.hero ?? player.job]?.name ?? jobNames[player.job]; }
@@ -115,6 +115,13 @@ let joining = false;
 let roomRequest = 0;
 const keys = new Set();
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
+const panKeys = new Set(['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight']);
+function localPlayer(state = frame) { return state?.players?.find(player => player.id === socket.id); }
+function directionOfKeys(spectating = false) {
+  const axis = (key, arrow) => Number(keys.has(key) || spectating && keys.has(arrow));
+  return { x: axis('KeyD', 'ArrowRight') - axis('KeyA', 'ArrowLeft'),
+    y: axis('KeyS', 'ArrowDown') - axis('KeyW', 'ArrowUp') };
+}
 let aim = null;
 let worldMap = null;
 let worldChests = [];
@@ -291,7 +298,7 @@ function renderClass(job) {
   $('class-damage').textContent = details.damage;
   $('class-defense').textContent = `${details.defense}（減傷 ${Math.round(100 * details.defense / (100 + details.defense))}%）`;
   $('class-cooldown').textContent = details.cooldown + ' ms';
-  const values = [details.hp / Math.max(...Object.values(classDetails).map(entry => entry.hp)), details.speed / 1000, details.range / 240,
+  const values = [details.hp / Math.max(...Object.values(classDetails).map(entry => entry.hp)), details.speed / 500, details.range / 240,
     details.damage / 650, 650 / details.cooldown];
   const points = values.map((value, index) => {
     const angle = index * Math.PI * 2 / values.length - Math.PI / 2;
@@ -511,16 +518,13 @@ socket.on('disconnect', () => {
 });
 
 function sendMovement() {
-  if (phase !== 'playing' || !socket.connected) return;
-  socket.volatile.emit('arenaInput', {
-    x: Number(keys.has('KeyD')) - Number(keys.has('KeyA')),
-    y: Number(keys.has('KeyS')) - Number(keys.has('KeyW'))
-  });
+  if (phase !== 'playing' || !socket.connected || !localPlayer()?.alive) return;
+  socket.volatile.emit('arenaInput', directionOfKeys());
 }
 
 function stopMovement() {
   keys.clear();
-  if (phase === 'playing' && socket.connected) socket.emit('arenaInput', { x: 0, y: 0 });
+  if (phase === 'playing' && socket.connected && localPlayer()?.alive) socket.emit('arenaInput', { x: 0, y: 0 });
 }
 
 function aimInWorld() {
@@ -533,7 +537,7 @@ function aimInWorld() {
 }
 
 function attack(skill) {
-  if (phase !== 'playing' || !socket.connected || !frame || !worldMap) return;
+  if (phase !== 'playing' || !socket.connected || !localPlayer()?.alive || !worldMap) return;
   socket.volatile.emit('arenaAttack', { ...aimInWorld(), skill });
 }
 
@@ -630,6 +634,11 @@ window.addEventListener('keydown', event => {
     return;
   }
   if (!room) return;
+  if (event.code === 'Escape' && fullMap) {
+    event.preventDefault();
+    toggleMap(false);
+    return;
+  }
   if (event.target.matches?.('input, textarea, select, [contenteditable]')) return;
   if (event.code === 'Enter' && !event.repeat && event.target.tagName !== 'BUTTON') {
     event.preventDefault();
@@ -641,7 +650,7 @@ window.addEventListener('keydown', event => {
     return;
   }
   if (phase !== 'playing') return;
-  if (movement.has(event.code)) {
+  if (movement.has(event.code) || !localPlayer()?.alive && panKeys.has(event.code)) {
     event.preventDefault();
     if (event.repeat) return;
     keys.add(event.code);
@@ -657,7 +666,7 @@ window.addEventListener('keydown', event => {
     else if (frame?.nearbyChest != null) lootCommand('lootOpen', frame.nearbyChest);
   }
   if (event.code === 'KeyF' && frame?.mode === 'flag') lootCommand('modeAntidote');
-  if (event.code === 'KeyM' && frame?.scenario) toggleMap();
+  if (event.code === 'KeyM' && frame) toggleMap();
   if (event.code === 'KeyR' && frame?.buffs?.some(buff => buff.label === '震波符文 [R]')) lootCommand('lootRune');
   if (/^Digit[1-5]$/.test(event.code)) useLootSlot(Number(event.code.slice(-1)) - 1);
 });
@@ -695,12 +704,16 @@ function scoreText(state, team) {
   return state.mode === 'survival' ? formatDuration(state.score[team]) : state.score[team];
 }
 
-function toggleMap() {
-  fullMap = !fullMap;
+function toggleMap(open = !fullMap) {
+  fullMap = open;
   $('tactical-overlay').hidden = !fullMap;
-  if (fullMap) stopMovement();
+  if (fullMap) {
+    stopMovement();
+    $('map-close').focus();
+  }
 }
-$('map-toggle').onclick = toggleMap;
+$('map-preview').onclick = $('map-toggle').onclick = () => toggleMap(true);
+$('map-close').onclick = () => { toggleMap(false); $('map-preview').focus(); };
 $('mode-craft').onclick = () => lootCommand('modeCraft');
 $('mode-antidote').onclick = () => lootCommand('modeAntidote');
 $('mode-interact').onclick = () => {
@@ -709,7 +722,7 @@ $('mode-interact').onclick = () => {
 
 function drawModeHud(state, now) {
   const info = state.scenario;
-  $('mode-hud').hidden = $('map-toggle').hidden = !info;
+  $('mode-hud').hidden = !info;
   const interaction = $('mode-interact');
   interaction.hidden = !info?.nearby;
   if (interaction.dataset.anchored === 'true') {
@@ -805,16 +818,54 @@ socket.on('arenaMap', data => {
   }
 });
 
+const teammateRows = new Map();
+function drawTeamVitals(teammates) {
+  const roster = $('team-vitals');
+  const ids = teammates.map(player => player.id).join(',');
+  if (roster.dataset.roster !== ids) {
+    roster.dataset.roster = ids;
+    teammateRows.clear();
+    roster.replaceChildren();
+    for (const player of teammates) {
+      const row = element('div', '');
+      row.className = 'team-vital';
+      const portrait = element('img', '');
+      portrait.src = heroArt(player.hero ?? player.job, 'avatar');
+      portrait.alt = '';
+      const labels = element('span', '');
+      const name = element('strong', player.name);
+      name.title = player.name;
+      const hp = element('progress', '');
+      hp.setAttribute('aria-label', player.name + '的生命值');
+      const numbers = element('small', '');
+      labels.append(name, hp, numbers);
+      row.append(portrait, labels);
+      roster.append(row);
+      teammateRows.set(player.id, { row, hp, numbers });
+    }
+  }
+  for (const player of teammates) {
+    const { row, hp, numbers } = teammateRows.get(player.id);
+    row.dataset.alive = String(player.alive);
+    hp.max = player.maxHp;
+    hp.value = player.alive ? player.hp : 0;
+    numbers.textContent = player.alive ? `${player.hp} / ${player.maxHp}` : '已倒下';
+  }
+}
+
 socket.on('arenaState', state => {
   if (state.id !== room || phase === 'lobby') return;
+  const wasAlive = localPlayer()?.alive;
   previous = frame;
   frame = state;
+  if (wasAlive !== localPlayer()?.alive) keys.clear();
   receivedAt = performance.now();
   if (state.phase === 'ended') {
     renderResults(state);
     return;
   }
-  const alive = state.players.find(player => player.id === socket.id)?.alive;
+  const alive = localPlayer(state)?.alive;
+  drawTeamVitals(state.teammates ?? []);
   lootButtons.forEach((button, index) => {
     const item = state.inventory?.[index];
     if (button.dataset.label !== (item?.label || '')) {
@@ -855,11 +906,12 @@ function renderFrame(time) {
     drawHeroHud(frame, me, serverTime, cooldown);
     $('respawn').hidden = me.alive;
     if (!me.alive) $('respawn').textContent = ['flag', 'survival'].includes(frame.mode)
-      ? '已淘汰 · 可查看隊友定位' : `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;
+      ? '已淘汰 · WASD／方向鍵移動視角' :
+      `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活 · WASD／方向鍵移動視角`;
   }
   const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
   drawLootHud(frame, serverTime);
-  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time);
+  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time, directionOfKeys(true));
   drawModeHud(frame, serverTime);
   drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id);
   if (fullMap) drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id, $('tactical-map'));
