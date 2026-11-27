@@ -1,13 +1,7 @@
 'use strict';
 
-const map = {
-  width: 960, height: 576, border: 16,
-  walls: [
-    [280, 80, 48, 144], [280, 352, 48, 144],
-    [632, 80, 48, 144], [632, 352, 48, 144],
-    [432, 240, 96, 96], [168, 268, 32, 40], [760, 268, 32, 40]
-  ]
-};
+const { generateWorld, solid, impassable } = require('./world');
+const map = generateWorld();
 const classes = {
   warrior: { hp: 150, speed: 150, range: 52, damage: 24, cooldown: 650 },
   archer: { hp: 100, speed: 185, range: 240, damage: 17, cooldown: 850 },
@@ -18,12 +12,20 @@ const teams = ['紅隊', '藍隊'];
 const radius = 12;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-function blocked(x, y, padding = radius) {
-  return x < map.border + padding || y < map.border + padding ||
-    x > map.width - map.border - padding || y > map.height - map.border - padding ||
-    map.walls.some(([left, top, width, height]) =>
-      x + padding > left && x - padding < left + width &&
-      y + padding > top && y - padding < top + height);
+function intersectsTiles({ tiles, tileSize }, left, top, right, bottom, matches) {
+  for (let row = Math.floor(top / tileSize); row <= Math.floor(bottom / tileSize); row++) {
+    for (let col = Math.floor(left / tileSize); col <= Math.floor(right / tileSize); col++) {
+      const tile = tiles[row]?.[col];
+      if (tile && matches(tile, col * tileSize, row * tileSize)) return true;
+    }
+  }
+  return false;
+}
+
+function blocked(x, y, padding = radius, world = map, obstacle = impassable) {
+  const { width, height } = world;
+  if (x - padding < 0 || y - padding < 0 || x + padding >= width || y + padding >= height) return true;
+  return intersectsTiles(world, x - padding, y - padding, x + padding, y + padding, obstacle);
 }
 
 function axisSpan(origin, delta, low, high) {
@@ -33,22 +35,26 @@ function axisSpan(origin, delta, low, high) {
   return [Math.min(start, end), Math.max(start, end)];
 }
 
-function clearLine(a, b, padding = 0) {
-  if (blocked(a.x, a.y, padding) || blocked(b.x, b.y, padding)) return false;
+function clearLine(a, b, padding = 0, world = map) {
+  const obstacle = padding ? impassable : solid;
+  if (blocked(a.x, a.y, padding, world, obstacle) || blocked(b.x, b.y, padding, world, obstacle)) return false;
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  return !map.walls.some(([left, top, width, height]) => {
-    const xSpan = axisSpan(a.x, dx, left - padding, left + width + padding);
-    const ySpan = axisSpan(a.y, dy, top - padding, top + height + padding);
-    return xSpan && ySpan && Math.max(0, xSpan[0], ySpan[0]) < Math.min(1, xSpan[1], ySpan[1]);
-  });
+  return !intersectsTiles(world, Math.min(a.x, b.x) - padding, Math.min(a.y, b.y) - padding,
+    Math.max(a.x, b.x) + padding, Math.max(a.y, b.y) + padding, (tile, left, top) => {
+      if (!obstacle(tile)) return false;
+      const xSpan = axisSpan(a.x, dx, left - padding, left + world.tileSize + padding);
+      const ySpan = axisSpan(a.y, dy, top - padding, top + world.tileSize + padding);
+      return xSpan && ySpan && Math.max(0, xSpan[0], ySpan[0]) < Math.min(1, xSpan[1], ySpan[1]);
+    });
 }
 
 function spawn(room, player, now) {
+  const { width, height } = room.map;
   const side = player.team === teams[0] ? 1 : -1;
   for (const offset of [0, -28, 28, -56, 56]) {
-    const position = { x: side === 1 ? 80 : 880, y: 80 + player.slot * 104 + offset };
-    if (blocked(position.x, position.y) || room.players.some(other =>
+    const position = { x: width / 2 - side * 464, y: height / 2 + side * ((player.slot - 2) * 72 + offset) };
+    if (blocked(position.x, position.y, radius, room.map) || room.players.some(other =>
       other !== player && other.alive && distance(position, other) < radius * 2)) continue;
     Object.assign(player, position, {
       hp: classes[player.job].hp, alive: true, input: { x: 0, y: 0 }, inputAt: 0,
@@ -60,9 +66,9 @@ function spawn(room, player, now) {
   player.respawnAt = now + 50;
 }
 
-function start(room, now) {
+function start(room, now, seed) {
   Object.assign(room, {
-    phase: 'playing', score: { [teams[0]]: 0, [teams[1]]: 0 }, effects: [],
+    phase: 'playing', map: seed === undefined ? map : generateWorld(seed), score: { [teams[0]]: 0, [teams[1]]: 0 }, effects: [],
     projectiles: [], kills: [], sequence: 0, endsAt: now + 300000, winner: null
   });
   room.roster = [...room.players];
@@ -129,7 +135,7 @@ function attack(room, player, x, y, skill, now) {
 
   const range = skill ? 90 : job.range;
   const enemies = room.players.filter(other => other.alive && other.team !== player.team &&
-    distance(player, other) <= range && clearLine(player, other) &&
+    distance(player, other) <= range && clearLine(player, other, 0, room.map) &&
     (skill || Math.cos(Math.atan2(other.y - player.y, other.x - player.x) - angle) >= Math.cos(0.30)));
   enemies.sort((a, b) => distance(player, a) - distance(player, b));
   for (const enemy of skill ? enemies : enemies.slice(0, 1)) hit(room, player, enemy, skill ? 38 : job.damage, now);
@@ -144,13 +150,13 @@ function advanceProjectile(room, projectile, dt, now) {
   for (let i = 0; i < steps; i++) {
     const x = projectile.x + Math.cos(projectile.angle) * step;
     const y = projectile.y + Math.sin(projectile.angle) * step;
-    if (blocked(x, y, 2)) {
+    if (blocked(x, y, 2, room.map, solid)) {
       impact = true;
       break;
     }
     Object.assign(projectile, { x, y });
     const target = room.players.find(player => player.alive && player.team !== projectile.source.team &&
-      distance(player, projectile) <= radius + 2 && clearLine(projectile, player));
+      distance(player, projectile) <= radius + 2 && clearLine(projectile, player, 0, room.map));
     if (!target) continue;
     if (projectile.type === 'arrow') hit(room, projectile.source, target, 13, now);
     impact = true;
@@ -161,7 +167,7 @@ function advanceProjectile(room, projectile, dt, now) {
   if (projectile.type === 'fireball') {
     effect(room, 'blast', projectile, 0, 66, projectile.source.team, now);
     for (const target of room.players) {
-      if (distance(target, projectile) <= 66 && clearLine(projectile, target)) {
+      if (distance(target, projectile) <= 66 && clearLine(projectile, target, 0, room.map)) {
         hit(room, projectile.source, target, 34, now);
       }
     }
@@ -177,11 +183,11 @@ function move(room, player, vector, dt) {
   const occupied = (nextX, nextY) => room.players.some(other => other !== player && other.alive &&
     Math.hypot(nextX - other.x, nextY - other.y) < radius * 2);
   player.moving = false;
-  if (x !== player.x && !blocked(x, player.y) && !occupied(x, player.y)) {
+  if (x !== player.x && !blocked(x, player.y, radius, room.map) && !occupied(x, player.y)) {
     player.x = x;
     player.moving = true;
   }
-  if (y !== player.y && !blocked(player.x, y) && !occupied(player.x, y)) {
+  if (y !== player.y && !blocked(player.x, y, radius, room.map) && !occupied(player.x, y)) {
     player.y = y;
     player.moving = true;
   }
@@ -207,7 +213,7 @@ function tick(room, now, dt, botInput) {
 
 function snapshot(room, now) {
   return {
-    id: room.id, phase: room.phase, winner: room.winner, score: room.score, now, map,
+    id: room.id, phase: room.phase, winner: room.winner, score: room.score, now,
     remaining: Math.max(0, room.endsAt - now), effects: room.effects, kills: room.kills,
     projectiles: room.projectiles.map(({ id, x, y, angle, type }) => ({ id, x, y, angle, type })),
     players: room.players.map(({ id, x, y, name, team, job, hp, bot, alive, moving, angle, facing,

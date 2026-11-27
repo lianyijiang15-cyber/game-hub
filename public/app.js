@@ -33,17 +33,22 @@ let joining = false;
 let roomRequest = 0;
 const keys = new Set();
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
-const aim = { x: 480, y: 288 };
+let aim = null;
+let worldMap = null;
+const matchKey = 'game-hub-seat';
 
 function show(id) {
   for (const panel of ['home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
+  if (id !== 'game') $('game').classList.remove('in-combat');
   document.querySelector('header').hidden = id !== 'home';
 }
 
 function exitRoom() {
+  sessionStorage.removeItem(matchKey);
   stopMovement();
   if (room && socket.connected) socket.emit('leave');
   room = null;
+  worldMap = null;
   phase = 'lobby';
   frame = previous = null;
   $('messages').replaceChildren();
@@ -52,9 +57,11 @@ function exitRoom() {
 }
 
 function home() {
+  sessionStorage.removeItem(matchKey);
   stopMovement();
   if (room && socket.connected) socket.emit('leave');
   room = null;
+  worldMap = null;
   phase = 'lobby';
   frame = previous = null;
   roomRequest++;
@@ -94,10 +101,13 @@ function enter(event, data) {
     }
     joining = false;
     if (error || result.error) {
+      if (event === 'resume') exitRoom();
       $('error').textContent = error ? '連線逾時' : result.error;
       return;
     }
     room = result.id;
+    if (result.ticket) sessionStorage.setItem(matchKey, JSON.stringify({ id: room, ticket: result.ticket }));
+    worldMap = result.map || null;
     phase = 'lobby';
     frame = previous = null;
     $('messages').replaceChildren();
@@ -184,6 +194,7 @@ function renderRoom(state) {
   phase = state.phase;
   $('waiting').hidden = !waiting;
   $('battle').hidden = phase !== 'playing';
+  $('game').classList.toggle('in-combat', phase === 'playing');
   $('results').hidden = phase !== 'ended';
   $('chat-title').textContent = waiting ? '房間聊天' : '隊伍聊天';
   $('return-lobby').hidden = $('rematch').hidden = !host;
@@ -261,10 +272,15 @@ socket.on('roomClosed', reason => {
   $('error').textContent = reason;
 });
 
+socket.on('connect', () => {
+  const saved = sessionStorage.getItem(matchKey);
+  if (saved) enter('resume', JSON.parse(saved));
+});
+
 socket.on('disconnect', () => {
   if (!room) return;
-  exitRoom();
-  $('error').textContent = '已斷線並離開房間。連線恢復後可重新加入等待中的房間。';
+  stopMovement();
+  $('room-error').textContent = '連線中斷，正在嘗試恢復席位…';
 });
 
 function sendMovement() {
@@ -281,8 +297,12 @@ function stopMovement() {
 }
 
 function attack(skill) {
-  if (phase !== 'playing' || !socket.connected || !frame) return;
-  socket.volatile.emit('arenaAttack', { ...aim, skill });
+  if (phase !== 'playing' || !socket.connected || !frame || !worldMap) return;
+  const canvas = $('arena');
+  const cursor = aim || { x: canvas.width / 2 + 45, y: canvas.height / 2 };
+  const x = Math.max(0, Math.min(worldMap.width, cursor.x + arenaCamera.x));
+  const y = Math.max(0, Math.min(worldMap.height, cursor.y + arenaCamera.y));
+  socket.volatile.emit('arenaAttack', { x, y, skill });
 }
 
 window.addEventListener('keydown', event => {
@@ -313,8 +333,10 @@ setInterval(() => { if (keys.size) sendMovement(); }, 50);
 function updateAim(event) {
   const canvas = $('arena');
   const bounds = canvas.getBoundingClientRect();
-  aim.x = Math.max(0, Math.min(canvas.width, (event.clientX - bounds.left) * canvas.width / bounds.width));
-  aim.y = Math.max(0, Math.min(canvas.height, (event.clientY - bounds.top) * canvas.height / bounds.height));
+  aim = {
+    x: Math.max(0, Math.min(canvas.width, (event.clientX - bounds.left) * canvas.width / bounds.width)),
+    y: Math.max(0, Math.min(canvas.height, (event.clientY - bounds.top) * canvas.height / bounds.height))
+  };
 }
 $('arena').onpointermove = updateAim;
 $('arena').onpointerdown = event => {
@@ -338,6 +360,10 @@ function renderResults(state) {
   }
 }
 
+socket.on('arenaMap', data => {
+  if (data.id === room) worldMap = data.map;
+});
+
 socket.on('arenaState', state => {
   if (state.id !== room || phase === 'lobby') return;
   previous = frame;
@@ -354,7 +380,7 @@ socket.on('arenaState', state => {
 
 function renderFrame(time) {
   requestAnimationFrame(renderFrame);
-  if (!frame || phase !== 'playing' || frame.phase !== 'playing') return;
+  if (!worldMap || !frame || phase !== 'playing' || frame.phase !== 'playing') return;
   const elapsed = Math.min(150, Math.max(0, time - receivedAt));
   const serverTime = frame.now + elapsed;
   const remaining = Math.ceil(Math.max(0, frame.remaining - elapsed) / 1000);
@@ -371,6 +397,6 @@ function renderFrame(time) {
     if (!me.alive) $('respawn').textContent = `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;
   }
   const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
-  drawArena(frame, previous, blend, serverTime, aim, socket.id);
+  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap);
 }
 requestAnimationFrame(renderFrame);

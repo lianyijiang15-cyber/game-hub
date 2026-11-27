@@ -17,6 +17,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const rooms = new Map();
 const seats = 10;
 const maxRooms = 50;
+const reconnectWindow = 45000;
 const channel = room => 'arena:' + room.id;
 const now = () => Math.floor(performance.now());
 
@@ -56,21 +57,26 @@ function addBot(room) {
 function closeRoom(room) {
   clearInterval(room.timer);
   clearTimeout(room.expiry);
+  clearTimeout(room.vacancyTimer);
   rooms.delete(room.id);
   list();
 }
 
-function leave(socket) {
+function leave(socket, reconnect = false) {
   const { room, player } = member(socket);
   if (!room) return;
   socket.leave(channel(room));
   socket.data.room = null;
   const successor = room.players.find(entry => entry !== player && !entry.bot);
-  if (!successor) {
+  const active = room.phase === 'playing';
+  if (!successor && !(active && reconnect)) {
     closeRoom(room);
     return;
   }
-  if (room.phase === 'playing') {
+  if (active) {
+    if (reconnect) player.reconnectUntil = now() + reconnectWindow;
+    else player.ticket = null;
+    player.originalName = player.name;
     Object.assign(player, {
       id: 'bot-' + crypto.randomUUID(), name: player.name.slice(0, 18) + ' · AI',
       bot: true, ready: true, input: { x: 0, y: 0 }, route: null, routeAt: 0
@@ -78,13 +84,19 @@ function leave(socket) {
   } else {
     room.players = room.players.filter(entry => entry !== player);
   }
-  if (room.host === socket.id) room.host = successor.id;
+  if (room.host === socket.id) room.host = successor?.id ?? null;
+  if (!successor) {
+    room.vacancyTimer = setTimeout(() => closeRoom(room), reconnectWindow);
+    room.vacancyTimer.unref();
+  }
   publish(room);
 }
 
 function runMatch(room) {
   clearTimeout(room.expiry);
-  combat.start(room, now());
+  for (const player of room.players) if (player.bot) player.ticket = null;
+  combat.start(room, now(), crypto.randomBytes(4).readUInt32LE());
+  io.to(channel(room)).emit('arenaMap', { id: room.id, map: room.map });
   publish(room);
   let lastTick = now();
   const broadcast = () => io.to(channel(room)).volatile.emit('arenaState', combat.snapshot(room, now()));
@@ -114,9 +126,11 @@ function runMatch(room) {
 }
 
 function join(socket, room, name) {
-  room.players.push({ id: socket.id, name, job: 'warrior', ready: false, bot: false });
+  const ticket = crypto.randomUUID();
+  room.players.push({ id: socket.id, name, job: 'warrior', ready: false, bot: false, ticket });
   socket.join(channel(room));
   socket.data.room = room.id;
+  return ticket;
 }
 
 function validName(value) {
@@ -162,8 +176,8 @@ io.on('connection', socket => {
     do { id = crypto.randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(id));
     const created = { id, host: socket.id, phase: 'lobby', players: [] };
     rooms.set(id, created);
-    join(socket, created, name);
-    return { id, room: roomState(created) };
+    const ticket = join(socket, created, name);
+    return { id, ticket, room: roomState(created) };
   });
   command('join', (data, { room }) => {
     if (room) return { error: '請先離開目前房間' };
@@ -174,8 +188,32 @@ io.on('connection', socket => {
     if (!target || target.phase !== 'lobby' || target.players.length >= seats) {
       return { error: '房間不存在、已開始或已滿' };
     }
-    join(socket, target, name);
-    return { id, room: roomState(target) };
+    const ticket = join(socket, target, name);
+    return { id, ticket, room: roomState(target) };
+  });
+  command('resume', (data, { room }) => {
+    if (room || typeof data?.id !== 'string' || typeof data?.ticket !== 'string') {
+      return { error: '無法恢復席位' };
+    }
+    const target = rooms.get(data.id);
+    if (!target || target.phase !== 'playing') return { error: '原本的對戰已結束或已關閉' };
+    const player = target.players.find(entry => entry.ticket === data.ticket);
+    if (player && !player.bot) {
+      const previous = io.of('/').sockets.get(player.id);
+      if (previous) {
+        leave(previous, true);
+        previous.emit('roomClosed', '此席位已在重新載入的分頁恢復');
+      }
+    }
+    if (!player?.bot || now() >= player.reconnectUntil) return { error: '重連期限已過' };
+    clearTimeout(target.vacancyTimer);
+    const ticket = crypto.randomUUID();
+    Object.assign(player, { id: socket.id, name: player.originalName, bot: false, ticket, reconnectUntil: 0,
+      input: { x: 0, y: 0 }, inputAt: 0 });
+    target.host ??= socket.id;
+    socket.join(channel(target));
+    socket.data.room = target.id;
+    return { id: target.id, ticket, room: roomState(target), map: target.map };
   });
   command('leave', () => leave(socket), 0);
   hostCommand('addBot', 'lobby', room => {
@@ -215,6 +253,7 @@ io.on('connection', socket => {
   });
   hostCommand('returnLobby', 'ended', room => {
     clearTimeout(room.expiry);
+    for (const player of room.players) if (player.bot) player.ticket = null;
     room.phase = 'lobby';
     room.players.forEach(player => { player.ready = player.bot; });
     publish(room);
@@ -252,7 +291,7 @@ io.on('connection', socket => {
       if (!teammate.bot && teammate.team === team) io.to(teammate.id).emit('chat', payload);
     }
   }, 650);
-  socket.on('disconnect', () => leave(socket));
+  socket.on('disconnect', () => leave(socket, true));
 });
 
 if (require.main === module) {

@@ -1,38 +1,45 @@
 'use strict';
 
 const { map, classes, blocked, clearLine, distance, attack } = require('./combat');
-const spacing = 24;
-const columns = Math.floor((map.width - 64) / spacing) + 1;
-const rows = Math.floor((map.height - 64) / spacing) + 1;
-const grid = Array.from({ length: columns * rows }, (_, index) => {
-  const x = 32 + (index % columns) * spacing;
-  const y = 32 + Math.floor(index / columns) * spacing;
-  return blocked(x, y, 14) ? null : { x, y };
-});
-const edges = grid.map((node, index) => {
-  if (!node) return [];
-  const col = index % columns;
-  return [col > 0 ? index - 1 : -1, col + 1 < columns ? index + 1 : -1,
-    index - columns, index + columns].filter(next => grid[next] && clearLine(node, grid[next], 14));
-});
-
-function nearest(point) {
-  let best = -1;
-  let cost = Infinity;
-  grid.forEach((node, index) => {
-    if (!node) return;
-    const gap = distance(node, point);
-    if (gap < cost && clearLine(point, node, 12)) {
-      best = index;
-      cost = gap;
-    }
+const graphs = new WeakMap();
+function navigation(world) {
+  if (graphs.has(world)) return graphs.get(world);
+  const { columns, rows, tileSize: spacing } = world;
+  const grid = Array.from({ length: columns * rows }, (_, index) => {
+    const x = ((index % columns) + 0.5) * spacing;
+    const y = (Math.floor(index / columns) + 0.5) * spacing;
+    return blocked(x, y, 14, world) ? null : { x, y };
   });
-  return best;
+  const edges = grid.map((node, index) => {
+    if (!node) return [];
+    const col = index % columns;
+    return [col > 0 ? index - 1 : -1, col + 1 < columns ? index + 1 : -1,
+      index - columns, index + columns].filter(next => grid[next]);
+  });
+  const graph = { grid, edges, columns, rows, spacing, world };
+  graphs.set(world, graph);
+  return graph;
 }
 
-function route(from, to) {
-  const start = nearest(from);
-  const goal = nearest(to);
+function nearest(point, { grid, columns, rows, spacing, world }) {
+  const col = Math.floor(point.x / spacing);
+  const row = Math.floor(point.y / spacing);
+  const candidates = [];
+  for (let y = Math.max(0, row - 1); y <= Math.min(rows - 1, row + 1); y++) {
+    for (let x = Math.max(0, col - 1); x <= Math.min(columns - 1, col + 1); x++) {
+      const index = y * columns + x;
+      if (grid[index] && clearLine(point, grid[index], 12, world)) candidates.push(index);
+    }
+  }
+  candidates.sort((a, b) => distance(point, grid[a]) - distance(point, grid[b]));
+  return candidates[0] ?? -1;
+}
+
+function route(from, to, world = map) {
+  const graph = navigation(world);
+  const { grid, edges, spacing } = graph;
+  const start = nearest(from, graph);
+  const goal = nearest(to, graph);
   if (start < 0 || goal < 0) return [];
   const open = new Set([start]);
   const previous = new Map();
@@ -41,7 +48,9 @@ function route(from, to) {
     let current;
     let best = Infinity;
     for (const index of open) {
-      const estimate = cost.get(index) + distance(grid[index], grid[goal]);
+      const node = grid[index];
+      const target = grid[goal];
+      const estimate = cost.get(index) + 1.001 * (Math.abs(node.x - target.x) + Math.abs(node.y - target.y));
       if (estimate < best) {
         best = estimate;
         current = index;
@@ -82,19 +91,19 @@ function botInput(room, bot, now) {
 
   const job = classes[bot.job];
   const gap = distance(bot, target);
-  const visible = clearLine(bot, target);
-  if (visible && gap <= job.range) {
+  const visible = gap <= job.range && clearLine(bot, target, 0, room.map);
+  if (visible) {
     attack(room, bot, target.x, target.y, false, now);
     if (now >= bot.skillAt) attack(room, bot, target.x, target.y, true, now);
     if (bot.job !== 'warrior' && gap < job.range * 0.44) {
       const retreat = { x: 2 * bot.x - target.x, y: 2 * bot.y - target.y };
       const vector = steer(bot, retreat);
-      if (!blocked(bot.x + vector.x * 20, bot.y + vector.y * 20)) return vector;
+      if (!blocked(bot.x + vector.x * 20, bot.y + vector.y * 20, 12, room.map)) return vector;
     }
     return idle;
   }
 
-  if (clearLine(bot, target, 13)) {
+  if (gap < 520 && clearLine(bot, target, 13, room.map)) {
     const vector = steer(bot, target);
     const ally = room.players.find(p => p !== bot && p.alive && p.team === bot.team &&
       Math.hypot(p.x - bot.x - vector.x * 18, p.y - bot.y - vector.y * 18) < 25);
@@ -102,18 +111,18 @@ function botInput(room, bot, now) {
     for (const side of [bot.slot % 2 ? 1 : -1, bot.slot % 2 ? -1 : 1]) {
       const x = -vector.y * side;
       const y = vector.x * side;
-      if (!blocked(bot.x + x * 22, bot.y + y * 22)) return { x, y };
+      if (!blocked(bot.x + x * 22, bot.y + y * 22, 12, room.map)) return { x, y };
     }
     return vector;
   }
 
   if (now >= bot.routeAt) {
     bot.routeAt = now + 550 + bot.slot * 25;
-    bot.route = route(bot, target);
+    bot.route = route(bot, target, room.map);
   }
   const path = bot.route || [];
   while (path.length && distance(bot, path[0]) < 9) path.shift();
-  while (path.length > 1 && clearLine(bot, path[1], 14)) path.shift();
+  while (path.length > 1 && clearLine(bot, path[1], 14, room.map)) path.shift();
   return path.length ? steer(bot, path[0]) : idle;
 }
 

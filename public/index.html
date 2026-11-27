@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Game Hub｜地下城對抗</title>
-<link rel="stylesheet" href="style.css?v=3">
+<title>Game Hub｜開放世界對抗</title>
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <main>
@@ -23,7 +23,7 @@
 <article>
 <div class="symbol">⚔️</div>
 <h2>團隊對抗</h2>
-<p>5v5 地下城死鬥 · 真人與 AI 同場</p>
+<p>5v5 開放世界死鬥 · 真人與 AI 同場</p>
 <button onclick="openLobby()">建立或加入房間</button>
 </article>
 </div>
@@ -115,7 +115,7 @@
       <span class="blue"><strong id="blue-score">0</strong><span>藍隊</span></span>
     </div>
     <div class="arena-frame">
-      <canvas id="arena" width="960" height="576" aria-label="地下城團隊對抗地圖"></canvas>
+      <canvas id="arena" width="960" height="576" aria-label="開放世界團隊對抗地圖"></canvas>
       <p id="respawn" hidden></p>
     </div>
     <div class="hud">
@@ -136,7 +136,7 @@
     <button id="return-lobby" class="secondary">返回大廳</button>
     <button id="rematch">再玩一局</button>
   </section>
-  <section class="panel">
+  <section id="match-chat" class="panel">
     <h3 id="chat-title">房間聊天</h3>
     <div id="messages" aria-live="polite"></div>
     <form id="chat-form">
@@ -148,7 +148,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=3"></script>
-<script src="arena-renderer.js?v=3"></script>
+<script src="app.js?v=4"></script>
+<script src="arena-renderer.js?v=4"></script>
 </body>
 </html>

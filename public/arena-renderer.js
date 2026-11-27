@@ -1,8 +1,10 @@
 'use strict';
 
 const arenaContext = $('arena').getContext('2d', { alpha: false });
-const dungeon = document.createElement('canvas');
-let dungeonKey = '';
+const terrainChunks = new Map();
+let paintedMap;
+const chunkTiles = 8;
+const arenaCamera = { x: 0, y: 0 };
 const colors = {
   '紅隊': { light: '#fb8d74', mid: '#bb453d', dark: '#672939' },
   '藍隊': { light: '#87d4f8', mid: '#3d78ad', dark: '#284669' }
@@ -14,117 +16,99 @@ function rect(ctx, color, x, y, width, height) {
   ctx.fillRect(Math.round(x), Math.round(y), width, height);
 }
 
-function paintDungeon(map) {
-  dungeon.width = map.width;
-  dungeon.height = map.height;
-  const ctx = dungeon.getContext('2d');
-  const palettes = ['#302b38', '#393442', '#343240', '#3c3847', '#343744'];
-  ctx.fillStyle = '#242630';
-  ctx.fillRect(0, 0, map.width, map.height);
-  for (let y = 0; y < map.height; y += 24) {
-    for (let x = -24; x < map.width; x += 48) {
-      const left = x + (y % 48 ? 24 : 0);
-      const seed = Math.imul(x + 87, 1759) ^ Math.imul(y + 49, 1171);
-      rect(ctx, palettes[Math.abs(seed) % palettes.length], left, y, 46, 22);
-      rect(ctx, '#ffffff0b', left + 2, y + 1, 42, 2);
-      rect(ctx, '#00000016', left + 2, y + 19, 44, 3);
-      if (seed % 7 === 0) {
-        rect(ctx, '#20212a', left + 12, y + 11, 12, 2);
-        rect(ctx, '#20212a', left + 22, y + 7, 2, 5);
-      }
-    }
-  }
-  for (const [x, tint, border, light] of [
-    [32, '#5c30384d', '#a85c54', '#e7a078'],
-    [map.width - 144, '#31527a4d', '#577caf', '#90c5e9']
-  ]) {
-    const center = x + 56;
-    rect(ctx, tint, x, 44, 112, map.height - 88);
-    for (const edge of [x + 2, x + 109]) rect(ctx, border, edge, 44, 1, map.height - 88);
-    for (let y = 80; y < map.height - 35; y += 104) {
-      rect(ctx, border, center - 15, y - 15, 30, 2);
-      rect(ctx, border, center - 15, y + 13, 30, 2);
-      for (const edge of [center - 15, center + 13]) rect(ctx, border, edge, y - 11, 2, 22);
-      rect(ctx, light, center - 4, y - 4, 8, 8);
-      rect(ctx, tint, center - 2, y - 2, 4, 4);
-    }
-  }
-  // Floor inlays mark the central approaches without adding collision geometry.
-  const centerX = map.width / 2;
-  for (const centerY of [156, map.height - 156]) {
-    const stone = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, 73);
-    stone.addColorStop(0, '#d4a7672d');
-    stone.addColorStop(1, '#d4a76700');
-    rect(ctx, stone, centerX - 73, centerY - 73, 146, 146);
-    for (let step = 0; step < 16; step++) {
-      const offset = step * 3;
-      for (const direction of [-1, 1]) {
-        rect(ctx, '#aa866464', centerX - offset, centerY + direction * (48 - offset), 3, 3);
-        rect(ctx, '#aa866464', centerX + offset, centerY + direction * (48 - offset), 3, 3);
-      }
-    }
-    rect(ctx, '#cfa47455', centerX - 12, centerY - 1, 24, 2);
-    rect(ctx, '#cfa47455', centerX - 1, centerY - 12, 2, 24);
-  }
-  const bounds = [[0, 0, map.width, map.border], [0, map.height - map.border, map.width, map.border],
-    [0, map.border, map.border, map.height - map.border * 2],
-    [map.width - map.border, map.border, map.border, map.height - map.border * 2]];
-  for (const [x, y, w, h] of [...map.walls, ...bounds]) {
-    rect(ctx, '#15172088', x + 5, y + 6, w, h);
-    if (w === 32 && h === 40) {
-      rect(ctx, '#352317', x, y, w, h);
-      rect(ctx, '#846045', x + 3, y + 3, w - 6, h - 7);
-      rect(ctx, '#ad7b4e', x + 6, y + 5, 5, h - 13);
-      rect(ctx, '#4d3427', x + 18, y + 5, 3, h - 13);
-      rect(ctx, '#b98c5f', x + 2, y + 9, w - 4, 3);
-      rect(ctx, '#b98c5f', x + 2, y + h - 12, w - 4, 3);
-      continue;
-    }
-    rect(ctx, '#22232e', x, y, w, h);
-    for (let row = 2; row < h - 3; row += 13) {
-      const brickHeight = Math.min(11, h - 3 - row);
-      for (let col = 2; col < w - 3; col += 22) {
-        const brickWidth = Math.min(20, w - 3 - col);
-        rect(ctx, row < h - 16 ? '#5b5967' : '#414050', x + col, y + row, brickWidth, brickHeight);
-        rect(ctx, '#ffffff22', x + col, y + row, brickWidth, 2);
-      }
-    }
-    rect(ctx, '#88818c', x, y, w, 3);
-    rect(ctx, '#ffffff21', x + 2, y + 3, w - 4, 2);
-    if (w >= 48 && h >= 80) {
-      for (const end of [y + 10, y + h - 24]) {
-        rect(ctx, '#29242e', x + 5, end + 3, 14, 15);
-        rect(ctx, '#787181', x + 5, end, 14, 4);
-        rect(ctx, '#4b4353', x + 7, end + 4, 10, 10);
-      }
-    }
-    rect(ctx, '#33313e', x, y + h - 4, w, 4);
-  }
-  const shade = ctx.createRadialGradient(map.width / 2, map.height / 2, 130, map.width / 2, map.height / 2, 550);
-  shade.addColorStop(0, '#100b1500');
-  shade.addColorStop(0.68, '#100b1520');
-  shade.addColorStop(1, '#100b15b0');
-  rect(ctx, shade, 0, 0, map.width, map.height);
+const terrainColors = {
+  g: ['#587c45', '#60854a', '#64894b'],
+  f: ['#395c3d', '#416841', '#456c42'],
+  r: ['#60675e', '#666d64', '#73796c'],
+  w: ['#306c83', '#32738a', '#34788c'],
+  d: ['#826344', '#8d6a49', '#91714f'],
+  p: ['#a38c61', '#ae956b', '#ad986d'],
+  '#': ['#272e31', '#303837', '#353b3a']
+};
+
+function tileVariation(x, y) {
+  return (Math.imul(x + 11, 73856093) ^ Math.imul(y + 17, 19349663)) >>> 0;
 }
 
-function torches(ctx, map, time) {
-  for (const [left, top, width, height] of map.walls) {
-    if (width === 32) continue;
-    const x = left + width / 2;
-    const y = top + height - 10;
-    const flicker = Math.floor(time / 110 + x) % 3;
-    const glow = ctx.createRadialGradient(x, y - 6, 1, x, y - 6, 41 + flicker * 3);
-    glow.addColorStop(0, '#ff9f4b68');
-    glow.addColorStop(1, '#ff773000');
-    rect(ctx, glow, x - 48, y - 54, 96, 96);
-    rect(ctx, '#29232a', x - 4, y - 1, 8, 10);
-    rect(ctx, '#d57638', x - 4, y - 9 - flicker, 8, 10 + flicker);
-    rect(ctx, '#ffdc85', x - 2, y - 10 + flicker, 4, 9);
-    for (let spark = 0; spark < 3; spark++) {
-      const age = (Math.floor(time / 85) + spark * 7 + x) % 23;
-      rect(ctx, age < 13 ? '#ffb86a' : '#f48a4d80', x + spark * 4 - 6 + age / 3, y - 11 - age, 2, 2);
+function paintTile(ctx, map, col, row, x, y) {
+  const tile = map.tiles[row][col];
+  const size = map.tileSize;
+  const hash = tileVariation(col, row);
+  const colors = terrainColors[tile];
+  rect(ctx, colors[hash % 3], x, y, size, size);
+  const adjacent = [map.tiles[row - 1]?.[col], map.tiles[row + 1]?.[col],
+    map.tiles[row][col - 1], map.tiles[row][col + 1]];
+  adjacent.forEach((neighbor, side) => {
+    if (!neighbor || neighbor === tile) return;
+    const tint = neighbor === 'w' ? '#69a7a4' : terrainColors[neighbor][1];
+    for (let offset = 0; offset < size; offset += 4) {
+      const depth = 1 + (tileVariation(col * 17 + offset, row * 13 + side) % 4);
+      if (side < 2) rect(ctx, tint, x + offset, y + (side ? size - depth : 0), 4, depth);
+      else rect(ctx, tint, x + (side === 3 ? size - depth : 0), y + offset, depth, 4);
+    }
+  });
+  const dx = x + 5 + (hash % 14);
+  const dy = y + 6 + ((hash >>> 8) % 15);
+  if (tile === 'w') {
+    rect(ctx, '#76b8bc80', dx - 2, dy, 8, 1);
+    rect(ctx, '#9acacb55', dx + 4, dy + 4, 7, 1);
+  } else if (tile === 'r' || tile === '#') {
+    rect(ctx, '#343d39', x + 3, y + 8, 26, 21);
+    rect(ctx, '#838984', x + 5, y + 5, 21, 17);
+    rect(ctx, '#a3a799', x + 7, y + 6, 16, 3);
+    rect(ctx, '#58635d', x + 13, y + 15, 13, 9);
+  } else if (tile === 'f') {
+    rect(ctx, '#24483480', dx - 4, dy + 8, 13, 4);
+    rect(ctx, '#6b543c', dx + 1, dy + 4, 3, 6);
+    rect(ctx, '#264a36', dx - 4, dy + 1, 13, 6);
+    rect(ctx, '#608751', dx - 2, dy - 3, 9, 7);
+    rect(ctx, '#85a160', dx, dy - 4, 4, 2);
+  } else {
+    rect(ctx, tile === 'g' ? '#9baa65' : '#c1a574', dx, dy, 4, 1);
+    rect(ctx, tile === 'g' ? '#385d3c' : '#65503a', dx + 2, dy + 4, 2, 2);
+    if (tile === 'g' && hash % 11 === 0) rect(ctx, '#eee3a2', dx + 6, dy - 2, 2, 2);
+  }
+}
+
+function paintWorld(ctx, map, width, height) {
+  if (paintedMap !== map) {
+    terrainChunks.clear();
+    paintedMap = map;
+  }
+  const span = map.tileSize * chunkTiles;
+  const left = Math.floor(arenaCamera.x / span);
+  const top = Math.floor(arenaCamera.y / span);
+  const right = Math.min(Math.ceil(map.columns / chunkTiles), Math.ceil((arenaCamera.x + width) / span));
+  const bottom = Math.min(Math.ceil(map.rows / chunkTiles), Math.ceil((arenaCamera.y + height) / span));
+  for (let row = top; row < bottom; row++) {
+    for (let col = left; col < right; col++) {
+      const key = row * map.columns + col;
+      let chunk = terrainChunks.get(key);
+      if (chunk) terrainChunks.delete(key);
+      else {
+        chunk = document.createElement('canvas');
+        chunk.width = chunk.height = span;
+        const surface = chunk.getContext('2d');
+        for (let y = 0; y < chunkTiles && row * chunkTiles + y < map.rows; y++) {
+          for (let x = 0; x < chunkTiles && col * chunkTiles + x < map.columns; x++) {
+            paintTile(surface, map, col * chunkTiles + x, row * chunkTiles + y, x * map.tileSize, y * map.tileSize);
+          }
+        }
+      }
+      terrainChunks.set(key, chunk);
+      ctx.drawImage(chunk, col * span, row * span);
     }
   }
+  const limit = Math.max(24, (right - left) * (bottom - top) + 8);
+  while (terrainChunks.size > limit) terrainChunks.delete(terrainChunks.keys().next().value);
+}
+
+function displayPosition(player, old, blend) {
+  const interpolate = old && old.alive === player.alive && old.spawnedAt === player.spawnedAt;
+  return {
+    x: Math.round(interpolate ? old.x + (player.x - old.x) * blend : player.x),
+    y: Math.round(interpolate ? old.y + (player.y - old.y) * blend : player.y)
+  };
 }
 
 function armor(ctx, job, color, headX, stride, back) {
@@ -200,9 +184,7 @@ function weapon(ctx, player, color, time) {
 }
 
 function sprite(ctx, p, old, blend, time, localId) {
-  const interpolate = old && old.alive === p.alive && old.spawnedAt === p.spawnedAt;
-  const x = Math.round(interpolate ? old.x + (p.x - old.x) * blend : p.x);
-  const y = Math.round(interpolate ? old.y + (p.y - old.y) * blend : p.y);
+  const { x, y } = displayPosition(p, old, blend);
   const color = colors[p.team];
   if (!p.alive) {
     const age = time - (p.respawnAt - 3000);
@@ -247,17 +229,28 @@ function sprite(ctx, p, old, blend, time, localId) {
   rect(ctx, color.light, x - 19, y - 48, Math.ceil(38 * p.hp / p.maxHp), 3);
 }
 
-function drawArena(state, old, blend, time, aim, localId) {
+function drawArena(state, old, blend, time, aim, localId, map) {
   const ctx = arenaContext;
-  const key = JSON.stringify(state.map);
-  if (dungeonKey !== key) {
-    dungeonKey = key;
-    paintDungeon(state.map);
-  }
-  ctx.drawImage(dungeon, 0, 0);
-  torches(ctx, state.map, time);
+  const canvas = $('arena');
+  const width = Math.min(map.width, canvas.clientWidth || canvas.width);
+  const height = Math.min(map.height, canvas.clientHeight || canvas.height);
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
   const older = new Map(old?.players.map(p => [p.id, p]));
-  for (const p of [...state.players].sort((a, b) => a.y - b.y)) sprite(ctx, p, older.get(p.id), blend, time, localId);
+  const player = state.players.find(p => p.id === localId);
+  if (player) {
+    const position = displayPosition(player, older.get(localId), blend);
+    arenaCamera.x = Math.round(Math.max(0, Math.min(map.width - width, position.x - width / 2)));
+    arenaCamera.y = Math.round(Math.max(0, Math.min(map.height - height, position.y - height / 2)));
+  }
+  ctx.save();
+  ctx.translate(-arenaCamera.x, -arenaCamera.y);
+  paintWorld(ctx, map, width, height);
+  for (const p of [...state.players].sort((a, b) => a.y - b.y)) {
+    if (p.x < arenaCamera.x - 96 || p.y < arenaCamera.y - 96 ||
+        p.x > arenaCamera.x + width + 96 || p.y > arenaCamera.y + height + 96) continue;
+    sprite(ctx, p, older.get(p.id), blend, time, localId);
+  }
   for (const effect of state.effects) {
     ctx.save();
     ctx.globalAlpha = Math.min(1, Math.max(0, (effect.until - time) / 240));
@@ -289,8 +282,10 @@ function drawArena(state, old, blend, time, aim, localId) {
     }
     ctx.restore();
   }
-  rect(ctx, '#fff0c2', aim.x - 6, aim.y, 4, 1);
-  rect(ctx, '#fff0c2', aim.x + 3, aim.y, 4, 1);
-  rect(ctx, '#fff0c2', aim.x, aim.y - 6, 1, 4);
-  rect(ctx, '#fff0c2', aim.x, aim.y + 3, 1, 4);
+  ctx.restore();
+  const cursor = aim || { x: width / 2 + 45, y: height / 2 };
+  rect(ctx, '#fff0c2', cursor.x - 6, cursor.y, 4, 1);
+  rect(ctx, '#fff0c2', cursor.x + 3, cursor.y, 4, 1);
+  rect(ctx, '#fff0c2', cursor.x, cursor.y - 6, 1, 4);
+  rect(ctx, '#fff0c2', cursor.x, cursor.y + 3, 1, 4);
 }

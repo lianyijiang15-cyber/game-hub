@@ -25,6 +25,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     return {
       tagName, hidden: false, children: [], value: '', textContent: '',
       width: 960, height: 576, dataset: {},
+      classList: { toggle() {}, remove() {} },
       setAttribute(name, value) { this[name] = value; },
       append(...items) { this.children.push(...items); },
       replaceChildren(...items) { this.children = items; },
@@ -70,6 +71,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
       activeElement: null
     },
     window: { addEventListener(event, handler) { keyHandlers.set(event, handler); } },
+    sessionStorage: { getItem() {}, setItem() {}, removeItem() {} },
     performance: { now: () => 100 },
     requestAnimationFrame: callback => frames.push(callback),
     setInterval() {}
@@ -112,13 +114,13 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.deepEqual(emitted.at(-1), ['start']);
   assert.equal(elements.get('battle').hidden, false);
   const player = {
-    id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 80, y: 80, hp: 80, maxHp: 80,
+    id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 1600, y: 1400, hp: 80, maxHp: 80,
     alive: true, facing: 0, attackAt: 0, skillAt: 0, spawnedAt: 0
   };
   socketHandlers.get('room')({ id: 'ABCDE0', host: 'self', players: [player], phase: 'playing' });
+  socketHandlers.get('arenaMap')({ id: 'ABCDE0', map: require('../arena/world').generateWorld() });
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', now: 100, phase: 'playing', remaining: 299900, players: [player],
-    map: { width: 960, height: 576, walls: [[280, 80, 48, 144]], border: 16 },
     effects: [], kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }
   });
   frames.shift()(115);
@@ -133,8 +135,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[1].x, 0);
   arena.onpointerdown({ button: 0, clientX: 90, clientY: 45 });
   assert.equal(emitted.at(-1)[0], 'arenaAttack');
-  assert.equal(emitted.at(-1)[1].x, 180);
-  assert.equal(emitted.at(-1)[1].y, 90);
+  assert.equal(emitted.at(-1)[1].x, 1300);
+  assert.equal(emitted.at(-1)[1].y, 1202);
   assert.equal(emitted.at(-1)[1].skill, false);
   keyHandlers.get('keydown')(keyboard('KeyQ'));
   assert.equal(emitted.at(-1)[1].skill, true);
