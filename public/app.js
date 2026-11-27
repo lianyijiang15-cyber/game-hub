@@ -14,13 +14,54 @@ let soupPage = 0;
 let soupPanels = [];
 const soupLevelButtons = ['soup-easy', 'soup-medium', 'soup-hard'];
 
+const narrationButton = $('comic-narration');
+const narrationVoice = window.speechSynthesis;
+const Utterance = window.SpeechSynthesisUtterance;
+let activeNarration = null;
+narrationButton.hidden = !narrationVoice || !Utterance;
+
+function stopNarration() {
+  if (!activeNarration) return;
+  activeNarration = null;
+  narrationVoice.cancel();
+  narrationButton.textContent = '播放旁白';
+}
+
+narrationButton.onclick = () => {
+  if (activeNarration) return stopNarration();
+  if (!narrationVoice || !Utterance || soupStage !== 'comic' || !soupPanels[soupPage]) return;
+  const clip = new Utterance(soupPanels[soupPage]);
+  clip.lang = 'zh-TW';
+  clip.rate = .88;
+  const voices = narrationVoice.getVoices();
+  const voice = voices.find(option => /^zh[-_](tw|hant)/i.test(option.lang)) ??
+    voices.find(option => /^zh(?:[-_]|$)/i.test(option.lang));
+  if (voice) clip.voice = voice;
+  activeNarration = clip;
+  $('soup-record').textContent = '';
+  narrationButton.textContent = '停止旁白';
+  clip.onend = () => {
+    if (activeNarration !== clip) return;
+    activeNarration = null;
+    narrationButton.textContent = '播放旁白';
+  };
+  clip.onerror = () => {
+    if (activeNarration !== clip) return;
+    clip.onend();
+    $('soup-record').textContent = '無法播放中文旁白，可以繼續閱讀漫畫字幕。';
+  };
+  narrationVoice.speak(clip);
+};
+
 function showSoupStage(stage) {
+  if (stage !== 'comic') stopNarration();
   soupStage = stage;
   for (const name of ['levels', 'comic', 'investigation']) $('soup-' + name).hidden = stage !== name;
   $('soup-level-back').hidden = stage === 'levels';
 }
 
 function showComicPage(index) {
+  stopNarration();
   soupPage = Math.max(0, Math.min(index, soupPanels.length - 1));
   $('comic-picture').dataset.page = String(soupPage);
   $('comic-caption').textContent = soupPanels[soupPage];
@@ -122,12 +163,25 @@ $('soup-question-form').onsubmit = event => {
 
 async function submitSoupAction(action, question) {
   if (soupStage !== 'investigation' || !soup || soupPending) return;
-  if (!onlineSoup) {
-    playSoup(soup, action, question);
-    renderSoup(soupView(soup));
-    return;
-  }
   const sequence = soupSequence;
+  if (!onlineSoup) {
+    const game = soup;
+    let verdict;
+    if (action === 'ask' && typeof accountRequest === 'function') {
+      soupPending = true;
+      try {
+        ({ verdict } = await accountRequest('soup/judge-guest', { storyId: soupStoryId, question }));
+      } catch {
+        // Guests still have the local judge if the server is unreachable.
+      } finally {
+        soupPending = false;
+      }
+    }
+    if (sequence !== soupSequence) return false;
+    playSoup(game, action, question, verdict);
+    renderSoup(soupView(game));
+    return true;
+  }
   soupPending = true;
   $('soup-record').textContent = '';
   try {
@@ -186,6 +240,16 @@ let joining = false;
 let roomRequest = 0;
 const keys = new Set();
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
+let spectatorTarget = null;
+let pendingAttack = null;
+let attackDeadline = { server: 0, local: 0 };
+
+function syncAttackDeadline(deadline, serverNow) {
+  if (!Number.isFinite(deadline) || deadline < attackDeadline.server || !Number.isFinite(serverNow)) return;
+  const end = performance.now() + Math.max(0, deadline - serverNow);
+  attackDeadline = { server: deadline, local: deadline === attackDeadline.server ? Math.min(attackDeadline.local, end) : end };
+}
+
 const panKeys = new Set(['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight']);
 function localPlayer(state = frame) { return state?.players?.find(player => player.id === socket.id); }
 function directionOfKeys(spectating = false) {
@@ -207,6 +271,7 @@ let fullMap = false;
 const matchKey = 'game-hub-seat';
 
 function show(id) {
+  if (id !== 'soup') stopNarration();
   for (const panel of ['title-screen', 'home', 'modes', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
   if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading', 'in-results');
   if (id === 'home') $('menu-arena').focus();
@@ -611,7 +676,21 @@ function aimInWorld() {
 
 function attack(skill) {
   if (phase !== 'playing' || !socket.connected || !localPlayer()?.alive || !worldMap) return;
-  socket.volatile.emit('arenaAttack', { ...aimInWorld(), skill });
+  const input = { ...aimInWorld(), skill };
+  if (skill) {
+    socket.volatile.emit('arenaAttack', input);
+    return;
+  }
+  if (pendingAttack || performance.now() < attackDeadline.local) return;
+  const request = { room, player: localPlayer().spawnedAt };
+  pendingAttack = request;
+  socket.timeout(850).emit('arenaAttack', input, (error, answer) => {
+    if (pendingAttack !== request) return;
+    pendingAttack = null;
+    if (!error && room === request.room && localPlayer()?.spawnedAt === request.player) {
+      syncAttackDeadline(answer?.attackAt, answer?.now);
+    }
+  });
 }
 
 const skillButtons = Array.from({ length: 3 }, (_, index) => $('hero-skill-' + index));
@@ -727,6 +806,7 @@ window.addEventListener('keydown', event => {
     event.preventDefault();
     if (event.repeat) return;
     keys.add(event.code);
+    if (spectatorTarget !== null) selectSpectator(null);
     sendMovement();
   }
   if (event.repeat) return;
@@ -891,6 +971,13 @@ socket.on('arenaMap', data => {
   }
 });
 
+function selectSpectator(id) {
+  spectatorTarget = id;
+  for (const [playerId, { watch }] of teammateRows) {
+    watch.setAttribute('aria-pressed', String(playerId === id));
+  }
+}
+
 const teammateRows = new Map();
 function drawTeamVitals(teammates) {
   const roster = $('team-vitals');
@@ -902,6 +989,16 @@ function drawTeamVitals(teammates) {
     for (const player of teammates) {
       const row = element('div', '');
       row.className = 'team-vital';
+      const watch = element('button', '');
+      watch.type = 'button';
+      watch.className = 'teammate-watch';
+      watch.setAttribute('aria-label', '觀戰 ' + player.name);
+      watch.onclick = () => {
+        if (localPlayer()?.alive === false) {
+          keys.clear();
+          selectSpectator(player.id);
+        }
+      };
       const portrait = element('img', '');
       portrait.src = heroArt(player.hero ?? player.job, 'avatar');
       portrait.alt = '';
@@ -912,13 +1009,16 @@ function drawTeamVitals(teammates) {
       hp.setAttribute('aria-label', player.name + '的生命值');
       const numbers = element('small', '');
       labels.append(name, hp, numbers);
-      row.append(portrait, labels);
+      watch.append(portrait);
+      row.append(watch, labels);
       roster.append(row);
-      teammateRows.set(player.id, { row, hp, numbers });
+      teammateRows.set(player.id, { row, watch, hp, numbers });
     }
   }
   for (const player of teammates) {
-    const { row, hp, numbers } = teammateRows.get(player.id);
+    const { row, watch, hp, numbers } = teammateRows.get(player.id);
+    watch.disabled = localPlayer()?.alive !== false;
+    watch.setAttribute('aria-pressed', String(spectatorTarget === player.id));
     row.dataset.alive = String(player.alive);
     hp.max = player.maxHp;
     hp.value = player.alive ? player.hp : 0;
@@ -928,10 +1028,17 @@ function drawTeamVitals(teammates) {
 
 socket.on('arenaState', state => {
   if (state.id !== room || phase === 'lobby') return;
-  const wasAlive = localPlayer()?.alive;
+  const lastPlayer = localPlayer();
   previous = frame;
   frame = state;
-  if (wasAlive !== localPlayer()?.alive) keys.clear();
+  const me = localPlayer();
+  if (lastPlayer?.alive !== me?.alive || lastPlayer?.spawnedAt !== me?.spawnedAt) {
+    keys.clear();
+    pendingAttack = null;
+    attackDeadline = { server: 0, local: 0 };
+    selectSpectator(null);
+  }
+  if (me?.alive) syncAttackDeadline(me.attackAt, state.now);
   receivedAt = performance.now();
   if (state.phase === 'ended') {
     renderResults(state);
@@ -975,7 +1082,8 @@ function renderFrame(time) {
     $('health-bar').max = me.maxHp;
     $('health-bar').value = me.hp;
     $('health').textContent = `${heroName(me)}${me.form === 1 ? ' · 第二形態' : ''} · HP ${me.hp}/${me.maxHp}`;
-    $('attack-status').textContent = `${frame.attackRange || '—'} px · ${cooldown(me.attackAt)}`;
+    const attackLeft = attackDeadline.local - time;
+    $('attack-status').textContent = `${frame.attackRange || '—'} px · ${attackLeft > 0 ? (attackLeft / 1000).toFixed(1) + ' 秒' : '就緒'}`;
     drawHeroHud(frame, me, serverTime, cooldown);
     $('respawn').hidden = me.alive;
     if (!me.alive) $('respawn').textContent = ['flag', 'survival'].includes(frame.mode)
@@ -984,7 +1092,7 @@ function renderFrame(time) {
   }
   const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
   drawLootHud(frame, serverTime);
-  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time, directionOfKeys(true));
+  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time, directionOfKeys(true), spectatorTarget);
   drawModeHud(frame, serverTime);
   drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id);
   if (fullMap) drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id, $('tactical-map'));

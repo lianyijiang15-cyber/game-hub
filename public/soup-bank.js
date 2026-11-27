@@ -177,28 +177,6 @@ const extraStories=[
     ]
   },
   {
-    "title": "消失的鑰匙",
-    "difficulty": "中等",
-    "category": "清湯",
-    "intro": "小華把鑰匙放進上鎖的抽屜，隔天沒開抽屜卻拿到了鑰匙。為什麼？",
-    "answer": "抽屜是透明展示櫃的一部分，鑰匙從背面開放的夾層取出。",
-    "hints": [
-      "抽屜不一定六面封閉。",
-      "有另一個開口。",
-      "從背面取出。"
-    ],
-    "keys": [
-      "背面",
-      "開口",
-      "夾層"
-    ],
-    "clues": [
-      "抽屜不一定六面封閉。",
-      "有另一個開口。",
-      "從背面取出。"
-    ]
-  },
-  {
     "title": "安靜的演唱會",
     "difficulty": "簡單",
     "category": "清湯",
@@ -263,6 +241,94 @@ const extraStories=[
       "表演透過網路播出。",
       "線上觀眾送出掌聲音效。"
     ]
+  },
+  {
+    "title": "旅館的空房來電",
+    "difficulty": "中等",
+    "category": "懸疑",
+    "intro": "空房上鎖又沒住客，午夜卻用房內分機打到櫃檯。值班員接到後只聽見三下敲擊，立刻派人到房外的走廊。為什麼？",
+    "answer": "來電其實來自走廊的緊急對講機。總機改裝時讓它共用空房的分機號碼，所以螢幕顯示的是房號。有人不能說話，只能敲對講機求助。",
+    "hints": [
+      "來電螢幕只顯示號碼，沒有顯示電話真正的位置。",
+      "走廊有一台能呼叫櫃檯的裝置。",
+      "對講機和空房共用分機。"
+    ],
+    "keys": [
+      "分機",
+      "對講機",
+      "共用"
+    ],
+    "clues": [
+      "來電螢幕只顯示號碼，沒有顯示電話真正的位置。",
+      "走廊有一台能呼叫櫃檯的裝置。",
+      "對講機和空房共用分機。"
+    ]
+  },
+  {
+    "title": "戲院門後的影子",
+    "difficulty": "中等",
+    "category": "懸疑",
+    "intro": "停業的戲院沒有開燈，霧玻璃後卻站著一道人影。每有車經過，影子就朝門口跨一步。她站了一會兒，確定裡面沒有人。為什麼？",
+    "answer": "戲院大廳留下了一個紙板人像。車頭燈透過側窗從不同角度掃過，人像投在霧玻璃上的影子就滑動，看著像朝門口跨了一步。",
+    "hints": [
+      "影子出現時，外面有光源。",
+      "影子移動時，形成影子的東西沒有移動。",
+      "車頭燈照到一個紙板人像。"
+    ],
+    "keys": [
+      "車頭燈",
+      "紙板",
+      "投影"
+    ],
+    "clues": [
+      "影子出現時，外面有光源。",
+      "影子移動時，形成影子的東西沒有移動。",
+      "車頭燈照到一個紙板人像。"
+    ]
+  },
+  {
+    "title": "停電後亮起的窗",
+    "difficulty": "困難",
+    "category": "懸疑",
+    "intro": "整棟樓停電了，沿街只有一扇窗每隔一段時間亮起。保全確定樓上沒人，卻走到騎樓等下一班公車。為什麼？",
+    "answer": "窗面正好會反射停靠公車的發光路線牌。每當公車停在窗外對街，反光便讓窗子看起來像從室內亮起。保全去等車，是為了比對發車間隔和亮起時間。",
+    "hints": [
+      "光不一定從窗內照出來。",
+      "窗亮的時間與路上某個東西停靠的時間吻合。",
+      "窗戶映出公車的發光路線牌。"
+    ],
+    "keys": [
+      "反射",
+      "路線牌",
+      "反光"
+    ],
+    "clues": [
+      "光不一定從窗內照出來。",
+      "窗亮的時間與路上某個東西停靠的時間吻合。",
+      "窗戶映出公車的發光路線牌。"
+    ]
+  },
+  {
+    "title": "洗衣機裡的敲門聲",
+    "difficulty": "簡單",
+    "category": "懸疑",
+    "intro": "深夜，男人聽見一台沒插電的洗衣機傳出三下敲門聲。他沒有打開它，而是停掉旁邊的烘衣機。敲聲立刻停止。為什麼？",
+    "answer": "旁邊的烘衣機裡有衣服的金屬拉鍊，翻滾時反覆撞到門。兩台機器靠在一起，震動透過外殼傳過去，聽起來像是從沒有插電的洗衣機裡發出的。",
+    "hints": [
+      "敲聲不一定起於聽起來最像的地方。",
+      "兩台機器的外殼互相碰著。",
+      "衣服的金屬拉鍊敲到烘衣機門。"
+    ],
+    "keys": [
+      "震動",
+      "拉鍊",
+      "外殼"
+    ],
+    "clues": [
+      "敲聲不一定起於聽起來最像的地方。",
+      "兩台機器的外殼互相碰著。",
+      "衣服的金屬拉鍊敲到烘衣機門。"
+    ]
   }
 ];
 
@@ -285,11 +351,82 @@ const soupComics = [
   ['letter', '阿倫每天寫一封信給遠方的朋友。', '信一封也沒寄出去，朋友卻知道裡面寫了什麼。'],
   ['elevator', '公寓電梯停用了一整天。', '住在十二樓的阿姨，這天沒有爬過任何一階樓梯。'],
   ['snow', '雪地裡，一排腳印一路通往小屋。', '找不到離開的腳印，屋主卻確信訪客已經走了。'],
-  ['key', '小華把鑰匙放進抽屜，然後上了鎖。', '隔天，他沒打開抽屜，手上卻已經拿著那把鑰匙。'],
   ['concert', '小琳去看了一場演唱會。', '她說歌手唱得很好，卻從頭到尾沒聽見任何聲音。'],
   ['birthday', '一對雙胞胎在同一天出生。', '但每一年，哥哥都會比弟弟早一天過生日。'],
-  ['stage', '一名演員獨自走上舞台，觀眾席空無一人。', '演出結束後，劇場裡卻傳來熱烈的掌聲。']
+  ['stage', '一名演員獨自走上舞台，觀眾席空無一人。', '演出結束後，劇場裡卻傳來熱烈的掌聲。'],
+  ['hotel-call', '午夜，旅館櫃檯接到一通來自上鎖空房的電話。', '電話裡只傳來三下敲擊。值班員立即派人到房外的走廊。'],
+  ['theater-shadow', '深夜，停業戲院的霧玻璃後站著一道人影。', '每有車經過，影子就往門口跨一步。她為什麼確定裡頭沒有人？'],
+  ['blackout-window', '整棟樓都停電了，只有一扇窗每隔一段時間就亮起來。', '保全知道樓上沒人，卻走去騎樓等下一班公車。'],
+  ['laundry-knock', '深夜，一台沒插電的洗衣機傳出三下敲門聲。', '男人停掉旁邊的烘衣機，敲聲立刻停止。']
 ];
+
+// Each inner group covers alternate wording for one deduction. Intro-only topics
+// never count towards solving the case.
+const soupConcepts = {
+  diner: [['船難', '海難', '沉船', '海上遇難', '漂流'], ['以前喝過', '曾經喝過', '冒充', '假海龜', '以前的湯'], ['味道', '滋味', '口味', '味覺', '不是海龜肉']],
+  light: [['海邊', '靠海', '沿海', '港口'], ['燈塔', '導航燈', '指引船隻'], ['迷航', '船難', '觸礁', '擱淺', '航行']],
+  clock: [['鏡子', '鏡面', '玻璃反光', '反光處'], ['反射', '倒影', '映照', '映出'], ['左右顛倒', '鏡像', '左右相反']],
+  rain: [['室內', '通道', '走廊', '騎樓'], ['屋頂', '天花板', '雨棚', '有頂'], ['遮雨', '擋雨', '沒淋', '沒有淋', '雨沒打到']],
+  class: [['不是學生', '非學生', '學生都', '同學都'], ['攝影', '拍照的人', '拍攝者', '掌鏡'], ['鏡頭外', '照片外', '沒入鏡', '沒有入鏡']],
+  alarm: [['手機', '電話', '行動裝置'], ['通知', '訊息', '推播'], ['不在店', '在店外', '報警', '遠端']],
+  bus: [['單車', '腳踏車', '自行車', '共享單車', '騎車'], ['捷徑', '近路', '抄小路'], ['繞路', '繞行', '站牌', '停靠']],
+  letter: [['紙本', '不是紙', '電子'], ['網路', '線上', '雲端', '同時讀'], ['文件', '文檔', '留言', '共用']],
+  elevator: [['在家', '待在家', '待在公寓', '沒出門', '沒有出門'], ['沒離開', '沒有離開', '沒外出'], ['沒上下樓', '沒有上下樓', '不用下樓']],
+  snow: [['同一排', '同一條', '同一路', '沿原路'], ['腳印重疊', '踩回', '踩原', '蓋住原'], ['倒著走', '倒退', '往後走', '往後退']],
+  concert: [['靜音', '沒有聲音', '沒開聲音'], ['影片', '錄影', '錄播', '不是現場'], ['字幕', '螢幕', '視覺', '用眼睛']],
+  birthday: [['時區', '時差', '國際換日線', '換日線'], ['不同國家', '不同地方', '不同地區', '跨國'], ['日期不同', '不同日期', '當地日期', '當地時間']],
+  stage: [['直播', '實況', '網路轉播'], ['音效', '喇叭', '音響', '擴音器'], ['遠端觀眾', '線上觀眾', '在家看']],
+  'hotel-call': [['分機', '總機', '房號'], ['對講機', '緊急電話', '求助按鈕'], ['共用', '共線', '同一號碼', '同個號碼', '同一個號碼']],
+  'theater-shadow': [['車頭燈', '車燈', '大燈', '燈光'], ['紙板', '立牌', '人形看板'], ['投影', '光源移動', '角度', '影子滑動']],
+  'blackout-window': [['反射', '倒映', '反光', '映過去'], ['路線牌', '公車看板', '電子看板', '公車的燈'], ['公車靠站', '班次', '停靠', '發車間隔']],
+  'laundry-knock': [['震動', '振動', '共振', '傳過去'], ['金屬拉鍊', '拉鏈', '拉鍊'], ['外殼', '機身', '兩台碰', '靠在一起']]
+};
+
+const soupTopics = {
+  diner: ['餐廳', '湯', '喝'], light: ['晚上', '關燈', '死', '意外'], clock: ['時鐘', '鐘', '指針', '時間'],
+  rain: ['雨', '鞋', '走路'], class: ['老師', '學生', '合照', '畢業'], alarm: ['商店', '警報', '店主', '闖入', '響'],
+  bus: ['公車', '巴士', '乘車', '車站', '時間'], letter: ['信', '朋友', '寄', '內容'],
+  elevator: ['樓梯', '電梯', '樓層', '阿姨'], snow: ['雪', '腳印', '訪客', '屋主'],
+  concert: ['歌手', '聽', '音樂', '唱歌'], birthday: ['雙胞胎', '兄弟', '生日', '日期', '出生'],
+  stage: ['觀眾', '舞台', '掌聲', '表演'], 'hotel-call': ['空房', '電話', '旅館', '走廊', '敲'],
+  'theater-shadow': ['戲院', '玻璃', '影子', '行人'], 'blackout-window': ['保全', '停電', '窗戶', '公車'],
+  'laundry-knock': ['洗衣機', '敲', '烘衣機', '聲響', '電']
+};
+
+const soupReplies = {
+  yes: '是。',
+  no: '不是。',
+  related: '有關。可以把問題縮小到一個人物、物品或原因。',
+  unclear: '目前還不能確定。試著指明你想確認的人、物品或事件。',
+  unrelated: '與這起事件的成因無關。'
+};
+
+function normalizeSoupQuestion(question) {
+  return question.normalize('NFKC').toLowerCase().replace(/[\s，。？！、：；,.?!]/gu, '')
+    .replace(/(?:是不是|有沒有|是否|有無|可不可以|會不會|能不能|對不對)/gu, '')
+    .replace(/(?:嗎|呢|對嗎)$/u, '');
+}
+
+function judgeSoupQuestion(storyId, question) {
+  const text = normalizeSoupQuestion(question);
+  const concepts = soupConcepts[storyId] ?? [];
+  const group = concepts.findIndex(aliases => aliases.some(alias => text.includes(alias)));
+  if (/(?:還是|或者|抑或)/u.test(text)) return { verdict: 'related', group: -1 };
+  if (/殺人|兇手|凶手|鬼魂|做夢|幻覺|時間旅行/u.test(text)) return { verdict: 'unclear', group: -1 };
+  if (group >= 0) {
+    // A matched word can merely be a topic, e.g. 「跟鏡子有關嗎」.
+    if (/有關|相關|關係|重要/u.test(text) && !/無關|沒有關係|沒關係|不相關/u.test(text)) return { verdict: 'related', group };
+    const negated = concepts[group].some(word => {
+      const position = text.indexOf(word);
+      if (position < 0 || /^(?:不|沒|無)/u.test(word)) return false;
+      return /(?:沒有|並非|不是|並不是|不曾|從沒|沒)(?:使用|用|透過|靠|經過|看過|見過|從)?$/u.test(text.slice(0, position)) ||
+        /^(?:無關|不相關|沒有關係|沒關係)/u.test(text.slice(position + word.length));
+    });
+    return { verdict: negated ? 'no' : 'yes', group };
+  }
+  if ((soupTopics[storyId] ?? []).some(topic => text.includes(topic))) return { verdict: 'related', group: -1 };
+  return { verdict: 'unclear', group: -1 };
+}
 
 function startSoupGame(random = Math.random, difficulty, previousId) {
   const indexed = stories.map((story, index) => ({ story, comic: soupComics[index] }));
@@ -297,18 +434,19 @@ function startSoupGame(random = Math.random, difficulty, previousId) {
   const fresh = matches.filter(({ comic }) => comic[0] !== previousId);
   const pool = fresh.length ? fresh : matches;
   const { story, comic } = pool[Math.floor(random() * pool.length)];
-  return { story, comic, hints: 0, progress: 0, reply: '', result: null, revealed: false };
+  return { story, comic, discoveries: new Set(), hints: 0, progress: 0, reply: '', result: null, revealed: false };
 }
 
-function playSoup(game, action, question) {
+function playSoup(game, action, question, verdict) {
   const { story } = game;
   if (action === 'ask') {
-    if (story.keys.some(key => question.includes(key))) {
-      game.reply = '是。 ' + (story.clues[game.progress] || '線索已全部揭曉。');
-      game.progress = Math.min(game.progress + 1, story.clues.length);
+    const judged = judgeSoupQuestion(game.comic[0], question);
+    const answer = Object.hasOwn(soupReplies, verdict) ? verdict : judged.verdict;
+    game.reply = soupReplies[answer];
+    if (answer === 'yes' && judged.group >= 0 && !game.discoveries.has(judged.group)) {
+      game.discoveries.add(judged.group);
+      if (game.progress < story.clues.length) game.reply += ' ' + story.clues[game.progress++];
       if (game.progress === story.clues.length) game.result ??= 'solved';
-    } else {
-      game.reply = /沒有|不是|不會|無法/.test(question) ? '不是。' : '無關（原型判斷；請嘗試詢問故事關鍵字）。';
     }
   }
   if (action === 'hint' && game.hints < 3) game.reply = '提示：' + story.hints[game.hints++];
@@ -326,4 +464,10 @@ function soupView(game) {
   };
 }
 
-if (typeof module !== 'undefined') module.exports = { startSoupGame, playSoup, soupView, soupDifficulties };
+function soupCase(id) {
+  const index = soupComics.findIndex(comic => comic[0] === id);
+  return stories[index];
+}
+if (typeof module !== 'undefined') module.exports = {
+  startSoupGame, playSoup, soupView, soupDifficulties, judgeSoupQuestion, soupCase
+};

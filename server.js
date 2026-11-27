@@ -386,13 +386,18 @@ io.on('connection', socket => {
     if (!room || !combat.castRune(room, player, now())) return { error: '沒有可使用的震波符文' };
   }, 250);
 
-  socket.on('arenaAttack', data => {
-    if (!accept('attack', 75)) return;
+  socket.on('arenaAttack', (data, response) => {
     const { room, player } = member(socket);
-    if (room?.phase !== 'playing' || typeof data?.skill !== 'boolean' ||
+    const time = now();
+    if (room?.phase !== 'playing' || !player.alive || typeof data?.skill !== 'boolean' ||
         !Number.isFinite(data.x) || !Number.isFinite(data.y) ||
-        data.x < 0 || data.y < 0 || data.x > combat.map.width || data.y > combat.map.height) return;
-    combat.attack(room, player, data.x, data.y, data.skill, now());
+        data.x < 0 || data.y < 0 || data.x > room.map.width || data.y > room.map.height) return;
+    const key = data.skill ? 'skillAt' : 'attackAt';
+    // Early repeat clicks do not take a rate-limit slot or move the accepted deadline.
+    if (time >= player[key] && accept('attack', 75)) {
+      combat.attack(room, player, data.x, data.y, data.skill, time);
+    }
+    if (typeof response === 'function') response({ now: time, attackAt: player.attackAt });
   });
   command('chat', (message, { room, player }) => {
     if (!room || typeof message !== 'string' || !message.trim()) return { error: '請輸入訊息' };

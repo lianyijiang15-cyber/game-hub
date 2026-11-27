@@ -65,7 +65,8 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.match(html, /id="menu-soup-name">海龜湯/);
   assert.match(html, /id="room-guide"[^>]*aria-haspopup="dialog"/);
   for (const path of ['/arena-guide.js', '/casebook.css', '/art/comics/clock.webp',
-    '/art/comics/class.webp', '/art/comics/snow.webp']) {
+    '/art/comics/class.webp', '/art/comics/snow.webp', '/art/comics/hotel-call.webp',
+    '/art/comics/theater-shadow.webp', '/art/comics/blackout-window.webp', '/art/comics/laundry-knock.webp']) {
     assert.equal((await fetch(base + path, { method: 'HEAD' })).status, 200, path);
   }
   assert.match(html, /id="menu-arena-name">像素衝突/);
@@ -167,6 +168,13 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const stopped = await receive(host, 'arenaState');
   const next = await receive(host, 'arenaState');
   assert.equal(stopped.players.find(p => p.id === host.id).x, next.players.find(p => p.id === host.id).x);
+  const swing = { x: mine.x + 34, y: mine.y, skill: false };
+  const accepted = await send(host, 'arenaAttack', swing);
+  assert.ok(accepted.attackAt > accepted.now);
+  for (let i = 0; i < 4; i++) {
+    const repeat = await send(host, 'arenaAttack', swing);
+    assert.equal(repeat.attackAt, accepted.attackAt);
+  }
 
   const boosted = receive(host, 'arenaState', state => state.heroEffects.some(effect => effect.key === 'surge'));
   assert.equal((await send(host, 'heroSkill', { slot: 1 })).ok, true);

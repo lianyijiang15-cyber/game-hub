@@ -83,3 +83,8 @@
   .soup-level-art { aspect-ratio: 23 / 6; background-size: 200% auto; }
   .soup-navigation { gap: 4px; }
 }
+#comic-narration { margin-inline: auto; }
+@media (max-width: 440px) {
+  .soup-page-actions { flex-wrap: wrap; }
+  #comic-narration { margin-inline: 0; }
+}

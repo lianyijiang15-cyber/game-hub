@@ -34,13 +34,14 @@ function createArenaCamera() {
       lastTime = time;
       watching = false;
     },
-    pan(position, map, width, height, time, direction) {
+    pan(position, map, width, height, time, direction, anchor) {
       const maxX = Math.max(0, map.width - width);
       const maxY = Math.max(0, map.height - height);
       const fresh = world !== map || !watching;
-      if (fresh) {
-        x = position.x - width / 2;
-        y = position.y - height / 2;
+      if (anchor || fresh) {
+        const center = anchor ?? position;
+        x = center.x - width / 2;
+        y = center.y - height / 2;
       }
       const dt = fresh ? 0 : Math.min(60, Math.max(0, time - lastTime)) / 1000;
       const distance = 530 * dt / Math.max(1, Math.hypot(direction.x, direction.y));
@@ -497,7 +498,7 @@ function drawSkillEffect(ctx, { x, y, tint, appearance, until }, now) {
   ctx.restore();
 }
 
-function drawArena(state, old, blend, time, aim, localId, map, frameTime, direction = { x: 0, y: 0 }) {
+function drawArena(state, old, blend, time, aim, localId, map, frameTime, direction, spectatorTarget) {
   const ctx = arenaContext;
   const canvas = $('arena');
   const width = Math.min(map.width, canvas.clientWidth || canvas.width);
@@ -511,7 +512,11 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime, direct
   const worldWidth = width / arenaZoom;
   const worldHeight = height / arenaZoom;
   if (player?.alive) arenaCamera.follow(position, player, map, worldWidth, worldHeight, frameTime);
-  else if (position) arenaCamera.pan(position, map, worldWidth, worldHeight, frameTime, direction);
+  else if (position) {
+    const watched = state.players.find(p => p.id === spectatorTarget && p.team === player.team);
+    const anchor = watched && displayPosition(watched, older.get(watched.id), blend);
+    arenaCamera.pan(position, map, worldWidth, worldHeight, frameTime, direction, anchor);
+  }
   ctx.save();
   ctx.scale(arenaZoom, arenaZoom);
   ctx.translate(-arenaCamera.x, -arenaCamera.y);

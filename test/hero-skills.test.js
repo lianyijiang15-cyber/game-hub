@@ -152,7 +152,7 @@ test('Beta splits damage 90/10, reflects 20% of absorption, and remembers form h
   assert.equal(foe.hp, 7269);
   self.powers.set('root', { until: 500 });
   assert.ok(cast(room, self, 2, 130).ok);
-  assert.deepEqual([self.hp, combat.stats(self).speed, combat.stats(self).damage], [5000, 340, 500]);
+  assert.deepEqual([self.hp, combat.stats(self).speed, combat.stats(self).damage], [5000, 238, 500]);
   assert.equal(skills.active(self, 'root', 131), null);
   self.hp = 3690;
   assert.ok(cast(room, self, 2, 45130).ok);
@@ -179,7 +179,7 @@ test('Gamma swaps, grants a two-second shield and hits only the closest three vi
 });
 
 test('live armor and rounded speeds are shared and crew health includes distant wiped teammates', () => {
-  const speeds = { sky: 300, oshi: 270, frost: 330, sain: 400, kosain: 350, tanjun: 250, alpha: 500, beta: 230, gamma: 330 };
+  const speeds = { sky: 210, oshi: 189, frost: 231, sain: 280, kosain: 245, tanjun: 175, alpha: 350, beta: 161, gamma: 231 };
   for (const [hero, speed] of Object.entries(speeds)) {
     assert.equal(combat.stats({ hero }).speed, speed);
     assert.equal(combat.stats({ hero }).defense, combat.playableHeroes[hero].defense);

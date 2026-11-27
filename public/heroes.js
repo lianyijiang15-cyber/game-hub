@@ -62,7 +62,7 @@ const playableHeroes = {
   beta: { defense: 44, job: 'warrior', role: 'fighter', name: '貝塔', color: '#ac95ec', hp: 10000, speed: 460, damage: 650, skills: [
     ['吸收反彈', 20, '選隊友後再指定敵人，2 秒內替隊友承擔 90% 傷害，反彈吸收量的 20%。', 'dual'],
     ['瞬間強擊', 10, '對附近最近三名敵人之一造成目前攻擊力的 130%。', 'enemy'],
-    ['切換形態', 45, '第二形態生命 5000、速度 340、防禦 22、攻擊 500。生命分開記錄，任何形態歸零即淘汰。']
+    ['切換形態', 45, '第二形態生命 5000、速度 238、防禦 22、攻擊 500。生命分開記錄，任何形態歸零即淘汰。']
   ] },
   gamma: { defense: 26, job: 'archer', role: 'fighter', name: '伽瑪', color: '#ffcb48', hp: 8000, speed: 650, damage: 570, skills: [
     ['換位', 25, '與指定敵人交換位置並定身對方 1 秒，自身獲得 2 秒、50% 減傷護盾。', 'enemy'],
@@ -70,7 +70,7 @@ const playableHeroes = {
     ['範圍攻擊', 13, '對周圍最近三名敵人各造成目前攻擊力的 50%。']
   ] }
 };
-function adjustedSpeed(speed) { return Math.ceil(speed / 20) * 10; }
+function adjustedSpeed(speed) { return Math.ceil(speed / 20) * 7; }
 const playableOrder = Object.keys(playableHeroes);
 Object.assign(heroes, playableHeroes);
 if (typeof module !== 'undefined') Object.assign(module.exports, { playableHeroes, playableOrder, adjustedSpeed });

@@ -14,6 +14,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   const emitted = [];
   const frames = [];
   let pixelDraws = 0;
+  let narration;
+  let wallTime = 100;
   const canvasContext = {
     fillRect() { pixelDraws++; },
     createRadialGradient() { return { addColorStop() {} }; }
@@ -54,6 +56,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     timeout() {
       return { emit(event, ...args) {
         emitted.push([event, ...args.slice(0, -1)]);
+        if (event === 'arenaAttack') return args.at(-1)(null, { now: wallTime, attackAt: wallTime + 650 });
         if (event === 'addBot') roster.players.push(bot(1));
         if (event === 'fillBots') while (roster.players.length < 10) roster.players.push(bot(roster.players.length));
         if (event === 'chooseClass') {
@@ -84,9 +87,17 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
       addEventListener() {},
       activeElement: null
     },
-    window: { addEventListener(event, handler) { keyHandlers.set(event, handler); } },
+    window: {
+      addEventListener(event, handler) { keyHandlers.set(event, handler); },
+      SpeechSynthesisUtterance: class { constructor(text) { this.text = text; } },
+      speechSynthesis: {
+        getVoices: () => [{ lang: 'zh-TW' }],
+        speak: clip => { narration = clip; },
+        cancel: () => { narration = null; }
+      }
+    },
     sessionStorage: { getItem() {}, setItem() {}, removeItem() {} },
-    performance: { now: () => 100 },
+    performance: { now: () => wallTime },
     requestAnimationFrame: callback => frames.push(callback),
     setInterval() {}
   });
@@ -144,7 +155,11 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('soup-investigation').hidden, true);
   elements.get('comic-next').onclick();
   assert.equal(elements.get('comic-page-count').textContent, '2 / 2');
+  elements.get('comic-narration').onclick();
+  assert.equal(narration.text, elements.get('comic-caption').textContent);
+  assert.equal(narration.voice.lang, 'zh-TW');
   elements.get('comic-previous').onclick();
+  assert.equal(narration, null);
   assert.equal(elements.get('comic-page-count').textContent, '1 / 2');
   elements.get('comic-next').onclick();
   elements.get('comic-start').onclick();
@@ -266,16 +281,23 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[1].y, vm.runInContext('arenaCamera.y + 90 / arenaZoom', context));
   assert.ok(vm.runInContext('arenaZoom > 1', context));
   assert.equal(emitted.at(-1)[1].skill, false);
+  const firstAttack = emitted.length;
+  const savedDeadline = vm.runInContext('attackDeadline.local', context);
+  wallTime = 190;
+  arena.onpointerdown({ button: 0, clientX: 90, clientY: 45 });
+  assert.equal(emitted.length, firstAttack);
+  vm.runInContext('syncAttackDeadline(750, 110)', context);
+  assert.equal(vm.runInContext('attackDeadline.local', context), savedDeadline);
   keyHandlers.get('keydown')(keyboard('KeyQ'));
   assert.equal(emitted.at(-1)[0], 'heroSkill');
   assert.equal(emitted.at(-1)[1].slot, 0);
   keyHandlers.get('keydown')(keyboard('Enter'));
   assert.equal(emitted.at(-1)[0], 'arenaInput');
   assert.equal(emitted.at(-1)[1].x, 0);
-  const ally = { id: 'ally', name: '遠方隊友', job: 'warrior', hero: 'sky', hp: 4300, maxHp: 8000, alive: true };
+  const ally = { id: 'ally', name: '遠方隊友', job: 'warrior', hero: 'sky', team: '紅隊', x: 2280, y: 1780, hp: 4300, maxHp: 8000, alive: true };
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', now: 120, phase: 'playing', remaining: 299880,
-    players: [{ ...player, alive: false, hp: 0 }], teammates: [ally],
+    players: [{ ...player, alive: false, hp: 0 }, ally], teammates: [ally],
     effects: [{ type: 'hero-skill', appearance: 'heal', x: 1600, y: 1400, tint: '#91ffb2', until: 810 }],
     kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }
   });
@@ -287,13 +309,19 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   keyHandlers.get('keydown')(keyboard('Escape'));
   assert.equal(elements.get('tactical-overlay').hidden, true);
   const vitals = elements.get('team-vitals').children[0];
-  assert.equal(vitals.children[0].src, '/art/heroes/sky-portrait.webp');
+  const watch = vitals.children[0];
+  assert.equal(watch.children[0].src, '/art/heroes/sky-portrait.webp');
+  assert.equal(watch.disabled, false);
+  watch.onclick();
+  assert.equal(watch['aria-pressed'], 'true');
   assert.equal(vitals.children[1].children[1].value, 4300);
-  frames.shift()(130);
+  frames.shift()(200);
   const initialCamera = vm.runInContext('arenaCamera.x', context);
+  assert.equal(initialCamera, Math.round(ally.x - arena.width / 1.38 / 2));
   const initialMessages = emitted.length;
   keyHandlers.get('keydown')(keyboard('ArrowRight'));
-  frames.shift()(150);
+  assert.equal(watch['aria-pressed'], 'false');
+  frames.shift()(220);
   keyHandlers.get('keyup')(keyboard('ArrowRight'));
   assert.ok(vm.runInContext('arenaCamera.x', context) > initialCamera);
   assert.equal(emitted.length, initialMessages);

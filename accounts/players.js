@@ -1,7 +1,9 @@
 'use strict';
 
 const { randomInt, randomUUID } = require('node:crypto');
-const { startSoupGame, playSoup, soupView, soupDifficulties } = require('../public/soup-bank');
+const { startSoupGame, playSoup, soupView, soupDifficulties, soupCase } = require('../public/soup-bank');
+
+const { checkSoup } = require('../ai/soup-host');
 
 const idPattern = /^[A-Z]{2}\d{6}$/;
 const normalizeName = name => name.normalize('NFKC').trim().replace(/\s+/gu, ' ');
@@ -70,6 +72,17 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
     res.json({ id: user.soup.id, ...soupView(user.soup) });
   });
 
+  router.post('/soup/judge-guest', async (req, res, next) => {
+    const { storyId, question } = req.body ?? {};
+    if (typeof storyId !== 'string' || !soupCase(storyId) ||
+        typeof question !== 'string' || !question.trim() || question.length > 300) {
+      return res.status(400).json({ error: '找不到題目或問題格式不正確。' });
+    }
+    try {
+      res.json({ verdict: await checkSoup(storyId, question) });
+    } catch (error) { next(error); }
+  });
+
   route('post', '/soup/action', async (req, res, user) => {
     const game = user.soup;
     const { id, action, question } = req.body ?? {};
@@ -77,7 +90,9 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
         (action === 'ask' && (typeof question !== 'string' || !question.trim() || question.length > 300))) {
       return res.status(400).json({ error: '題目已失效或輸入有誤，請重新開始。' });
     }
-    playSoup(game, action, question);
+    const verdict = action === 'ask' ? await checkSoup(game.comic[0], question) : undefined;
+    if (user.soup !== game) return res.status(409).json({ error: '題目已更新，請重新提問。' });
+    playSoup(game, action, question, verdict);
     const view = soupView(game);
     if (game.result && !game.recorded) {
       const entry = { id, title: view.title, result: game.result, hints: view.hints, progress: view.progress,
