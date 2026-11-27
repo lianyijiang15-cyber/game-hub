@@ -164,10 +164,13 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 #game .ready-actions button:not(.ghost) { min-width: 142px; background: linear-gradient(#86bd79, #4f8054); border: 1px solid #bdd69b; color: #fff9e8; font-size: 1.06rem; }
 #start-help { flex-basis: 100%; margin: 0; color: #f3dfac; text-align: center; font-size: .82rem; }
 #players { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-#players .player-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 100px; padding: 8px 4px; text-align: center; }
+#players .player-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 120px; padding: 8px 4px; text-align: center; }
 #players .player-tile[data-ready="true"] { border-color: #60846d; }
-.player-avatar, .private-avatar { display: grid; place-items: center; width: min(48px, 90%); height: auto; aspect-ratio: 1; object-fit: cover; margin-bottom: 5px; border: 1px solid #a293aa; border-radius: 5px; }
-.private-avatar { background: #343143; color: #d7cadb; }
+.player-avatar {
+  display: block; width: min(76px, 90%); height: auto; aspect-ratio: 1;
+  object-fit: cover; margin-bottom: 5px; border: 1px solid #a293aa;
+  border-radius: 7px; background: #343143; box-shadow: 0 2px 6px #070d19a6;
+}
 #players .player-tile small { font-size: .73rem; }
 #players .player-tile .ghost { margin: 2px 0 0; padding: 4px; font-size: .72rem; }
 #players .vacant { border-style: dashed; color: #b5a9bc; }

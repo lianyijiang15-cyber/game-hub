@@ -631,11 +631,18 @@ function renderRoom(state) {
     const tile = element('div', '');
     tile.className = 'player-tile';
     tile.dataset.ready = String(player.ready);
-    const badge = element('span', player.bot ? 'AI' : '玩家');
-    badge.className = 'private-avatar';
-    tile.append(badge);
+    const portrait = element('img', '');
+    const fallback = heroArt(player.lobbyHero ?? player.hero ?? 'sky', 'avatar');
+    portrait.className = 'player-avatar';
+    portrait.src = player.avatar || fallback;
+    portrait.alt = '';
+    portrait.onerror = () => {
+      portrait.onerror = null;
+      portrait.src = fallback;
+    };
+    tile.append(portrait);
     tile.append(element('strong', player.name),
-      element('small', `${player.id === me.id ? '你 · ' : ''}${player.ready ? '已準備' : '未準備'}${player.id === state.host ? ' · 房主' : ''}`));
+      element('small', `${player.bot ? 'AI · ' : player.id === me.id ? '你 · ' : ''}${player.ready ? '已準備' : '未準備'}${player.id === state.host ? ' · 房主' : ''}`));
     if (host && player.bot) {
       const remove = element('button', '移除 AI');
       remove.className = 'ghost';

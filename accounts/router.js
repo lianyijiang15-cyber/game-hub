@@ -69,7 +69,7 @@ function requestOrigin(req) {
   return null;
 }
 
-function createAccountRouter(file) {
+function createAccountRouter(file, onAvatarChange = () => {}) {
   const router = Router();
   const store = accountStore(file);
   const sessions = new Map();
@@ -153,7 +153,9 @@ function createAccountRouter(file) {
         const loggedIn = { key, username: account.username, profile, ends: now + lifetime };
         sessions.set(token, loggedIn);
         // A profile may have been saved while this login was computing its hash.
-        loggedIn.profile = (await store.read())[key]?.profile ?? loggedIn.profile;
+        const latest = (await store.read())[key];
+        loggedIn.profile = latest?.profile ?? loggedIn.profile;
+        loggedIn.avatar = latest?.avatar ?? null;
         return res.cookie(cookieName, token, { ...res.locals.cookieOptions, maxAge: lifetime })
           .json({ username: account.username, profile: loggedIn.profile });
       } catch (error) {
@@ -193,6 +195,11 @@ function createAccountRouter(file) {
     for (const loggedIn of sessions.values()) {
       if (loggedIn.key === key) loggedIn.profile = profile;
     }
+  }, (key, photo) => {
+    for (const loggedIn of sessions.values()) {
+      if (loggedIn.key === key) loggedIn.avatar = photo;
+    }
+    onAvatarChange(key, photo);
   });
   router.use((error, _req, res, _next) => {
     if (error.status === 400 || error.status === 413 || error.status === 415) {

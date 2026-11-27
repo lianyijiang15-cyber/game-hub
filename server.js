@@ -15,7 +15,7 @@ const { createAccountRouter } = require('./accounts/router');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 8192 });
-const accounts = createAccountRouter(process.env.PIXEL_CLASH_ACCOUNTS_FILE || path.join(__dirname, 'data', 'accounts.json'));
+const accounts = createAccountRouter(process.env.PIXEL_CLASH_ACCOUNTS_FILE || path.join(__dirname, 'data', 'accounts.json'), updateLobbyAvatar);
 app.use('/api/account', accounts.router);
 app.get('/title-map', (_, response) => {
   response.set('Cache-Control', 'public, max-age=3600').json(combat.map);
@@ -42,8 +42,10 @@ function roomState(room, viewerId) {
   return {
     id: room.id, host: room.host, size: seats, phase: room.phase, mode: room.mode,
     loadingRemaining: Math.max(0, (room.loadingUntil ?? 0) - now()),
-    players: room.players.map(({ id, name, job, hero, ready, bot, team, slot }) => ({
-      id, name, ready, bot, ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, hero, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot, hero) } : {}) } : id === viewerId ? { job, hero } : {})
+    players: room.players.map(({ id, name, job, hero, ready, bot, team, slot, avatar }) => ({
+      id, name, ready, bot,
+      ...(room.phase === 'lobby' ? bot ? { lobbyHero: hero } : avatar ? { avatar } : {} : {}),
+      ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, hero, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot, hero) } : {}) } : id === viewerId ? { job, hero } : {})
     }))
   };
 }
@@ -53,6 +55,15 @@ function publish(room) {
     if (!player.bot) io.to(player.id).emit('room', roomState(room, player.id));
   }
   list();
+}
+
+function updateLobbyAvatar(key, photo) {
+  for (const room of rooms.values()) {
+    const player = room.players.find(entry => !entry.bot && entry.accountKey === key);
+    if (!player) continue;
+    player.avatar = photo;
+    if (room.phase === 'lobby') publish(room);
+  }
 }
 
 function member(socket) {
@@ -192,9 +203,9 @@ function matchStats(room, player) {
   return { ...playerStats(player), finished, survived, finisher: finished && player.finisher, loneSurvivor };
 }
 
-function join(socket, room, name, accountKey) {
+function join(socket, room, name, account) {
   const ticket = crypto.randomUUID();
-  room.players.push({ id: socket.id, name, accountKey, job: 'warrior', hero: 'sky', ready: false, bot: false, ticket });
+  room.players.push({ id: socket.id, name, accountKey: account?.key, avatar: account?.avatar, job: 'warrior', hero: 'sky', ready: false, bot: false, ticket });
   socket.join(channel(room));
   socket.data.room = room.id;
   return ticket;
@@ -247,7 +258,7 @@ io.on('connection', socket => {
     if (typeof mode !== 'string' || !Object.hasOwn(modes.durations, mode)) return { error: '未知副本' };
     const created = { id, host: socket.id, phase: 'lobby', mode, players: [] };
     rooms.set(id, created);
-    const ticket = join(socket, created, name, account?.key);
+    const ticket = join(socket, created, name, account);
     return { id, ticket, room: roomState(created, socket.id) };
   });
   command('join', (data, { room }) => {
@@ -269,7 +280,7 @@ io.on('connection', socket => {
     if (target.players.some(player => player.name.toLowerCase() === name.toLowerCase())) {
       return { error: '房間內已有相同玩家名稱' };
     }
-    const ticket = join(socket, target, name, account?.key);
+    const ticket = join(socket, target, name, account);
     return { id, ticket, room: roomState(target, socket.id) };
   });
   command('resume', (data, { room }) => {
@@ -279,7 +290,8 @@ io.on('connection', socket => {
     const target = rooms.get(data.id);
     if (!target || !matchActive(target)) return { error: '原本的對戰已結束或已關閉' };
     const player = target.players.find(entry => entry.ticket === data.ticket);
-    if (player?.accountKey && player.accountKey !== accounts.session(socket.request)?.key) {
+    const account = accounts.session(socket.request);
+    if (player?.accountKey && player.accountKey !== account?.key) {
       return { error: '請使用原本的玩家帳號恢復席位' };
     }
     if (player && !player.bot) {
@@ -293,7 +305,7 @@ io.on('connection', socket => {
     clearTimeout(target.vacancyTimer);
     const ticket = crypto.randomUUID();
     Object.assign(player, { id: socket.id, name: player.originalName, bot: false, ticket, reconnectUntil: 0,
-      input: { x: 0, y: 0 }, inputAt: 0, statsAtDeparture: null });
+      input: { x: 0, y: 0 }, inputAt: 0, statsAtDeparture: null, avatar: account?.avatar });
     if (target.phase === 'playing') player.playedMatch = target.matchId;
     target.host ??= socket.id;
     socket.join(channel(target));

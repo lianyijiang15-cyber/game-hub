@@ -47,6 +47,8 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const cookie = login.headers.get('set-cookie').split(';')[0];
   const named = await accountAction('profile', { name: 'Registered Host' }, cookie);
   assert.equal(named.status, 200);
+  const avatar = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCUAomv/9k=';
+  assert.equal((await accountAction('avatar', { photo: avatar }, cookie)).status, 200);
   const clients = [cookie, null, null].map(value => connect(base, {
     transports: ['websocket'], extraHeaders: value ? { Cookie: value } : {}
   }));
@@ -101,10 +103,23 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.ok((await send(outsider, 'create', null)).error);
   const { id, room: created } = await send(host, 'create', { type: 'arena', size: 10, name: 'Host' });
   assert.equal(created.players[0].name, 'Registered Host');
+  assert.equal(created.players[0].avatar, avatar);
   assert.match(id, /^[A-F0-9]{6}$/);
-  assert.equal((await send(guest, 'join', { id: id.toLowerCase(), name: 'Guest' })).id, id);
+  const joined = await send(guest, 'join', { id: id.toLowerCase(), name: 'Guest' });
+  assert.equal(joined.id, id);
+  assert.equal(joined.room.players[0].avatar, avatar);
+  assert.equal(joined.room.players[1].avatar, undefined);
+  const removedPhoto = receive(guest, 'room', room => room.players[0].avatar === undefined);
+  assert.equal((await accountAction('avatar', { photo: null }, cookie)).status, 200);
+  await removedPhoto;
+  const replacedPhoto = receive(guest, 'room', room => room.players[0].avatar === avatar);
+  assert.equal((await accountAction('avatar', { photo: avatar }, cookie)).status, 200);
+  await replacedPhoto;
   assert.ok((await send(guest, 'fillBots')).error);
-  assert.equal((await send(host, 'addBot')).room.players.filter(p => p.bot).length, 1);
+  const bots = (await send(host, 'addBot')).room.players.filter(p => p.bot);
+  assert.equal(bots.length, 1);
+  assert.equal(bots[0].lobbyHero, 'sky');
+  assert.equal(bots[0].avatar, undefined);
   const botId = rooms.get(id).players.find(player => player.bot).id;
   assert.equal((await send(host, 'removeBot', botId)).ok, true);
   const filled = receive(guest, 'room', room => room.players.length === 10);
@@ -116,7 +131,9 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   await wait(160);
   const selection = receive(host, 'room', room => room.phase === 'selection');
   assert.equal((await send(host, 'start')).ok, true);
-  const ownTeam = (await selection).players.filter(p => p.team === '紅隊');
+  const selected = await selection;
+  assert.ok(selected.players.every(player => player.avatar === undefined));
+  const ownTeam = selected.players.filter(p => p.team === '紅隊');
   assert.equal(ownTeam.length, 5);
   assert.ok(ownTeam.every(p => p.job));
   const guestView = receive(guest, 'room');

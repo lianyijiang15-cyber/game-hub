@@ -40,7 +40,7 @@ function validAvatar(photo) {
   return false;
 }
 
-function mountPlayerRoutes(router, store, session, setSessionProfile) {
+function mountPlayerRoutes(router, store, session, setSessionProfile, setSessionAvatar) {
   function route(method, path, action, needsProfile = true) {
     router[method](path, (req, res, next) => {
       const user = session(req);
@@ -84,6 +84,7 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
       else account.avatar = photo;
       return { changed: true };
     });
+    setSessionAvatar(user.key, photo);
     res.json({ photo });
   });
 
