@@ -1,118 +1,317 @@
-const socket=io();let mode='wolf',room=null,role='',soup=null,hintCount=0,progress=0;
-const $=id=>document.getElementById(id);
+'use strict';
+
+const socket = io();
+const $ = id => document.getElementById(id);
+let room = null;
+let soup = null;
+let hintCount = 0;
+let progress = 0;
+
 const stories=[
  {title:'餐廳裡的海龜湯',intro:'一名男子在餐廳喝了一口海龜湯，回家後卻做出了令人震驚的決定。為什麼？',clues:['他以前曾遭遇船難。','他當年吃過一碗被稱作海龜湯的湯。','餐廳的味道與記憶不同，讓他發現當年吃的不是海龜。'],hints:['想想男子過去的經歷。','關鍵在於兩次湯的味道。','當年的湯其實不是海龜肉。'],keys:['船','海龜','味道'],answer:'經典版本中，男子曾在船難後喝下被謊稱為海龜湯的湯。多年後嚐到真正的海龜湯，才察覺當年的真相。'},
  {title:'關燈的人',intro:'一個人晚上關燈睡覺，隔天得知許多人因此喪命。為什麼？',clues:['他住在靠海的地方。','這盞燈不是普通房間的照明。','他是燈塔管理員，關燈導致船隻迷航。'],hints:['注意這盞燈的位置。','燈光可能是給別人看的。','想想燈塔。'],keys:['海','燈','船'],answer:'他是燈塔管理員，誤關了指引船隻的燈，造成船難。'}
 ];
-if(typeof extraStories!=='undefined')stories.push(...extraStories);
-function show(id){['home','soup','lobby','game'].forEach(x=>$(x).hidden=x!==id);}function home(){if(room){socket.emit('leave');room=null;}show('home');socket.emit('list');}
+stories.push(...extraStories);
 function openSoup(){show('soup');newSoup();}function newSoup(){soup=stories[Math.floor(Math.random()*stories.length)];hintCount=0;progress=0;$('soup-title').textContent=soup.title;$('soup-story').textContent=soup.intro;$('soup-end').textContent='';$('answer').textContent='';updateSoup();}
 function updateSoup(){$('hints').textContent=3-hintCount;$('soup-progress').textContent=`已解鎖線索：${progress}/${soup.clues.length}`;}
 function askSoup(){const q=$('question').value.trim();if(!q)return;$('question').value='';if(soup.keys.some(k=>q.includes(k))){$('answer').textContent='是。 '+(soup.clues[progress]||'線索已全部揭曉。');progress=Math.min(progress+1,soup.clues.length);}else if(/沒有|不是|不會|無法/.test(q))$('answer').textContent='不是。';else $('answer').textContent='無關（原型判斷；請嘗試詢問故事關鍵字）。';updateSoup();if(progress===soup.clues.length)$('soup-end').textContent='你已解鎖所有線索！可按「揭曉答案」。';}
 function hint(){if(hintCount>=3)return;$('answer').textContent='提示：'+soup.hints[hintCount++];updateSoup();}function reveal(){$('soup-end').textContent=soup.answer;}
-function openLobby(type){mode=type;show('lobby');$('mode-title').textContent=type==='wolf'?'🌙 狼人殺':'⚔️ 團隊對抗';$('size').replaceChildren(...(type==='wolf'?[8,9,10,12]:[10,12,14]).map(n=>new Option(n+' 人',n)));socket.emit('list');}
-function createRoom(){socket.emit('create',{type:mode,size:Number($('size').value),name:$('nickname').value},result=>{if(result.error)$('error').textContent=result.error;else enter(result.id);});}
-function joinRoom(id){socket.emit('join',{id:id||$('room-code').value,name:$('nickname').value},result=>{if(result.error)$('error').textContent=result.error;else enter(result.id);});}
-function enter(id){room=id;role='';wolfIntel={teammates:[],votes:[]};window.lastWolfRoom=null;$('role').textContent='';$('messages').replaceChildren();$('room-id').textContent=id;show('game');}
-function sendChat(){const v=$('chat-input').value;socket.emit('chat',v);$('chat-input').value='';}
-socket.on('rooms',rooms=>{$('room-list').replaceChildren();rooms.filter(r=>r.type===mode).forEach(r=>{const p=document.createElement('p');p.textContent=`${r.id} · ${r.players.length}/${r.size} 人 · ${r.started?'遊戲中':'招募中'} `;if(!r.started&&r.players.length<r.size){const b=document.createElement('button');b.textContent='加入';b.onclick=()=>joinRoom(r.id);p.append(b);}$('room-list').append(p);});});
-socket.on('room',r=>{if(r.id!==room)return;$('game-status').textContent=`${r.type==='wolf'?'狼人殺':'團隊對抗'} · ${r.players.length}/${r.size} · ${r.phase} · 第 ${r.day} 天`;$('players').replaceChildren();r.players.forEach(p=>{const d=document.createElement('div');d.textContent=`${p.name} ${p.ready?'✓ 已準備':'○ 未準備'} ${p.alive?'':'（已淘汰）'} ${(p.team||'')+(p.hp!==undefined?' · HP '+p.hp+' · ('+p.x+','+p.y+')':'')}`;$('players').append(d);});$('ready').hidden=r.started;$('start').hidden=r.started||r.host!==socket.id;$('start').disabled=r.players.length!==r.size||!r.players.every(p=>p.ready);$('votes').replaceChildren();if(r.type==='arena'&&r.started){const h=document.createElement('h3');h.textContent='⚔️ '+r.mode+' · 中央據點 (4,3) · '+JSON.stringify(r.points);$('votes').append(h);const me=r.players.find(p=>p.id===socket.id);if(me&&me.hp>0&&r.phase==='playing'){for(const [label,dx,dy] of [['↑',0,-1],['←',-1,0],['↓',0,1],['→',1,0]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>socket.emit('move',{dx,dy});$('votes').append(b);}const list=document.createElement('div');for(const p of r.players.filter(p=>p.team!==me.team&&p.hp>0&&Math.abs(p.x-me.x)+Math.abs(p.y-me.y)<=1)){const b=document.createElement('button');b.textContent='攻擊 '+p.name;b.onclick=()=>socket.emit('attack',p.id);list.append(b);}$('votes').append(list);}}if(r.type==='wolf'&&r.started&&r.phase!=='ended'&&r.players.find(p=>p.id===socket.id)?.alive){const h=document.createElement('h3');h.textContent=r.phase==='night'?'黑夜行動（僅狼人可投票）':'白天放逐投票';$('votes').append(h);if(r.phase==='day'||role.includes('狼'))r.players.filter(p=>p.alive&&p.id!==socket.id).forEach(p=>{const b=document.createElement('button');b.className='secondary';b.textContent='選擇 '+p.name;b.onclick=()=>socket.emit('vote',p.id);$('votes').append(b);});}});
-socket.on('role',value=>{role=value;$('role').textContent='你的秘密身分：'+role;});socket.on('notice',v=>appendMessage('📢 '+v));socket.on('chat',v=>appendMessage(`${v.name}：${v.text}`));function appendMessage(v){const p=document.createElement('p');p.textContent=v;$('messages').append(p);$('messages').scrollTop=$('messages').scrollHeight;}
-socket.emit('list');
-socket.on('connect',()=>{socket.emit('list');if(room)appendMessage('連線恢復，正在同步房間狀態。');});socket.on('disconnect',()=>{if(room)appendMessage('連線中斷，請等待重新連線。');});
 
+const jobNames = { warrior: '戰士', archer: '弓箭手', mage: '法師' };
+const skills = { warrior: '旋風斬', archer: '三重箭', mage: '火球術' };
+const descriptions = {
+  warrior: '150 HP · 近戰長劍 · 旋風斬攻擊四周敵人',
+  archer: '100 HP · 遠程長弓 · 三重箭向三個角度射出實體箭矢',
+  mage: '80 HP · 遠程法杖 · 火球撞擊後造成範圍傷害'
+};
+let phase = 'lobby';
+let frame = null;
+let previous = null;
+let receivedAt = 0;
+let listedRooms = [];
+let joining = false;
+let roomRequest = 0;
+const keys = new Set();
+const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
+const aim = { x: 480, y: 288 };
 
-// v0.2: AI seats, arena controls and explicit room lifecycle.
-const originalHome=home;
-home=function(){if(room){socket.emit('leave');room=null;role='';}originalHome();};
-function gameButton(label,fn){const b=document.createElement('button');b.className='secondary';b.textContent=label;b.onclick=fn;return b;}
-function extraControls(r){
- if(r.id!==room)return;
- let hostPanel=document.getElementById('bot-panel');
- if(!hostPanel){hostPanel=document.createElement('div');hostPanel.id='bot-panel';$('players').after(hostPanel);}
- hostPanel.replaceChildren();
- const me=r.players.find(p=>p.id===socket.id);
- if(!r.started&&r.host===socket.id){
-  const count=r.players.filter(p=>p.bot).length;
-  const p=document.createElement('p');p.textContent='🤖 AI 機器人：'+count+' 人（房主可補滿空位）';hostPanel.append(p);
-  if(r.players.length<r.size)hostPanel.append(gameButton('＋ 加入一名 AI',()=>socket.emit('addBot',result=>{if(result?.error)alert(result.error);})));
-  for(const bot of r.players.filter(p=>p.bot))hostPanel.append(gameButton('移除 '+bot.name,()=>socket.emit('removeBot',bot.id,result=>{if(result?.error)alert(result.error);})));
- }
- if(r.type==='arena'&&r.started){
-  $('role').textContent=me?'所屬隊伍：'+me.team+'｜職業：'+me.job+'｜HP：'+me.hp:'';
-  if(r.phase==='playing'&&me?.alive){
-   const h=document.createElement('h3');h.textContent='⚔️ 回合戰鬥原型（每 1.8 秒可行動一次）';hostPanel.append(h);
-   for(const target of r.players.filter(p=>p.alive&&p.team!==me.team))hostPanel.append(gameButton('攻擊 '+target.name+' ('+target.hp+' HP)',()=>socket.emit('arenaAction',{action:'attack',target:target.id})));
-   if(me.job==='輔助')for(const target of r.players.filter(p=>p.alive&&p.team===me.team))hostPanel.append(gameButton('治療 '+target.name,()=>socket.emit('arenaAction',{action:'heal',target:target.id})));
-  }
- }
- if(r.type==='wolf'&&r.started&&r.phase==='night'&&!role.includes('狼')){
-  const p=document.createElement('p');p.textContent='🌙 夜晚請等待狼人行動。';hostPanel.append(p);
- }
+function show(id) {
+  for (const panel of ['home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
+  document.querySelector('header').hidden = id !== 'home';
 }
-socket.on('room',extraControls);
-socket.on('connect',()=>{socket.emit('list');if(room){$('game-status').textContent='連線已恢復，但先前房間可能已離開；請返回首頁重新加入。';}});
-socket.on('disconnect',()=>{if(room)$('game-status').textContent='網路中斷，正在嘗試重新連線…';});
 
-socket.on('deadChat',v=>appendMessage('👻 淘汰者頻道｜'+v.name+'：'+v.text));
-socket.on('rolesRevealed',list=>{
- appendMessage('🏁 本局身分揭曉：');
- for(const p of list)appendMessage((p.alive?'🟢 ':'💀 ')+p.name+' — '+p.role);
+function exitRoom() {
+  stopMovement();
+  if (room && socket.connected) socket.emit('leave');
+  room = null;
+  phase = 'lobby';
+  frame = previous = null;
+  $('messages').replaceChildren();
+  $('chat-input').value = '';
+  openLobby();
+}
+
+function home() {
+  stopMovement();
+  if (room && socket.connected) socket.emit('leave');
+  room = null;
+  phase = 'lobby';
+  frame = previous = null;
+  roomRequest++;
+  joining = false;
+  show('home');
+}
+
+function openLobby() {
+  $('error').textContent = '';
+  show('lobby');
+  renderRoomList();
+  if (socket.connected) socket.emit('list');
+}
+
+function command(event, ...args) {
+  if (!socket.connected) {
+    $('room-error').textContent = '連線中斷';
+    return;
+  }
+  socket.timeout(3000).emit(event, ...args, (error, result) => {
+    $('room-error').textContent = error ? '操作逾時' : result.error || '';
+  });
+}
+
+function enter(event, data) {
+  if (!socket.connected || joining) {
+    if (!socket.connected) $('error').textContent = '尚未連線，請稍後再試';
+    return;
+  }
+  joining = true;
+  const request = ++roomRequest;
+  socket.timeout(3500).emit(event, { ...data, name: $('nickname').value }, (error, result) => {
+    if (request !== roomRequest) {
+      if (result?.id && !room) socket.emit('leave');
+      return;
+    }
+    joining = false;
+    if (error || result.error) {
+      $('error').textContent = error ? '連線逾時' : result.error;
+      return;
+    }
+    room = result.id;
+    phase = 'lobby';
+    frame = previous = null;
+    $('messages').replaceChildren();
+    $('chat-input').value = '';
+    $('room-error').textContent = '';
+    $('room-id').textContent = room;
+    $('waiting').hidden = false;
+    $('battle').hidden = $('results').hidden = true;
+    show('game');
+  });
+}
+
+function createRoom() { enter('create', { type: 'arena', size: 10 }); }
+function joinRoom(id) { enter('join', { id: id || $('room-code').value }); }
+function element(tag, text) {
+  const node = document.createElement(tag);
+  node.textContent = text;
+  return node;
+}
+
+function renderRoomList() {
+  const list = $('room-list');
+  list.replaceChildren();
+  if (!listedRooms.length) list.append(element('p', '目前沒有房間'));
+  for (const entry of listedRooms) {
+    const label = { lobby: '等待中', playing: '對戰中', ended: '已結束' }[entry.phase];
+    const row = element('p', `${entry.id} · ${entry.count}/${entry.size} · ${label} `);
+    if (entry.phase === 'lobby' && entry.count < entry.size) {
+      const join = element('button', '加入');
+      join.className = 'secondary';
+      join.onclick = () => joinRoom(entry.id);
+      row.append(join);
+    }
+    list.append(row);
+  }
+}
+
+socket.on('rooms', entries => {
+  listedRooms = entries;
+  if (!$('lobby').hidden) renderRoomList();
 });
 
-let revealedNames=new Set();
-socket.on('room',r=>{
- if(r.id!==room||r.type!=='wolf')return;
- const me=r.players.find(p=>p.id===socket.id);
- const ghost=!!(r.started&&!me?.alive&&r.phase!=='ended');
- $('votes').hidden=ghost;
- $('role').textContent=ghost?'👻 旁觀模式｜你已淘汰，無法投票或操作；可與其他淘汰玩家討論。':r.phase==='ended'?'🏁 本局已結束，所有角色已公開。':'你的秘密身分：'+(role||'等待分配');
- $('chat-input').placeholder=ghost?'👻 傳送至淘汰者專屬聊天':'輸入訊息';
- if(r.phase==='ended'&&Array.isArray(r.revealedRoles)){
-  const signature=r.id+':'+r.day+':'+r.revealedRoles.map(p=>p.id+':'+p.role).join('|');
-  if(!revealedNames.has(signature)){
-   revealedNames.add(signature);
-   appendMessage('🏁 本局完整身分表');
-   for(const p of r.revealedRoles)appendMessage(p.name+'：'+p.role);
+socket.on('room', state => {
+  if (state.id !== room) return;
+  const me = state.players.find(player => player.id === socket.id);
+  if (!me) return;
+  const host = state.host === socket.id;
+  const waiting = state.phase === 'lobby';
+  if (phase !== state.phase) {
+    stopMovement();
+    $('messages').replaceChildren();
+    if (state.phase === 'playing' || waiting) frame = previous = null;
   }
- }
+  phase = state.phase;
+  $('waiting').hidden = !waiting;
+  $('battle').hidden = phase !== 'playing';
+  $('results').hidden = phase !== 'ended';
+  $('chat-title').textContent = waiting ? '房間聊天' : '隊伍聊天';
+  $('return-lobby').hidden = $('rematch').hidden = !host;
+  $('results-note').textContent = host ? '' : '等待房主返回大廳或開始下一局。';
+  if (!waiting) return;
+  $('seat-count').textContent = `玩家 ${state.players.length}/${state.size}`;
+  $('players').replaceChildren();
+  for (const player of state.players) {
+    const tile = element('div', '');
+    tile.append(element('strong', player.name),
+      element('small', `${player.bot ? 'AI' : '真人'} · ${jobNames[player.job]} · ${player.ready ? '已準備' : '未準備'}${player.id === state.host ? ' · 房主' : ''}`));
+    if (host && player.bot) {
+      const remove = element('button', '移除 AI');
+      remove.className = 'ghost';
+      remove.onclick = () => command('removeBot', player.id);
+      tile.append(remove);
+    }
+    $('players').append(tile);
+  }
+  $('job').value = me.job;
+  $('job-description').textContent = descriptions[me.job];
+  $('bot-controls').hidden = !host || state.players.length === state.size;
+  $('ready').textContent = me.ready ? '取消準備' : '準備';
+  $('start').hidden = !host;
+  $('start').disabled = state.players.length !== state.size || !state.players.every(p => p.ready);
+});
+$('job').onchange = () => command('chooseClass', $('job').value);
+
+socket.on('chat', message => {
+  if (!room) return;
+  const messages = $('messages');
+  messages.append(element('p', `${message.name}：${message.text}`));
+  if (messages.children.length > 60) messages.firstElementChild.remove();
+  messages.scrollTop = messages.scrollHeight;
+});
+$('chat-input').onfocus = stopMovement;
+$('chat-form').onsubmit = event => {
+  event.preventDefault();
+  const input = $('chat-input');
+  if (!input.value.trim()) return;
+  command('chat', input.value);
+  input.value = '';
+  input.blur();
+};
+
+socket.on('roomClosed', reason => {
+  if (!room) return;
+  exitRoom();
+  $('error').textContent = reason;
 });
 
-let wolfIntel={teammates:[],votes:[]};
-socket.on('wolfIntel',data=>{wolfIntel=data;if(window.lastWolfRoom)renderWolfBoard(window.lastWolfRoom);});
-function renderWolfBoard(r){
- if(r.id!==room||r.type!=='wolf')return;
- const me=r.players.find(p=>p.id===socket.id);
- const active=r.started&&r.phase!=='ended'&&me?.alive;
- const canVote=active&&(r.phase==='day'||(r.phase==='night'&&role.includes('狼')));
- $('votes').replaceChildren();
- const status=document.createElement('p');
- status.className='vote-help';
- status.textContent=r.phase==='discussion'?'🗣️ 討論進行中：發言會影響 AI 的判斷，房主結束討論後才開始投票。':r.phase==='night'?(role.includes('狼')?'🐺 點選非狼人玩家頭像，與隊友協調夜間目標。':'🌙 黑夜中，等待狼人行動。'):r.phase==='day'?'☀️ 點選頭像進行放逐投票。':'🏁 身分已公開';
- $('votes').append(status);
- $('end-discussion').hidden=!(r.phase==='discussion'&&r.host===socket.id);
- $('debate-hint').textContent=r.phase==='discussion'?'真人與 AI 自由辯論；AI 會閱讀公開發言並回應。':r.phase==='night'?'狼人使用秘密頻道；其他玩家不會看見。':'所有玩家可查看公開討論紀錄。';
- $('players').replaceChildren();
- r.players.forEach((p,i)=>{
-  const seat=document.createElement('button');
-  seat.type='button';seat.className='player-seat'+(!p.alive?' eliminated':'')+(p.id===socket.id?' self-seat':'');
-  const ally=role.includes('狼')&&wolfIntel.teammates.some(t=>t.id===p.id);
-  const eligible=canVote&&p.alive&&p.id!==socket.id&&!(r.phase==='night'&&ally);
-  seat.disabled=!eligible;
-  const avatar=document.createElement('span');avatar.className='player-avatar';avatar.textContent=p.bot?'🤖':(p.alive?'👤':'👻');
-  const label=document.createElement('strong');label.textContent=p.name;
-  const tag=document.createElement('small');tag.textContent=!p.alive?'已淘汰':ally?'🐺 狼人隊友':p.id===socket.id?'你自己':p.bot?'AI 玩家':'真人玩家';
-  seat.append(avatar,label,tag);
-  if(r.phase==='ended'&&r.revealedRoles){const info=r.revealedRoles.find(q=>q.id===p.id);if(info){const roleTag=document.createElement('small');roleTag.textContent='🎭 '+info.role;seat.append(roleTag);}}
-  if(eligible)seat.onclick=()=>{socket.emit('vote',p.id);seat.classList.add('voted-seat');};
-  $('players').append(seat);
- });
- const intel=$('wolf-intel');intel.replaceChildren();
- intel.hidden=!(r.started&&r.phase==='night'&&role.includes('狼'));
- if(!intel.hidden){
-  const title=document.createElement('h4');title.textContent='🐺 狼人秘密作戰室';intel.append(title);
-  const team=document.createElement('p');team.textContent='隊友：'+wolfIntel.teammates.map(p=>p.name+(p.alive?'':'（淘汰）')).join('、');intel.append(team);
-  const votes=document.createElement('p');votes.textContent='夜間投票：'+(wolfIntel.votes.length?wolfIntel.votes.map(v=>v.voter+' → '+v.target).join('；'):'尚無隊友投票');intel.append(votes);
- }
+socket.on('disconnect', () => {
+  if (!room) return;
+  exitRoom();
+  $('error').textContent = '已斷線並離開房間。連線恢復後可重新加入等待中的房間。';
+});
+
+function sendMovement() {
+  if (phase !== 'playing' || !socket.connected) return;
+  socket.volatile.emit('arenaInput', {
+    x: Number(keys.has('KeyD')) - Number(keys.has('KeyA')),
+    y: Number(keys.has('KeyS')) - Number(keys.has('KeyW'))
+  });
 }
-socket.on('room',r=>{if(r.id!==room)return;window.lastWolfRoom=r;if(r.type==='wolf')renderWolfBoard(r);else{$('end-discussion').hidden=true;$('wolf-intel').hidden=true;}});
+
+function stopMovement() {
+  keys.clear();
+  if (phase === 'playing' && socket.connected) socket.emit('arenaInput', { x: 0, y: 0 });
+}
+
+function attack(skill) {
+  if (phase !== 'playing' || !socket.connected || !frame) return;
+  socket.volatile.emit('arenaAttack', { ...aim, skill });
+}
+
+window.addEventListener('keydown', event => {
+  if (!room || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.target.matches?.('input, textarea, select, [contenteditable]')) return;
+  if (event.code === 'Enter' && !event.repeat && event.target.tagName !== 'BUTTON') {
+    event.preventDefault();
+    $('chat-input').focus();
+  }
+  if (phase !== 'playing') return;
+  if (movement.has(event.code)) {
+    event.preventDefault();
+    if (event.repeat) return;
+    keys.add(event.code);
+    sendMovement();
+  }
+  if (event.code === 'KeyQ' && !event.repeat) attack(true);
+});
+window.addEventListener('keyup', event => {
+  if (!keys.delete(event.code)) return;
+  if (keys.size) sendMovement();
+  else stopMovement();
+});
+window.addEventListener('blur', stopMovement);
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopMovement(); });
+setInterval(() => { if (keys.size) sendMovement(); }, 50);
+
+function updateAim(event) {
+  const canvas = $('arena');
+  const bounds = canvas.getBoundingClientRect();
+  aim.x = Math.max(0, Math.min(canvas.width, (event.clientX - bounds.left) * canvas.width / bounds.width));
+  aim.y = Math.max(0, Math.min(canvas.height, (event.clientY - bounds.top) * canvas.height / bounds.height));
+}
+$('arena').onpointermove = updateAim;
+$('arena').onpointerdown = event => {
+  if (event.button !== 0 || document.activeElement === $('chat-input')) return;
+  document.activeElement?.blur();
+  updateAim(event);
+  attack(false);
+};
+
+function renderResults(state) {
+  const headline = state.winner ? state.winner + '獲勝' : '平手';
+  $('winner').textContent = `${headline} · ${state.score['紅隊']} : ${state.score['藍隊']}`;
+  const body = $('results-body');
+  body.replaceChildren();
+  for (const player of state.results) {
+    const row = document.createElement('tr');
+    row.className = player.team === '紅隊' ? 'red' : 'blue';
+    for (const value of [player.name + (player.bot ? ' [AI]' : ''), player.team, jobNames[player.job],
+      player.kills, player.deaths, player.damage]) row.append(element('td', value));
+    body.append(row);
+  }
+}
+
+socket.on('arenaState', state => {
+  if (state.id !== room || phase === 'lobby') return;
+  previous = frame;
+  frame = state;
+  receivedAt = performance.now();
+  if (state.phase === 'ended') {
+    renderResults(state);
+    return;
+  }
+  $('red-score').textContent = state.score['紅隊'];
+  $('blue-score').textContent = state.score['藍隊'];
+  $('kill-feed').replaceChildren(...state.kills.map(kill => element('li', `${kill.attacker} 擊倒 ${kill.victim}`)));
+});
+
+function renderFrame(time) {
+  requestAnimationFrame(renderFrame);
+  if (!frame || phase !== 'playing' || frame.phase !== 'playing') return;
+  const elapsed = Math.min(150, Math.max(0, time - receivedAt));
+  const serverTime = frame.now + elapsed;
+  const remaining = Math.ceil(Math.max(0, frame.remaining - elapsed) / 1000);
+  $('clock').textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
+  const me = frame.players.find(player => player.id === socket.id);
+  if (me) {
+    const cooldown = at => at > serverTime ? ((at - serverTime) / 1000).toFixed(1) + ' 秒' : '就緒';
+    $('health').textContent = `${jobNames[me.job]} · HP ${me.hp}/${me.maxHp}`;
+    $('attack-status').textContent = '普攻 ' + cooldown(me.attackAt);
+    $('skill-status').textContent = `Q ${skills[me.job]} · ${cooldown(me.skillAt)}`;
+    $('respawn').hidden = me.alive;
+    if (!me.alive) $('respawn').textContent = `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;
+  }
+  const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
+  drawArena(frame, previous, blend, serverTime, aim, socket.id);
+}
+requestAnimationFrame(renderFrame);

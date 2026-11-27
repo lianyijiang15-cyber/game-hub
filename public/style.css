@@ -22,35 +22,37 @@ input,select{min-height:43px;background:#0c152a;border-color:#546483}
 #players>div{background:#0e1830;border:1px solid #354365;border-radius:12px;padding:12px}
 #messages{max-height:360px;background:#0a1226;border:1px solid #354365;border-radius:12px;padding:16px}
 #messages p{margin:0;padding:9px 0;border-bottom:1px solid #26334b}
-#bot-panel{margin-top:14px;padding:12px;border-radius:12px;background:#111b34}
-#game-status{color:#d3c9ff;font-weight:700}
-#role{color:#f3d88e;font-weight:750}
-#votes button{margin:5px}
+
+
+
+
 @media(max-width:640px){header{padding:36px 0 48px}article{min-height:240px}main{padding:18px 14px}button{min-height:44px}#chat-input{width:100%;margin-left:0}}
 @media(prefers-reduced-motion:reduce){article,button{transition:none}}
 
-/* Original social-deduction tabletop layout; no third-party game assets */
-#game{max-width:1250px;margin:auto}
-#game>h2{font-size:clamp(1.5rem,3vw,2.3rem);margin-bottom:5px}
-.wolf-layout{display:grid;grid-template-columns:minmax(310px,1fr) minmax(340px,1.1fr);gap:20px;align-items:start}
-.wolf-layout>.panel{margin-top:12px;min-width:0}
-.wolf-roster{background:radial-gradient(circle at 50% 15%,#35305b,#17172f 70%);border:1px solid #6a557f}
-.discussion-panel{background:linear-gradient(160deg,#172a3d,#121c30);border:1px solid #466d83}
-#players{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;line-height:1.2}
-#players .player-seat{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;min-height:145px;margin:0;padding:13px 5px;background:linear-gradient(165deg,#27365a,#111b32);border:1px solid #4d5c80;border-radius:17px;color:#f3f4ff;box-shadow:0 8px 18px #0004;cursor:pointer}
-#players .player-seat:hover:not(:disabled){border-color:#c3acff;background:#35436b;transform:translateY(-3px)}
-#players .player-seat:disabled{opacity:1;cursor:default}
-#players .player-seat.eliminated{filter:grayscale(.85);opacity:.55}
-#players .player-seat.self-seat{border-color:#d4b778}
-#players .player-seat.voted-seat{box-shadow:0 0 0 2px #b4a4ff}
-.player-avatar{display:grid;place-items:center;width:62px;height:62px;border-radius:50%;font-size:2rem;background:radial-gradient(circle at 35% 25%,#6676a7,#293553);border:2px solid #7d89aa}
-.player-seat strong{font-size:.88rem;overflow-wrap:anywhere}
-.player-seat small{color:#c7cfe6;font-size:.71rem}
-.vote-help{color:#c4b9ff;font-size:.91rem;line-height:1.6}
-#wolf-intel{margin-top:16px;padding:15px;border:1px solid #955d6e;border-radius:14px;background:#351a2c;color:#ffdae1}
-#wolf-intel h4{margin:0 0 8px}
-#wolf-intel p{margin:7px 0;line-height:1.6}
-.discussion-panel #messages{height:430px;max-height:55vh;overflow:auto;background:#0b1727}
-.discussion-panel #chat-input{width:calc(100% - 105px);margin-left:0}
-@media(max-width:850px){.wolf-layout{grid-template-columns:1fr}.discussion-panel #messages{height:300px}}
-@media(max-width:450px){#players{grid-template-columns:repeat(2,minmax(0,1fr))}.discussion-panel #chat-input{width:100%}}
+
+header { padding: 45px 0 38px; }
+.room-heading, .scoreboard, .hud { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#room-id, .scoreboard, .hud, kbd { font-family: ui-monospace, monospace; }
+#room-id { color: #e9c780; letter-spacing: .12em; }
+#room-error { color: #ffacb3; margin: 0; }
+#players small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+#players strong { overflow-wrap: anywhere; }
+#game .panel { background: #181823; border-color: #40384b; border-radius: 8px; }
+.scoreboard, .hud { background: #171620; border: 1px solid #48404e; padding: 10px 16px; }
+.scoreboard { font-size: clamp(1rem, 3vw, 1.6rem); }
+.scoreboard strong { padding: 0 .25em; }
+.red { color: #ff9c8c; }
+.blue { color: #8acbff; }
+.arena-frame { position: relative; background: #121119; box-shadow: 0 8px 28px #0008; }
+#arena { width: 100%; height: auto; display: block; image-rendering: pixelated; cursor: crosshair; }
+#respawn { position: absolute; inset: 43% 0 auto; width: max-content; margin: auto; padding: 12px 20px; background: #171620ed; border: 2px solid #e9c780; pointer-events: none; }
+.hud { justify-content: flex-start; flex-wrap: wrap; color: #ebdcb6; }
+.hud span + span { border-left: 1px solid #585064; padding-left: 12px; }
+kbd { border: 1px solid #635c72; background: #181823; color: #faf0ff; padding: 2px 5px; }
+.controls { line-height: 1.7; }
+#kill-feed { margin: 0; padding-left: 22px; color: #f4c48d; font-size: .9rem; }
+#messages { max-height: 170px; overflow-wrap: anywhere; }
+#chat-input { margin-left: 0; }
+.table-wrap { overflow: auto; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }

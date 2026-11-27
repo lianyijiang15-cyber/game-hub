@@ -265,4 +265,3 @@ const extraStories=[
     ]
   }
 ];
-stories.push(...extraStories);

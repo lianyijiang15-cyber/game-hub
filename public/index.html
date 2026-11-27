@@ -1,1 +1,136 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Game Hub｜三副本遊戲</title><link rel="stylesheet" href="style.css"></head><body><main><header><span class="eyebrow">COMPUTER SCIENCE PROJECT</span><h1>GAME <em>HUB</em></h1><p>選擇你的冒險 · 三種遊戲模式</p></header><section id="home"><div class="cards"><article><div class="symbol">🐢</div><h2>海龜湯</h2><p>單人推理 · 是 / 不是 / 無關 · 三次提示</p><button onclick="openSoup()">開始推理</button></article><article><div class="symbol">🌙</div><h2>狼人殺</h2><p>8 / 9 / 10 / 12 人 · 身分隱藏 · 日夜投票</p><button onclick="openLobby('wolf')">建立或加入房間</button></article><article><div class="symbol">⚔️</div><h2>團隊對抗</h2><p>10 / 12 / 14 人 · 紅藍分隊 · 戰鬥原型</p><button onclick="openLobby('arena')">建立或加入房間</button></article></div></section><section id="soup" hidden><button class="ghost" onclick="home()">← 返回大廳</button><h2>🐢 海龜湯</h2><p class="muted">請提出可以用「是、不是、無關」回答的問題。這是本地題庫關鍵字判斷原型，非 AI 自由推理。</p><div class="panel"><h3 id="soup-title"></h3><p id="soup-story"></p><p id="soup-progress"></p><input id="question" placeholder="例如：他喝的是海龜湯嗎？"><button onclick="askSoup()">提問</button><p id="answer"></p><button class="secondary" onclick="hint()">取得提示（剩餘 <span id="hints">3</span> 次）</button><button class="secondary" onclick="reveal()">揭曉答案</button><button class="secondary" onclick="newSoup()">換一題</button><p id="soup-end"></p></div></section><section id="lobby" hidden><button class="ghost" onclick="home()">← 返回首頁</button><h2 id="mode-title"></h2><div class="panel"><label>暱稱 <input id="nickname" maxlength="24" placeholder="輸入暱稱"></label><label>人數 <select id="size"></select></label><button onclick="createRoom()">建立房間</button><label>房間代碼 <input id="room-code" maxlength="6" placeholder="ABC123"></label><button class="secondary" onclick="joinRoom()">加入房間</button><p id="error"></p></div><h3>目前房間</h3><div id="room-list"></div></section><section id="game" hidden><button class="ghost" onclick="home()">← 離開畫面（連線將保留至關閉分頁）</button><h2>房間 <span id="room-id"></span></h2><p id="game-status"></p><div class="wolf-layout"><div class="panel wolf-roster"><h3>🎭 玩家席位 · 點選頭像投票</h3><div id="players"></div><button id="ready" onclick="socket.emit('ready')">確認準備 / 取消</button><button id="start" onclick="socket.emit('start')">房主開始遊戲</button><p id="role"></p><div id="votes"></div><div id="wolf-intel" hidden></div></div><div class="panel discussion-panel"><h3>💬 中央討論區</h3><p id="debate-hint" class="muted">發言、質疑、辯論；AI 會參考討論內容。</p><button id="end-discussion" class="secondary" hidden onclick="socket.emit(&quot;endDiscussion&quot;)">結束討論・開始投票</button><div id="messages" aria-live="polite"></div><input id="chat-input" maxlength="300" placeholder="輸入訊息"><button onclick="sendChat()">傳送發言</button></div></div></section><footer>Game Hub · 課堂專題原型 · 部分多人玩法尚在開發中</footer></main><script src="/socket.io/socket.io.js"></script><script src="soup-bank.js"></script><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Hub｜地下城對抗</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<header>
+<h1>GAME <em>HUB</em>
+</h1>
+</header>
+<section id="home">
+<div class="cards">
+<article>
+<div class="symbol">🐢</div>
+<h2>海龜湯</h2>
+<p>單人推理 · 是 / 不是 / 無關 · 三次提示</p>
+<button onclick="openSoup()">開始推理</button>
+</article>
+<article>
+<div class="symbol">⚔️</div>
+<h2>團隊對抗</h2>
+<p>5v5 地下城死鬥 · 真人與 AI 同場</p>
+<button onclick="openLobby()">建立或加入房間</button>
+</article>
+</div>
+</section>
+<section id="soup" hidden>
+<button class="ghost" onclick="home()">← 返回大廳</button>
+<h2>🐢 海龜湯</h2>
+<p class="muted">請提出可以用「是、不是、無關」回答的問題。這是本地題庫關鍵字判斷原型，非 AI 自由推理。</p>
+<div class="panel">
+<h3 id="soup-title">
+</h3>
+<p id="soup-story">
+</p>
+<p id="soup-progress">
+</p>
+<input id="question" placeholder="例如：他喝的是海龜湯嗎？">
+<button onclick="askSoup()">提問</button>
+<p id="answer">
+</p>
+<button class="secondary" onclick="hint()">取得提示（剩餘 <span id="hints">3</span> 次）</button>
+<button class="secondary" onclick="reveal()">揭曉答案</button>
+<button class="secondary" onclick="newSoup()">換一題</button>
+<p id="soup-end">
+</p>
+</div>
+</section>
+<section id="lobby" hidden>
+<button class="ghost" onclick="home()">← 返回首頁</button>
+<h2>團隊對抗</h2>
+<div class="panel">
+<label>暱稱 <input id="nickname" maxlength="24" placeholder="輸入暱稱">
+</label>
+<button onclick="createRoom()">建立房間</button>
+<label>房間代碼 <input id="room-code" maxlength="6" placeholder="ABC123">
+</label>
+<button class="secondary" onclick="joinRoom()">加入房間</button>
+<p id="error">
+</p>
+</div>
+<h3>目前房間</h3>
+<div id="room-list">
+</div>
+</section><section id="game" hidden>
+  <div class="room-heading">
+    <h2>房間 <span id="room-id"></span></h2>
+    <button class="ghost" onclick="exitRoom()">離開房間</button>
+  </div>
+  <p id="room-error" role="status"></p>
+  <div id="waiting" class="panel">
+    <h3 id="seat-count"></h3>
+    <div id="players"></div>
+    <label>職業
+      <select id="job">
+        <option value="warrior">戰士</option>
+        <option value="archer">弓箭手</option>
+        <option value="mage">法師</option>
+      </select>
+    </label>
+    <p id="job-description" class="muted"></p>
+    <div id="bot-controls" hidden>
+      <button class="secondary" onclick="command('addBot')">加入 AI</button>
+      <button class="secondary" onclick="command('fillBots')">補滿 AI</button>
+    </div>
+    <button id="ready" onclick="command('ready')">準備</button>
+    <button id="start" onclick="command('start')">開始遊戲</button>
+  </div>
+  <div id="battle" hidden>
+    <div class="scoreboard">
+      <span class="red">紅隊 <strong id="red-score">0</strong></span>
+      <strong id="clock">05:00</strong>
+      <span class="blue"><strong id="blue-score">0</strong> 藍隊</span>
+    </div>
+    <div class="arena-frame">
+      <canvas id="arena" width="960" height="576" aria-label="地下城團隊對抗地圖"></canvas>
+      <p id="respawn" hidden></p>
+    </div>
+    <div class="hud">
+      <span id="health"></span>
+      <span id="attack-status"></span>
+      <span id="skill-status"></span>
+    </div>
+    <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>Enter</kbd> 聊天</p>
+    <ul id="kill-feed" aria-label="擊殺通知"></ul>
+  </div>
+  <section id="results" class="panel" hidden>
+    <h3 id="winner"></h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>玩家</th><th>隊伍</th><th>職業</th><th>擊殺</th><th>死亡</th><th>傷害</th></tr></thead>
+      <tbody id="results-body"></tbody>
+    </table></div>
+    <p id="results-note" class="muted"></p>
+    <button id="return-lobby" class="secondary" onclick="command('returnLobby')">返回大廳</button>
+    <button id="rematch" onclick="command('rematch')">再玩一局</button>
+  </section>
+  <section class="panel">
+    <h3 id="chat-title">房間聊天</h3>
+    <div id="messages" aria-live="polite"></div>
+    <form id="chat-form">
+      <input id="chat-input" maxlength="300" aria-label="聊天訊息" autocomplete="off" placeholder="輸入訊息">
+      <button>傳送</button>
+    </form>
+  </section>
+</section>
+</main>
+<script src="/socket.io/socket.io.js"></script>
+<script src="soup-bank.js"></script>
+<script src="app.js"></script>
+<script src="arena-renderer.js"></script>
+</body>
+</html>
