@@ -40,7 +40,7 @@ const matchKey = 'game-hub-seat';
 
 function show(id) {
   for (const panel of ['home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
-  if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection');
+  if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading');
   document.querySelector('header').hidden = id !== 'home';
 }
 
@@ -158,8 +158,8 @@ function renderClass(job) {
   const profile = $('class-profile');
   if (profile.dataset.job !== job || !$('class-role').textContent) {
     const art = $('class-art');
-    art.src = `/art/${job}-key-art.webp`;
-    art.alt = jobNames[job] + '立繪';
+    art.src = `/art/${job}-portrait.webp`;
+    art.alt = jobNames[job] + '頭肩立繪';
   }
   profile.dataset.job = job;
   $('class-name').textContent = jobNames[job];
@@ -244,6 +244,8 @@ function renderRoom(state) {
   $('battle').hidden = phase !== 'playing';
   $('game').classList.toggle('in-combat', phase === 'playing');
   $('game').classList.toggle('in-selection', selecting);
+  $('game').classList.toggle('in-lobby', waiting);
+  $('game').classList.toggle('in-loading', phase === 'loading');
   $('results').hidden = phase !== 'ended';
   $('chat-title').textContent = waiting ? '房間聊天' : '隊伍聊天';
   $('return-lobby').hidden = $('rematch').hidden = !host;

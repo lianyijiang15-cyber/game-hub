@@ -22,10 +22,15 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     'beginPath', 'arc', 'moveTo', 'lineTo', 'stroke']) canvasContext[name] = () => {};
 
   function element(tagName = 'DIV') {
+    const classes = new Set();
     return {
       tagName, hidden: false, children: [], value: '', textContent: '',
       width: 960, height: 576, dataset: {},
-      classList: { toggle() {}, remove() {} },
+      classList: {
+        toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); },
+        remove(...names) { for (const name of names) classes.delete(name); },
+        contains(name) { return classes.has(name); }
+      },
       setAttribute(name, value) { this[name] = value; },
       append(...items) { this.children.push(...items); },
       replaceChildren(...items) { this.children = items; },
@@ -131,28 +136,30 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('bot-summary').textContent, '9 名 AI · 0 個空位');
   assert.equal(elements.get('fill-bots').disabled, true);
   assert.equal(elements.get('class-profile').hidden, true);
+  assert.equal(elements.get('game').classList.contains('in-lobby'), true);
   assert.equal(elements.get('lobby-start').disabled, true);
   elements.get('lobby-ready').onclick();
   assert.equal(elements.get('lobby-start').disabled, false);
   elements.get('lobby-start').onclick();
   assert.equal(elements.get('class-profile').hidden, false);
   assert.equal(elements.get('room-waiting').hidden, true);
+  assert.equal(elements.get('game').classList.contains('in-lobby'), false);
   assert.equal(elements.get('chat-title').textContent, '隊伍聊天');
   assert.equal(elements.get('selection-team').children.length, 5);
   assert.equal(elements.get('start').disabled, true);
   elements.get('class-next').onclick();
   assert.deepEqual(emitted.at(-1), ['chooseClass', 'archer']);
-  assert.equal(elements.get('class-art').src, '/art/archer-key-art.webp');
+  assert.equal(elements.get('class-art').src, '/art/archer-portrait.webp');
   assert.equal(elements.get('class-name').textContent, '弓箭手');
   assert.equal(elements.get('class-hp').textContent, '600 HP');
   assert.equal(elements.get('selection-team').children[0].children[0].src, '/art/archer-avatar.webp');
   assert.equal(elements.get('class-archer').dataset.position, 'center');
   assert.equal(elements.get('class-warrior').dataset.position, 'left');
   elements.get('class-prev').onclick();
-  assert.equal(elements.get('class-art').src, '/art/warrior-key-art.webp');
+  assert.equal(elements.get('class-art').src, '/art/warrior-portrait.webp');
   assert.equal(elements.get('class-hp').textContent, '800 HP');
   elements.get('class-prev').onclick();
-  assert.equal(elements.get('class-art').src, '/art/mage-key-art.webp');
+  assert.equal(elements.get('class-art').src, '/art/mage-portrait.webp');
   assert.equal(elements.get('class-hp').textContent, '580 HP');
   assert.equal(elements.get('class-mage').dataset.position, 'center');
   elements.get('ready').onclick();
@@ -162,6 +169,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   elements.get('start').onclick();
   assert.deepEqual(emitted.at(-1), ['start']);
   assert.equal(elements.get('match-loading').hidden, false);
+  assert.equal(elements.get('game').classList.contains('in-loading'), true);
   assert.equal(elements.get('battle').hidden, true);
   assert.equal(elements.get('loading-blue').children.length, 5);
   assert.equal(elements.get('loading-red').children.length, 5);
@@ -173,6 +181,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   socketHandlers.get('room')({ id: 'ABCDE0', host: 'self', players: [player], phase: 'playing' });
   socketHandlers.get('arenaMap')({ id: 'ABCDE0', map: require('../arena/world').generateWorld() });
   assert.equal(elements.get('match-loading').hidden, true);
+  assert.equal(elements.get('game').classList.contains('in-loading'), false);
   assert.equal(elements.get('battle').hidden, false);
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', now: 100, phase: 'playing', remaining: 299900, players: [player],

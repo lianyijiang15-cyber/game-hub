@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜開放世界對抗</title>
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <main>
@@ -100,7 +100,7 @@
         </div>
       </div>
       <aside class="class-sheet" aria-label="職業美術與能力">
-        <img id="class-art" src="/art/warrior-key-art.webp" alt="戰士立繪" width="220" height="310" fetchpriority="high">
+        <img id="class-art" src="/art/warrior-portrait.webp" alt="戰士頭肩立繪" width="384" height="288" fetchpriority="high">
         <div id="class-chart" class="class-chart" role="img" aria-label="職業能力雷達圖">
           <span class="axis-hp">生命</span><span class="axis-speed">速度</span>
           <span class="axis-range">射程</span><span class="axis-damage">傷害</span><span class="axis-rate">攻速</span>
@@ -115,7 +115,8 @@
         </dl>
       </aside>
     </section>
-    <section id="room-waiting" aria-label="等待大廳">
+    <section id="room-waiting" aria-labelledby="waiting-title">
+    <h3 id="waiting-title">等待大廳</h3>
     <h3 id="seat-count"></h3>
     <div id="players" aria-label="玩家席位"></div>
     <div class="bot-settings">
@@ -179,7 +180,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=9"></script>
-<script src="arena-renderer.js?v=9"></script>
+<script src="app.js?v=10"></script>
+<script src="arena-renderer.js?v=10"></script>
 </body>
 </html>
