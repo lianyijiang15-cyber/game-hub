@@ -3,17 +3,18 @@
 for (const [job, team] of [['warrior', '紅隊'], ['archer', '藍隊'], ['mage', '藍隊']]) {
   const canvas = $('menu-' + job);
   const ctx = canvas.getContext('2d');
-  if (heroSprites) {
+  const id = { warrior: 'sky', archer: 'sain', mage: 'gamma' }[job];
+  if (campaignSprites) {
     const render = () => {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-      drawHeroPixels(ctx, job, 2, 1, 48, 50);
+      drawHeroPixels(ctx, id, 2, 1, 48, 50);
       ctx.restore();
     };
-    if (heroSprites.complete) queueMicrotask(render);
-    else heroSprites.addEventListener('load', render, { once: true });
+    if (campaignSprites.complete) queueMicrotask(render);
+    else campaignSprites.addEventListener('load', render, { once: true });
   }
   ctx.translate(20, 46);
   const color = colors[team];
@@ -77,6 +78,7 @@ previewMap.then(map => {
   if (!map) return;
   drawMapPreview($('home-map'), map, .5, .52);
   drawMapPreview($('modes-map'), map, .32, .43);
+  drawMapPreview($('room-entry-map'), map, .64, .55);
   const canvas = $('menu-arena-map');
   drawMapPreview(canvas, map, 0.31, 0.74);
   const ctx = canvas.getContext('2d');

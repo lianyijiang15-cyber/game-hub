@@ -1,6 +1,6 @@
 'use strict';
 
-const { map, stats, blocked, clearLine, distance, attack, canSee, scenarioGoal } = require('./combat');
+const { map, stats, blocked, clearLine, distance, attack, canSee, canTarget, scenarioGoal } = require('./combat');
 const { campOffset } = require('./world');
 const graphs = new WeakMap();
 function navigation(world) {
@@ -86,7 +86,7 @@ function steer(player, target) {
 function botInput(room, bot, now) {
   const objective = scenarioGoal(room, bot, now);
   const enemies = room.players.concat(room.scenario?.beasts ?? []).filter(player => player.alive && player.team !== bot.team &&
-    canSee(bot, player, room.map));
+    canTarget(bot, player, now) && canSee(bot, player, room.map));
   enemies.sort((a, b) => distance(bot, a) - distance(bot, b) ||
     ((a.slot + bot.slot) % 5) - ((b.slot + bot.slot) % 5));
   const enemy = enemies[0];

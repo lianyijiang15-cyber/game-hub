@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 <link rel="stylesheet" href="menu.css?v=3">
 <link rel="stylesheet" href="account.css?v=2">
 </head>
@@ -177,22 +177,33 @@
 <p id="soup-record" role="status"></p>
 </div>
 </section>
-<section id="lobby" hidden>
-<button class="ghost" onclick="show('modes')">← 選擇副本</button>
-<h2 id="lobby-mode">團隊死鬥</h2>
-<div class="panel">
-<label>暱稱 <input id="nickname" maxlength="24" placeholder="輸入暱稱">
-</label>
-<button onclick="createRoom()">建立房間</button>
-<label>房間代碼 <input id="room-code" maxlength="6" placeholder="ABC123">
-</label>
-<button class="secondary" onclick="joinRoom()">加入房間</button>
-<p id="error">
-</p>
-</div>
-<h3>目前房間</h3>
-<div id="room-list">
-</div>
+<section id="lobby" hidden aria-labelledby="lobby-mode">
+  <canvas class="menu-map-backdrop" id="room-entry-map" width="960" height="540" aria-hidden="true"></canvas>
+  <div class="menu-frame room-entry-frame">
+    <div class="menu-bar">
+      <h2 id="lobby-mode">團隊死鬥</h2>
+      <button class="menu-back" id="room-entry-back" type="button">← 選擇副本</button>
+    </div>
+    <div class="room-entry-grid">
+      <section class="room-entry-card" aria-labelledby="entry-title">
+        <h3 id="entry-title">建立或加入房間</h3>
+        <p id="entry-rules"></p>
+        <label for="nickname">玩家暱稱</label>
+        <input id="nickname" maxlength="24" placeholder="輸入暱稱">
+        <button class="room-create" id="entry-create" type="button">＋ 建立房間</button>
+        <form id="entry-join">
+          <label for="room-code">房間代碼</label>
+          <div class="room-entry-code"><input id="room-code" maxlength="6" placeholder="ABC123" autocomplete="off">
+          <button class="secondary" type="submit">加入 →</button></div>
+        </form>
+        <p id="error" role="status"></p>
+      </section>
+      <section class="room-entry-card" aria-labelledby="room-list-name">
+        <h3 id="room-list-name">目前房間</h3>
+        <div id="room-list"></div>
+      </section>
+    </div>
+  </div>
 </section><section id="game" hidden>
   <div class="room-heading">
     <h2>房間 <span id="room-id"></span></h2>
@@ -200,34 +211,34 @@
   </div>
   <p id="room-error" role="status"></p>
   <div id="waiting" class="panel">
-    <section id="class-profile" class="class-select" hidden data-job="warrior" aria-label="個人選角">
+    <section id="class-profile" class="class-select" hidden data-job="sky" aria-label="個人選角">
       <div class="picker-stage">
         <h3 class="picker-title">選擇出戰角色</h3>
         <div class="hero-categories" aria-label="角色分類">
-          <button type="button" id="hero-warriors">戰士</button>
-          <button type="button" id="hero-archers">弓箭手</button>
-          <button type="button" id="hero-mages">法師</button>
+          <button type="button" id="hero-commanders">指揮</button>
+          <button type="button" id="hero-supports">輔助</button>
+          <button type="button" id="hero-fighters">打手</button>
         </div>
         <div class="picker-carousel">
           <button class="class-arrow" id="class-prev" type="button" aria-label="上一個角色">‹</button>
           <div id="class-options" class="class-options" role="group" aria-label="角色">
-            <button type="button" id="class-warrior" data-job="warrior" data-position="center" aria-pressed="true"><img src="/art/warrior-model.webp" alt="" width="220" height="310"><span>戰士</span></button>
-            <button type="button" id="class-archer" data-job="archer" data-position="right" aria-pressed="false"><img src="/art/archer-model.webp" alt="" width="220" height="310"><span>弓箭手</span></button>
-            <button type="button" id="class-mage" data-job="mage" data-position="left" aria-pressed="false"><img src="/art/mage-model.webp" alt="" width="220" height="310"><span>法師</span></button>
-            <button type="button" id="class-frostguard" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
-            <button type="button" id="class-berserker" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
-            <button type="button" id="class-scout" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
-            <button type="button" id="class-marksman" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
-            <button type="button" id="class-frostmage" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
-            <button type="button" id="class-stormmage" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
+            <button type="button" id="class-sky" aria-pressed="false" hidden></button>
+            <button type="button" id="class-oshi" aria-pressed="false" hidden></button>
+            <button type="button" id="class-frost" aria-pressed="false" hidden></button>
+            <button type="button" id="class-sain" aria-pressed="false" hidden></button>
+            <button type="button" id="class-kosain" aria-pressed="false" hidden></button>
+            <button type="button" id="class-tanjun" aria-pressed="false" hidden></button>
+            <button type="button" id="class-alpha" aria-pressed="false" hidden></button>
+            <button type="button" id="class-beta" aria-pressed="false" hidden></button>
+            <button type="button" id="class-gamma" aria-pressed="false" hidden></button>
           </div>
           <button class="class-arrow" id="class-next" type="button" aria-label="下一個角色">›</button>
         </div>
         <div class="class-copy" aria-live="polite">
           <p id="class-role"></p>
-          <h3 id="class-name">戰士</h3>
+          <h3 id="class-name">斯蓋</h3>
           <p id="job-description"></p>
-          <p class="class-skill"><kbd>Q</kbd> <strong id="class-skill"></strong></p>
+          <ul id="class-skills" class="class-skills"></ul>
         </div>
         <div id="selection-team" class="selection-team" aria-label="同隊角色"></div>
         <div class="ready-actions">
@@ -298,6 +309,7 @@
     </div>
     <div id="mode-hud" hidden>
       <span id="mode-status"></span>
+      <button id="mode-craft" type="button" hidden>融合草藥 [G]</button>
       <button id="mode-antidote" type="button" hidden>使用解藥 [F]</button>
     </div>
     <button id="mode-interact" type="button" hidden></button>
@@ -316,9 +328,16 @@
     <div class="hud">
       <div class="health-block"><span id="health"></span><progress id="health-bar" max="800" value="0" aria-label="生命值"></progress></div>
       <div class="ability"><kbd>左鍵</kbd><span id="attack-status"></span></div>
-      <div class="ability"><kbd>Q</kbd><span id="skill-status"></span></div>
+      <div class="ability" id="legacy-skill"><kbd>Q</kbd><span id="skill-status"></span></div>
+      <div id="hero-skill-controls">
+        <div id="hero-skill-buttons">
+          <button type="button" id="hero-skill-0"></button><button type="button" id="hero-skill-1"></button>
+          <button type="button" id="hero-skill-2"></button>
+        </div>
+        <select id="skill-ally" aria-label="指定隊友" hidden></select>
+      </div>
     </div>
-    <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>E</kbd> 互動 · <kbd>Enter</kbd> 聊天</p>
+    <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd>/<kbd>C</kbd>/<kbd>V</kbd> 技能 · <kbd>E</kbd> 互動 · <kbd>Enter</kbd> 聊天</p>
     <ul id="kill-feed" aria-label="擊殺通知"></ul>
   </div>
   <section id="results" aria-labelledby="winner" hidden>
@@ -363,10 +382,10 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=2"></script>
-<script src="heroes.js?v=1"></script>
-<script src="app.js?v=20"></script>
-<script src="arena-renderer.js?v=19"></script>
-<script src="menu-art.js?v=3"></script>
+<script src="heroes.js?v=2"></script>
+<script src="app.js?v=21"></script>
+<script src="arena-renderer.js?v=20"></script>
+<script src="menu-art.js?v=4"></script>
 <script src="account.js?v=2"></script>
 <script src="player-panel.js?v=3"></script>
 </body>

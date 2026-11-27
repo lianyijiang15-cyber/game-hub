@@ -210,9 +210,11 @@ test('both teams award MVP and lowest KDA and the winning MVP is featured', () =
 });
 
 test('nine heroes apply their server-side traits, including frost slow and storm cooldown', () => {
-  const ids = Object.keys(combat.heroes);
+  const ids = Object.keys(combat.playableHeroes);
   assert.equal(ids.length, 9);
-  for (const job of combat.jobs) assert.equal(ids.filter(id => combat.heroes[id].job === job).length, 3);
+  for (const role of ['commander', 'support', 'fighter']) {
+    assert.equal(ids.filter(id => combat.playableHeroes[id].role === role).length, 3);
+  }
 
   const room = match();
   const [frost, opponent, storm] = room.players;

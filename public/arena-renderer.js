@@ -19,7 +19,7 @@ function createArenaCamera() {
       const maxY = Math.max(0, map.height - height);
       const targetX = clamp(position.x - width / 2, maxX);
       const targetY = clamp(position.y - height / 2, maxY);
-      const reset = world !== map || player.id !== playerId || player.spawnedAt !== spawnedAt;
+      const reset = world !== map || player.id !== playerId || player.spawnedAt !== spawnedAt || player.warped !== this.warped;
       const elapsed = Math.min(100, Math.max(0, time - lastTime));
       const blend = reset ? 1 : 1 - Math.exp(-elapsed / 65);
       x = clamp(x + (targetX - x) * blend, maxX);
@@ -29,6 +29,7 @@ function createArenaCamera() {
       world = map;
       playerId = player.id;
       spawnedAt = player.spawnedAt;
+      this.warped = player.warped;
       lastTime = time;
     }
   };
@@ -36,13 +37,17 @@ function createArenaCamera() {
 const arenaCamera = createArenaCamera();
 let arenaZoom = 1.38;
 const heroSprites = typeof Image === 'undefined' ? null : new Image();
+const campaignSprites = typeof Image === 'undefined' ? null : new Image();
 if (heroSprites) heroSprites.src = '/art/heroes/sprites.webp';
+if (campaignSprites) campaignSprites.src = '/art/heroes/campaign-sprites.webp';
 
 function drawHeroPixels(ctx, id, x, y, width, height) {
-  const index = heroAtlasOrder.indexOf(id);
-  if (!heroSprites?.complete || !heroSprites.naturalWidth || index < 0) return false;
+  const campaignIndex = playableOrder.indexOf(id);
+  const atlas = campaignIndex < 0 ? heroSprites : campaignSprites;
+  const index = campaignIndex < 0 ? heroAtlasOrder.indexOf(id) : campaignIndex;
+  if (!atlas?.complete || !atlas.naturalWidth || index < 0) return false;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(heroSprites, index * 28, 0, 28, 30, x, y, width, height);
+  ctx.drawImage(atlas, index * 28, 0, 28, 30, x, y, width, height);
   return true;
 }
 const colors = {
@@ -165,7 +170,7 @@ function paintWorld(ctx, map, width, height, camera = arenaCamera) {
 }
 
 function displayPosition(player, old, blend) {
-  const interpolate = old && old.alive === player.alive && old.spawnedAt === player.spawnedAt;
+  const interpolate = old && old.alive === player.alive && old.spawnedAt === player.spawnedAt && old.warped === player.warped;
   return {
     x: Math.round(interpolate ? old.x + (player.x - old.x) * blend : player.x),
     y: Math.round(interpolate ? old.y + (player.y - old.y) * blend : player.y)
@@ -268,6 +273,10 @@ function sprite(ctx, p, old, blend, time, localId) {
   const headX = Math.abs(Math.cos(facing)) > 0.7 ? Math.sign(Math.cos(facing)) * 3 : 0;
   ctx.save();
   ctx.translate(x, y - bob);
+  if (p.form === 1) {
+    rect(ctx, '#bd99fd8e', -21, -46, 2, 44);
+    rect(ctx, '#bd99fd8e', 19, -46, 2, 44);
+  }
   ctx.save();
   if (Math.cos(facing) < -.3) ctx.scale(-1, 1);
   ctx.rotate(p.action?.until > time ? .10 : 0);

@@ -664,3 +664,46 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 .hero-categories { display: flex; justify-content: center; gap: 6px; }
 #game .hero-categories button { margin: 0; background: #2c2928e8; color: #fff2d4; border: 1px solid #b59a72; padding: 4px 9px; }
 #game .hero-categories button[aria-pressed="true"] { background: #e9cb8b; color: #2a2125; }
+
+#lobby {
+  position: fixed; inset: 0; z-index: 9; isolation: isolate; overflow: auto;
+  background: #172623; --room-accent: #d8b477;
+}
+#lobby[data-mode="survival"] { --room-accent: #a8d0b9; }
+#lobby[data-mode="control"] { --room-accent: #c5ade8; }
+#lobby::before {
+  position: fixed; inset: 0; content: ""; z-index: -1; pointer-events: none;
+  background: linear-gradient(135deg, #101923f0, #121f23a6 65%, #101923e8);
+}
+.room-entry-frame { grid-template-rows: auto 1fr; }
+.room-entry-frame h2 { margin: 0; font-size: clamp(1.25rem, 3vw, 2rem); letter-spacing: .14em; }
+.room-entry-grid {
+  display: grid; grid-template-columns: minmax(260px, .8fr) minmax(270px, 1.2fr);
+  gap: clamp(14px, 3vw, 36px); align-content: center; padding-block: 24px;
+}
+.room-entry-card {
+  background: #171f28ed; border: 2px solid var(--room-accent); box-shadow: 6px 7px #0a1118ba;
+  padding: clamp(16px, 2.8vw, 32px); color: #f8ebd3;
+}
+.room-entry-card h3 { margin-top: 0; color: var(--room-accent); font-size: clamp(1.15rem, 2vw, 1.55rem); }
+.room-entry-card label { display: block; margin-bottom: 5px; }
+.room-entry-card input { display: block; margin: 0; min-width: 0; width: 100%; }
+#lobby .room-create { margin: 12px 0 4px; color: #21171e; background: var(--room-accent); border-radius: 0; }
+.room-entry-code { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.room-entry-code button { margin: 0; border-radius: 0; }
+#room-list p { border-block-end: 1px solid #8c8d694f; padding-bottom: 7px; overflow-wrap: anywhere; }
+.class-skills { padding: 0; margin: .4rem 0 0; list-style: none; }
+.class-skills li { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: start; margin-bottom: 5px; }
+.class-skills li span { grid-column: 2; font-size: .72rem; }
+#hero-skill-controls, #hero-skill-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+#game #hero-skill-buttons button, #game #mode-craft { margin: 2px; padding: 4px 7px; }
+#hero-skill-controls select { margin: 2px; padding: 5px; font-size: .75rem; }
+.in-combat #hero-skill-controls { pointer-events: auto; }
+@media (max-width: 700px) {
+  .room-entry-grid { grid-template-columns: minmax(0, 1fr); align-content: start; }
+}
+.in-selection .picker-stage { grid-template-rows: auto auto 1fr auto auto auto; }
+@media (min-width: 901px) {
+  .in-selection .hero-categories { grid-row: 2; }
+  .in-selection .picker-carousel { grid-row: 3; }
+}

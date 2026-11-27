@@ -42,7 +42,7 @@ function roomState(room, viewerId) {
     id: room.id, host: room.host, size: seats, phase: room.phase, mode: room.mode,
     loadingRemaining: Math.max(0, (room.loadingUntil ?? 0) - now()),
     players: room.players.map(({ id, name, job, hero, ready, bot, team, slot }) => ({
-      id, name, ready, bot, ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, hero, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot) } : {}) } : id === viewerId ? { job, hero } : {})
+      id, name, ready, bot, ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, hero, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot, hero) } : {}) } : id === viewerId ? { job, hero } : {})
     }))
   };
 }
@@ -63,11 +63,10 @@ function member(socket) {
 function addBot(room) {
   let number = 1;
   while (room.players.some(player => player.bot && player.name === 'AI ' + number)) number++;
-  room.players.push({
-    id: 'bot-' + crypto.randomUUID(), name: 'AI ' + number, bot: true, ready: true,
-    hero: Object.keys(combat.heroes)[(number - 1) % 9],
-    job: Object.values(combat.heroes)[(number - 1) % 9].job
-  });
+  const botOrder = ['sky', 'sain', 'alpha', 'oshi', 'kosain', 'beta', 'frost', 'tanjun', 'gamma'];
+  const hero = botOrder[(number - 1) % botOrder.length];
+  room.players.push({ id: 'bot-' + crypto.randomUUID(), name: 'AI ' + number, bot: true, ready: true,
+    hero, job: combat.playableHeroes[hero].job });
 }
 
 function closeRoom(room) {
@@ -178,7 +177,7 @@ function playerStats({ team, job, hero, kills, deaths, assists, damage }) {
 
 function join(socket, room, name, accountKey) {
   const ticket = crypto.randomUUID();
-  room.players.push({ id: socket.id, name, accountKey, job: 'warrior', hero: 'warrior', ready: false, bot: false, ticket });
+  room.players.push({ id: socket.id, name, accountKey, job: 'warrior', hero: 'sky', ready: false, bot: false, ticket });
   socket.join(channel(room));
   socket.data.room = room.id;
   return ticket;
@@ -304,7 +303,7 @@ io.on('connection', socket => {
     publish(room);
   });
   command('chooseClass', (hero, { room, player }) => {
-    if (room?.phase !== 'selection' || player.ready || typeof hero !== 'string' || !Object.hasOwn(combat.heroes, hero)) return { error: '目前無法選擇此職業' };
+    if (room?.phase !== 'selection' || player.ready || typeof hero !== 'string' || !Object.hasOwn(combat.playableHeroes, hero)) return { error: '目前無法選擇此職業' };
     player.hero = hero;
     player.job = combat.heroes[hero].job;
     player.ready = false;
@@ -360,6 +359,15 @@ io.on('connection', socket => {
     if (!room || typeof id !== 'string' || id.length > 24) return { error: '無效的互動目標' };
     return combat.interact(room, player, id, now());
   }, 250);
+  command('modeCraft', (_, { room, player }) => {
+    if (!room) return { error: '目前無法融合草藥' };
+    return modes.craftAntidote(room, player);
+  }, 400);
+  command('heroSkill', (data, { room, player }) => {
+    const validId = value => value == null || typeof value === 'string' && value.length <= 64;
+    if (!room || !validId(data?.ally) || !validId(data?.enemy)) return { error: '無效技能目標' };
+    return combat.cast(room, player, data, now());
+  }, 140);
   command('modeAntidote', (_, { room, player }) => {
     if (!room) return { error: '目前無法使用解藥' };
     return modes.antidote(room, player, now());

@@ -4,7 +4,8 @@ const { generateWorld, solid, impassable, campOffset } = require('./world');
 const { terrainBlocked, playerBlocked, movePlayer } = require('./collision');
 const loot = require('./loot');
 const modes = require('./modes');
-const { heroes } = require('../public/heroes');
+const skill = require('./hero-skills');
+const { heroes, playableHeroes } = require('../public/heroes');
 const map = generateWorld();
 const visionRadius = 360;
 const grassRevealRadius = 80;
@@ -16,8 +17,12 @@ const classes = {
 };
 const jobs = Object.keys(classes);
 const heroStats = Object.fromEntries(Object.entries(heroes).map(([id, hero]) =>
-  [id, { ...classes[hero.job], ...hero.stats }]));
-function stats(player) { return heroStats[player.hero] ?? classes[player.job]; }
+  [id, playableHeroes[id] ? { ...classes[hero.job], hp: hero.hp, speed: hero.speed, damage: hero.damage, defense: 0 } :
+    { ...classes[hero.job], ...hero.stats }]));
+function stats(player) {
+  const base = heroStats[player.hero] ?? classes[player.job];
+  return player.hero === 'beta' && player.form === 1 ? { ...base, hp: 5000, speed: 670, damage: 500 } : base;
+}
 const teams = ['紅隊', '藍隊'];
 const radius = 12;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -90,10 +95,14 @@ function spawn(room, player, now) {
   for (const position of positions) {
     if (terrainBlocked(room.map, position.x, position.y) ||
         playerBlocked(room.players, player, position.x, position.y)) continue;
+    player.form = 0;
+    player.formHealth = player.hero === 'beta' ? [10000, 5000] : null;
+    player.formState = player.hero === 'beta' ? [null, null] : null;
     Object.assign(player, position, {
       hp: stats(player).hp, alive: true, input: { x: 0, y: 0 }, inputAt: 0,
       angle: side === 1 ? 0 : Math.PI, facing: side === 1 ? 0 : Math.PI, moving: false,
-      contributors: new Map(), buffs: new Map(), attackAt: 0, skillAt: 0, slowUntil: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
+      contributors: new Map(), buffs: new Map(), powers: new Map(), skillTimes: [0, 0, 0], nextAttack: false,
+      nextBotSkill: 0, warped: 0, attackAt: 0, skillAt: 0, slowUntil: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
     });
     return;
   }
@@ -130,6 +139,7 @@ function start(room, now, seed) {
 function defeat(room, target, source, now, attackerName) {
   target.alive = false;
   target.buffs.clear();
+  target.powers?.clear();
   target.moving = false;
   target.input = { x: 0, y: 0 };
   target.respawnAt = now + 3000;
@@ -148,44 +158,86 @@ function defeat(room, target, source, now, attackerName) {
   if (source && modes.modeOf(room) === 'deathmatch' && room.score[source.team] >= 20) modes.finish(room, now);
 }
 
-function environmentHit(room, player, damage, now, cause) {
-  player.hp = Math.max(0, player.hp - damage);
-  player.hurtAt = now;
-  if (!player.hp) defeat(room, player, null, now, cause);
+function attackTargets(room) { return room.players.concat(room.scenario?.beasts ?? []); }
+
+function damagePlayer(room, source, target, raw, now, options = {}) {
+  if (room.phase !== 'playing' || !target.alive || raw <= 0) return;
+  const lootBonus = loot.modifiers(target, now);
+  if (!options.direct && (lootBonus.immune || skill.active(target, 'immune', now))) return;
+  const shield = skill.active(target, 'shield', now);
+  const support = skill.active(target, 'supportShield', now);
+  const surge = skill.active(target, 'surge', now);
+  const absorb = !options.secondary && skill.active(target, 'absorb', now);
+  let incoming = options.direct ? raw : raw * (1 - (shield?.reduction ?? 0)) *
+    (1 - (support?.reduction ?? 0)) * (1 - (surge?.reduction ?? 0)) *
+    (source ? 100 / (100 + stats(target).defense + lootBonus.defense) : 1);
+
+  let diverted = 0;
+  if (absorb?.source?.alive && absorb.source.form === absorb.sourceForm) {
+    diverted = incoming * .9;
+    incoming -= diverted;
+  }
+  const actual = Math.min(target.hp, Math.round(incoming));
+  if (source && source !== target && actual > 0) {
+    target.contributors.set(source, now);
+    source.damage += actual;
+  }
+  target.hp -= actual;
+  if (actual) target.hurtAt = now;
+  if (target.hp <= 0) defeat(room, target, source, now, source?.name ?? options.cause);
+  else skill.protectLowHealth(target, stats, skill.active(target, 'controlImmune', now));
+
+  if (diverted) {
+    damagePlayer(room, source, absorb.source, diverted, now, { direct: true, secondary: true, cause: options.cause });
+    if (absorb.rebound.alive) {
+      damagePlayer(room, absorb.source, absorb.rebound, diverted * .2, now, { secondary: true });
+    }
+  }
+  if (!options.secondary && source?.alive && source.team !== target.team && shield?.reflect) {
+    damagePlayer(room, target, source, raw * shield.reflect, now, { secondary: true });
+  }
 }
 
-function attackTargets(room) { return room.players.concat(room.scenario?.beasts ?? []); }
+function environmentHit(room, player, damage, now, cause) {
+  const direct = cause === '炸彈' || cause === '生命燃燒';
+  damagePlayer(room, null, player, damage, now, { cause, direct, secondary: direct });
+}
 
 function hit(room, source, target, damage, now) {
   if (room.phase !== 'playing' || !target.alive || source.team === target.team) return;
   if (!target.team) return modes.hitBeast(room, source, target, damage);
-  const defense = loot.modifiers(target, now);
-  if (defense.immune) return;
-  const actual = Math.min(target.hp, Math.round(damage * 100 / (100 + stats(target).defense + defense.defense)));
-  target.contributors.set(source, now);
-  target.hp -= actual;
-  source.damage += actual;
-  target.hurtAt = now;
-  if (target.hp <= 0) defeat(room, target, source, now, source.name);
+  damagePlayer(room, source, target, damage, now);
+}
+
+function canTarget(player, target, now) {
+  return target.team === player.team || !skill.active(target, 'invisible', now);
+}
+
+function cast(room, player, request, now) {
+  return skill.cast(room, player, request, now, { clearLine, stats,
+    hit: (source, target, damage) => hit(room, source, target, damage, now) });
 }
 
 const scenarioHooks = { clearLine, stats, environmentHit, movePlayer };
 
 function effect(room, type, position, angle, range, team, now) {
-  room.effects.push({ type, x: position.x, y: position.y, angle, range, team, until: now + 240 });
+  room.effects.push({ actor: position.id, type, x: position.x, y: position.y, angle, range, team, until: now + 240 });
 }
 
-function attack(room, player, x, y, skill, now) {
+function attack(room, player, x, y, useSkill, now) {
   if (room.phase !== 'playing' || !player.alive || now >= room.endsAt) return;
-  const key = skill ? 'skillAt' : 'attackAt';
+  if (useSkill && playableHeroes[player.hero]) return;
+  const key = useSkill ? 'skillAt' : 'attackAt';
   if (now < player[key]) return;
   const job = stats(player);
-  const attackBoost = loot.modifiers(player, now).attack;
+  const attackBoost = loot.modifiers(player, now).attack * skill.attackMultiplier(player, now) *
+    (!useSkill && player.nextAttack ? 1.5 : 1);
+  if (!useSkill) player.nextAttack = false;
   const angle = Math.atan2(y - player.y, x - player.x);
-  player[key] = now + (skill ? job.skillCooldown ?? 5000 : job.cooldown);
-  Object.assign(player, { angle, facing: angle, action: { skill, until: now + 240 } });
+  player[key] = now + (useSkill ? job.skillCooldown ?? 5000 : job.cooldown);
+  Object.assign(player, { angle, facing: angle, action: { skill: useSkill, until: now + 240 } });
 
-  if (skill && player.job !== 'warrior') {
+  if (useSkill && player.job !== 'warrior') {
     const arrows = player.job === 'archer';
     for (const spread of arrows ? [-0.18, 0, 0.18] : [0]) {
       room.projectiles.push({
@@ -198,13 +250,13 @@ function attack(room, player, x, y, skill, now) {
     return;
   }
 
-  const range = skill ? 90 : job.range;
-  const enemies = attackTargets(room).filter(other => other.alive && other.team !== player.team &&
+  const range = useSkill ? 90 : job.range;
+  const enemies = attackTargets(room).filter(other => other.alive && other.team !== player.team && canTarget(player, other, now) &&
     distance(player, other) <= range && clearLine(player, other, 0, room.map) &&
-    (skill || Math.cos(Math.atan2(other.y - player.y, other.x - player.x) - angle) >= Math.cos(0.30)));
+    (useSkill || Math.cos(Math.atan2(other.y - player.y, other.x - player.x) - angle) >= Math.cos(0.30)));
   enemies.sort((a, b) => distance(player, a) - distance(player, b));
-  for (const enemy of skill ? enemies : enemies.slice(0, 1)) hit(room, player, enemy, (skill ? job.skillDamage : job.damage) * attackBoost, now);
-  effect(room, skill ? 'spin' : player.job, player, angle, range, player.team, now);
+  for (const enemy of useSkill ? enemies : enemies.slice(0, 1)) hit(room, player, enemy, (useSkill ? job.skillDamage : job.damage) * attackBoost, now);
+  effect(room, useSkill ? 'spin' : player.job, player, angle, range, player.team, now);
 }
 
 function advanceProjectile(room, projectile, dt, now) {
@@ -220,7 +272,7 @@ function advanceProjectile(room, projectile, dt, now) {
       break;
     }
     Object.assign(projectile, { x, y });
-    const target = attackTargets(room).find(player => player.alive && player.team !== projectile.source.team &&
+    const target = attackTargets(room).find(player => player.alive && player.team !== projectile.source.team && canTarget(projectile.source, player, now) &&
       distance(player, projectile) <= radius + 2 && clearLine(projectile, player, 0, room.map));
     if (!target) continue;
     if (projectile.type === 'arrow') hit(room, projectile.source, target, projectile.damage, now);
@@ -236,7 +288,7 @@ function advanceProjectile(room, projectile, dt, now) {
       if (distance(target, projectile) <= blast && clearLine(projectile, target, 0, room.map)) {
         const hp = target.hp;
         hit(room, projectile.source, target, projectile.damage, now);
-        if (projectile.slow && target.team && target.alive && target.hp < hp) target.slowUntil = now + 1800;
+        if (projectile.slow && target.team && target.alive && target.hp < hp && !skill.active(target, 'controlImmune', now)) target.slowUntil = now + 1800;
       }
     }
   }
@@ -245,7 +297,7 @@ function advanceProjectile(room, projectile, dt, now) {
 
 function move(room, player, vector, dt, now) {
   const length = Math.max(1, Math.hypot(vector.x, vector.y));
-  const step = stats(player).speed * (player.slowUntil > now ? .72 : 1) * loot.modifiers(player, now).speed * dt / length;
+  const step = stats(player).speed * skill.speedMultiplier(player, now) * (player.slowUntil > now ? .72 : 1) * loot.modifiers(player, now).speed * dt / length;
   player.moving = movePlayer(room.map, room.players, player, vector.x * step, vector.y * step);
   if (player.moving) player.facing = Math.atan2(vector.y, vector.x);
 }
@@ -259,6 +311,15 @@ function tick(room, now, dt, botInput, route) {
     if (room.phase !== 'playing') break;
     if (!player.alive) {
       if (modes.respawns(room) && now >= player.respawnAt) spawn(room, player, now);
+      continue;
+    }
+    skill.tick(player, now, stats, (target, amount) => environmentHit(room, target, amount, now, '生命燃燒'));
+    if (!player.alive || room.phase !== 'playing') continue;
+    if (player.bot) skill.botCast(room, player, now, { clearLine, stats,
+      hit: (source, target, damage) => hit(room, source, target, damage, now) });
+    if (!player.alive || room.phase !== 'playing') continue;
+    if (skill.active(player, 'root', now)) {
+      player.moving = false;
       continue;
     }
     const vector = player.bot ? botInput(room, player, now) :
@@ -290,7 +351,7 @@ function castRune(room, player, now) {
       !loot.consumeRune(player, now)) return false;
   const damage = loot.shockwave.damage * loot.modifiers(player, now).attack;
   for (const enemy of attackTargets(room)) {
-    if (loot.inRange(player, enemy, loot.shockwave.range) && clearLine(player, enemy, 0, room.map)) {
+    if (canTarget(player, enemy, now) && loot.inRange(player, enemy, loot.shockwave.range) && clearLine(player, enemy, 0, room.map)) {
       hit(room, player, enemy, damage, now);
     }
   }
@@ -320,11 +381,11 @@ function snapshot(room, now, viewer = null) {
   // The client draws the visible camera rectangle. Keep distant opponents out of its feed.
   const sees = point => !local || Math.abs(viewer.x - point.x) <= 1010 && Math.abs(viewer.y - point.y) <= 730;
   const players = local ? room.players.filter(player => player === viewer ||
-    sees(player)) : room.players;
+    canTarget(viewer, player, now) && sees(player)) : room.players;
   const results = room.phase === 'ended' ? room.roster.map(player => {
     const { id, name, team, bot, job, hero, kills, deaths, assists, damage, role, eliminatedAt } = player;
     return { id, name, team, bot, job, hero, kills, deaths, assists, damage, role,
-      survival: room.scenario?.mode === 'survival' ? Math.max(0, (eliminatedAt ?? Math.min(now, room.endsAt)) - room.scenario.startedAt) : null };
+      survival: room.scenario?.mode === 'survival' ? Math.max(0, (eliminatedAt ?? room.scenario.finishedAt ?? Math.min(now, room.endsAt)) - room.scenario.startedAt) : null };
   }) : null;
   const awards = results ? teamAwards(results) : null;
   const mvp = room.winner ? awards?.[room.winner]?.mvp ?? null :
@@ -338,17 +399,23 @@ function snapshot(room, now, viewer = null) {
     loot.inRange(viewer, chest, loot.interactRange) && clearLine(viewer, chest, 2, room.map))
     .sort((a, b) => distance(viewer, a) - distance(viewer, b))[0]?.id ?? null : null;
   return {
-    id: room.id, mode: modes.modeOf(room), scenario: modes.view(room, local ? viewer : null, now, sees, clearLine), phase: room.phase, winner: room.winner, score: room.score, now,
-    remaining: Math.max(0, room.endsAt - now), effects: room.effects.filter(sees), kills: room.kills,
+    id: room.id, mode: modes.modeOf(room), scenario: modes.view(room, local ? viewer : null, now, sees, clearLine, canTarget), phase: room.phase, winner: room.winner, score: room.score, now,
+    remaining: Math.max(0, room.endsAt - now), effects: room.effects.filter(item => sees(item) &&
+      (!local || !room.players.some(player => player.id === item.actor && !canTarget(viewer, player, now)))), kills: room.kills,
     chests, nearbyChest, openedChestIds: room.chests.filter(chest => chest.openedAt !== null).map(chest => chest.id),
     inventory: local ? viewer.inventory.map(item => item && { label: item.label, quality: item.quality }) : [],
     buffs: local ? loot.activeBuffs(viewer, now).map(({ label, until }) => ({ label, until })) : [],
     attackRange, targetInRange,
+    skillAllies: local ? room.players.filter(player => player !== viewer && player.alive && player.team === viewer.team)
+      .map(({ id, name, x, y }) => ({ id, name, x, y })) : [],
+    skillTimes: local ? viewer.skillTimes : [],
+    heroEffects: local ? [...(viewer.powers ?? [])].filter(([, power]) => power.until > now)
+      .map(([key, power]) => ({ key, until: power.until })) : [],
     projectiles: room.projectiles.filter(sees).map(({ id, x, y, angle, type, tint }) => ({ id, x, y, angle, type, tint })),
     players: players.map(({ id, x, y, name, team, job, hero, role, hp, bot, alive, moving, angle, facing,
-      action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt }) =>
-      ({ id, x, y, name, team, job, hero, role, hp, maxHp: stats({ hero, job }).hp, bot, alive, moving, angle, facing,
-        action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt })),
+      action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt, form, warped }) =>
+      ({ id, x, y, name, team, job, hero, role, hp, maxHp: stats({ hero, job, form }).hp, bot, alive, moving, angle, facing,
+        action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt, form, warped })),
     results, mvp, teamAwards: awards
   };
 }
@@ -356,4 +423,4 @@ function snapshot(room, now, viewer = null) {
 function interact(room, player, id, now) { return modes.interact(room, player, id, now, scenarioHooks); }
 function scenarioGoal(room, player, now) { return modes.botGoal(room, player, now, scenarioHooks); }
 
-module.exports = { heroes, stats, interact, scenarioGoal, map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };
+module.exports = { heroes, playableHeroes, cast, canTarget, stats, interact, scenarioGoal, map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };

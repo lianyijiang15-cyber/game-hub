@@ -94,9 +94,11 @@ const baseStats = {
   archer: { role: '遠距游擊', hp: 600, defense: 12, range: 240, speed: 185, damage: 72, cooldown: 850, description: '利用長弓和最快的移動速度，從遠處牽制敵人。三重箭向不同角度飛出，適合封住通道或在近距離打中多支。' },
   mage: { role: '遠程範圍傷害', hp: 560, defense: 8, range: 190, speed: 165, damage: 86, cooldown: 950, description: '靠隊友掩護尋找施法角度。火球撞擊後會爆炸，適合攻擊聚在一起的敵人。' }
 };
-const classDetails = Object.fromEntries(Object.entries(heroes).map(([id, hero]) =>
-  [id, { ...baseStats[hero.job], ...hero.stats, ...hero }]));
-const heroSkill = { frostmage: '冰晶爆裂', stormmage: '雷霆法球' };
+const classDetails = Object.fromEntries(playableOrder.map(id => {
+  const hero = playableHeroes[id];
+  return [id, { ...baseStats[hero.job], ...hero, defense: 0 }];
+}));
+const heroSkillKeys = ['Q', 'C', 'V'];
 function heroName(player) { return heroes[player.hero ?? player.job]?.name ?? jobNames[player.job]; }
 function heroArt(id, type, job = id) {
   const variant = type === 'avatar' ? 'portrait' : type;
@@ -120,7 +122,7 @@ let lootToastUntil = 0;
 const modeNames = { deathmatch: '團隊死鬥', flag: '拔旗戰', survival: '生存戰', control: '據點戰' };
 const roleNames = { commander: '指揮', support: '輔助', fighter: '打手' };
 const modeReasons = { flag: '敵隊旗幟已被拔下', closest: '以最靠近旗區的存活隊員判定',
-  eliminated: '所有玩家已淘汰', time: '時間結束', 'all-marked': '所有據點已完成標記' };
+  eliminated: '一方全員淘汰，立即結算', time: '時間結束', 'all-marked': '所有據點已完成標記' };
 let selectedMode = 'deathmatch';
 let fullMap = false;
 
@@ -174,6 +176,11 @@ function home() {
 function openLobby(mode = selectedMode) {
   selectedMode = mode;
   $('lobby-mode').textContent = modeNames[mode];
+  $('lobby').dataset.mode = mode;
+  $('entry-rules').textContent = {
+    deathmatch: '5v5 · 5 分鐘 · 率先取得 20 擊殺', flag: '5v5 · 20 分鐘 · 拔下敵方旗幟',
+    survival: '5v5 · 24 分鐘 · 任一隊全滅即結算', control: '5v5 · 20 分鐘 · 完成據點標記'
+  }[mode];
   $('error').textContent = '';
   const name = typeof playerAccount === 'undefined' ? '' : playerAccount.profile?.name;
   $('nickname').readOnly = Boolean(name);
@@ -231,6 +238,10 @@ function enter(event, data) {
 }
 
 function createRoom() { enter('create', { type: 'arena', size: 10, mode: selectedMode }); }
+$('room-entry-back').onclick = openModes;
+$('entry-create').onclick = createRoom;
+$('entry-join').onsubmit = event => { event.preventDefault(); joinRoom(); };
+
 function joinRoom(id) { enter('join', { id: id || $('room-code').value, mode: selectedMode }); }
 function element(tag, text) {
   const node = document.createElement(tag);
@@ -270,8 +281,9 @@ function renderClass(job) {
     art.alt = details.name + '頭肩立繪';
   }
   profile.dataset.job = job;
+  profile.setAttribute('style', '--class-color: ' + details.color);
   $('class-name').textContent = details.name;
-  $('class-role').textContent = jobNames[details.job] + ' · ' + details.trait;
+  $('class-role').textContent = roleNames[details.role] + (details.role === 'support' ? ' · 可融合資源' : '');
   $('job-description').textContent = details.description;
   $('class-hp').textContent = details.hp + ' HP';
   $('class-range').textContent = details.range + ' px';
@@ -279,31 +291,35 @@ function renderClass(job) {
   $('class-damage').textContent = details.damage;
   $('class-defense').textContent = `${details.defense}（減傷 ${Math.round(100 * details.defense / (100 + details.defense))}%）`;
   $('class-cooldown').textContent = details.cooldown + ' ms';
-  const values = [details.hp / Math.max(...Object.values(classDetails).map(entry => entry.hp)), details.speed / 211, details.range / 286,
-    details.damage / 114, 540 / details.cooldown];
+  const values = [details.hp / Math.max(...Object.values(classDetails).map(entry => entry.hp)), details.speed / 1000, details.range / 240,
+    details.damage / 650, 650 / details.cooldown];
   const points = values.map((value, index) => {
     const angle = index * Math.PI * 2 / values.length - Math.PI / 2;
     return `${50 + 42 * value * Math.cos(angle)}% ${50 + 42 * value * Math.sin(angle)}%`;
   });
   $('chart-shape').setAttribute('style', `clip-path: polygon(${points.join(',')})`);
-  $('class-skill').textContent = (heroSkill[job] ?? skills[details.job]) +
-    ` · ${(details.skillCooldown ?? 5000) / 1000} 秒冷卻`;
+  $('class-skills').replaceChildren(...details.skills.map(([name, cooldown, description], index) => {
+    const item = element('li', '');
+    item.append(element('kbd', heroSkillKeys[index]), element('strong', name + ' · ' + cooldown + ' 秒'),
+      element('span', description));
+    return item;
+  }));
   for (const [category, button] of Object.entries(categoryButtons)) {
-    button.setAttribute('aria-pressed', String(category === details.job));
+    button.setAttribute('aria-pressed', String(playableHeroes[category].role === details.role));
   }
-  const ordered = classOrder.filter(id => heroes[id].job === details.job);
+  const ordered = classOrder.filter(id => playableHeroes[id].role === details.role);
   for (const [id, button] of Object.entries(classButtons)) {
     button.setAttribute('aria-pressed', String(id === job));
-    button.hidden = heroes[id].job !== details.job;
+    button.hidden = playableHeroes[id].role !== details.role;
     button.dataset.position = ['center', 'right', 'left'][(ordered.indexOf(id) - ordered.indexOf(job) + 3) % 3];
   }
 }
 
-const classOrder = heroAtlasOrder;
+const classOrder = playableOrder;
 const classButtons = Object.fromEntries(classOrder.map(job => [
   job, $('class-' + job)
 ]));
-const categoryButtons = { warrior: $('hero-warriors'), archer: $('hero-archers'), mage: $('hero-mages') };
+const categoryButtons = { sky: $('hero-commanders'), sain: $('hero-supports'), alpha: $('hero-fighters') };
 for (const [job, button] of Object.entries(categoryButtons)) button.onclick = () => sendRoomCommand('chooseClass', job);
 for (const [job, button] of Object.entries(classButtons)) {
   button.replaceChildren(Object.assign(element('img', ''), { src: heroArt(job, 'model'), alt: '', width: 220, height: 310 }),
@@ -316,7 +332,7 @@ for (const [job, button] of Object.entries(classButtons)) {
 function rotateClass(direction) {
   if ($('class-prev').disabled) return;
   const active = $('class-profile').dataset.job;
-  const available = classOrder.filter(id => heroes[id].job === heroes[active].job);
+  const available = classOrder.filter(id => playableHeroes[id].role === playableHeroes[active].role);
   const job = available[(available.indexOf(active) + direction + available.length) % available.length];
   sendRoomCommand('chooseClass', job);
 }
@@ -381,7 +397,7 @@ function renderRoom(state) {
   const full = state.players.length === state.size;
   const unready = state.players.filter(player => !player.ready).length;
   if (selecting) {
-    renderClass(me.hero ?? me.job);
+    renderClass(Object.hasOwn(playableHeroes, me.hero) ? me.hero : 'sky');
     for (const button of [...Object.values(classButtons), ...Object.values(categoryButtons)]) button.disabled = me.ready;
     $('class-prev').disabled = $('class-next').disabled = me.ready;
     $('ready').hidden = me.ready;
@@ -507,13 +523,70 @@ function stopMovement() {
   if (phase === 'playing' && socket.connected) socket.emit('arenaInput', { x: 0, y: 0 });
 }
 
-function attack(skill) {
-  if (phase !== 'playing' || !socket.connected || !frame || !worldMap) return;
+function aimInWorld() {
   const canvas = $('arena');
   const cursor = aim || { x: canvas.width / 2 + 45, y: canvas.height / 2 };
-  const x = Math.max(0, Math.min(worldMap.width, cursor.x / arenaZoom + arenaCamera.x));
-  const y = Math.max(0, Math.min(worldMap.height, cursor.y / arenaZoom + arenaCamera.y));
-  socket.volatile.emit('arenaAttack', { x, y, skill });
+  return {
+    x: Math.max(0, Math.min(worldMap.width, cursor.x / arenaZoom + arenaCamera.x)),
+    y: Math.max(0, Math.min(worldMap.height, cursor.y / arenaZoom + arenaCamera.y))
+  };
+}
+
+function attack(skill) {
+  if (phase !== 'playing' || !socket.connected || !frame || !worldMap) return;
+  socket.volatile.emit('arenaAttack', { ...aimInWorld(), skill });
+}
+
+const skillButtons = Array.from({ length: 3 }, (_, index) => $('hero-skill-' + index));
+function castHeroSkill(slot) {
+  const player = frame?.players.find(p => p.id === socket.id);
+  if (!player?.alive || !worldMap) return;
+  const hero = playableHeroes[player.hero];
+  if (!hero) {
+    if (!slot) attack(true);
+    return;
+  }
+  const point = aimInWorld();
+  const closest = players => {
+    const target = [...players].sort((a, b) =>
+      Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y))[0];
+    return target && Math.hypot(target.x - point.x, target.y - point.y) <= 48 ? target.id : undefined;
+  };
+  const kind = hero.skills[slot][3];
+  const ally = ['ally', 'dual'].includes(kind) ? $('skill-ally').value || closest(frame.skillAllies ?? []) : undefined;
+  const enemy = ['enemy', 'dual'].includes(kind) ? closest(frame.players.filter(p => p.alive && p.team !== player.team)) : undefined;
+  lootCommand('heroSkill', { slot, ally, enemy });
+}
+
+skillButtons.forEach((button, index) => { button.onclick = () => castHeroSkill(index); });
+$('skill-ally').onchange = () => $('skill-ally').blur();
+
+function drawHeroHud(state, me, now, cooldown) {
+  const hero = playableHeroes[me.hero];
+  $('legacy-skill').hidden = Boolean(hero);
+  $('hero-skill-controls').hidden = !hero;
+  if (!hero) {
+    $('skill-status').textContent = `${skills[me.job]} · ${cooldown(me.skillAt)}`;
+    return;
+  }
+  const allySelect = $('skill-ally');
+  allySelect.hidden = !hero.skills.some(entry => entry[3] === 'ally' || entry[3] === 'dual');
+  const teammates = state.skillAllies ?? [];
+  const signature = teammates.map(ally => ally.id).join(',');
+  if (allySelect.dataset.roster !== signature) {
+    const previous = allySelect.value;
+    allySelect.dataset.roster = signature;
+    allySelect.replaceChildren(Object.assign(element('option', '指定隊友…'), { value: '' }),
+      ...teammates.map(({ id, name }) => Object.assign(element('option', name), { value: id })));
+    if (teammates.some(ally => ally.id === previous)) allySelect.value = previous;
+  }
+  skillButtons.forEach((button, slot) => {
+    const [label, , description] = hero.skills[slot];
+    const at = state.skillTimes?.[slot] ?? 0;
+    button.textContent = `[${heroSkillKeys[slot]}] ${label} · ${cooldown(at)}`;
+    button.title = description;
+    button.disabled = !me.alive || at > now;
+  });
 }
 
 const lootButtons = Array.from({ length: 5 }, (_, index) => $('loot-' + (index + 1)));
@@ -575,7 +648,10 @@ window.addEventListener('keydown', event => {
     sendMovement();
   }
   if (event.repeat) return;
-  if (event.code === 'KeyQ') attack(true);
+  if (event.code === 'KeyQ') castHeroSkill(0);
+  if (event.code === 'KeyC') castHeroSkill(1);
+  if (event.code === 'KeyV') castHeroSkill(2);
+  if (event.code === 'KeyG' && frame?.mode === 'flag' && frame.scenario?.role === 'support') lootCommand('modeCraft');
   if (event.code === 'KeyE') {
     if (frame?.scenario?.nearby) lootCommand('modeInteract', frame.scenario.nearby);
     else if (frame?.nearbyChest != null) lootCommand('lootOpen', frame.nearbyChest);
@@ -625,6 +701,7 @@ function toggleMap() {
   if (fullMap) stopMovement();
 }
 $('map-toggle').onclick = toggleMap;
+$('mode-craft').onclick = () => lootCommand('modeCraft');
 $('mode-antidote').onclick = () => lootCommand('modeAntidote');
 $('mode-interact').onclick = () => {
   if (frame?.scenario?.nearby) lootCommand('modeInteract', frame.scenario.nearby);
@@ -643,8 +720,9 @@ function drawModeHud(state, now) {
   if (!info) return;
   const words = [modeNames[info.mode], roleNames[info.role]];
   $('mode-antidote').hidden = info.mode !== 'flag';
+  $('mode-craft').hidden = info.mode !== 'flag' || info.role !== 'support';
   if (info.mode === 'flag') words.push('毒氣免疫 ' + formatDuration(info.protectedUntil - now),
-    `草藥 月露 ${info.herbs[0]} · 赤蕊 ${info.herbs[1]} · 星脈 ${info.herbs[2]}`);
+    `草藥 月露 ${info.herbs[0]} · 赤蕊 ${info.herbs[1]} · 星脈 ${info.herbs[2]} · 解藥 ${info.antidotes}`);
   if (info.mode === 'survival') {
     words.push(info.night ? '黑夜' : '白天', '生存資源 ' + formatDuration(info.protectedUntil - now));
     if (info.exposureUntil > now) words.push('定位暴露 ' + formatDuration(info.exposureUntil - now));
@@ -772,9 +850,9 @@ function renderFrame(time) {
     const cooldown = at => at > serverTime ? ((at - serverTime) / 1000).toFixed(1) + ' 秒' : '就緒';
     $('health-bar').max = me.maxHp;
     $('health-bar').value = me.hp;
-    $('health').textContent = `${heroName(me)} · HP ${me.hp}/${me.maxHp}`;
+    $('health').textContent = `${heroName(me)}${me.form === 1 ? ' · 第二形態' : ''} · HP ${me.hp}/${me.maxHp}`;
     $('attack-status').textContent = `${frame.attackRange || '—'} px · ${cooldown(me.attackAt)}`;
-    $('skill-status').textContent = `${heroSkill[me.hero] ?? skills[me.job]} · ${cooldown(me.skillAt)}`;
+    drawHeroHud(frame, me, serverTime, cooldown);
     $('respawn').hidden = me.alive;
     if (!me.alive) $('respawn').textContent = ['flag', 'survival'].includes(frame.mode)
       ? '已淘汰 · 可查看隊友定位' : `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;

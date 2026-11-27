@@ -77,6 +77,8 @@ test('flag beasts yield distinct herbs, antidote is single-player, and gas drain
     combat.attack(room, player, beast.x + 1, beast.y, true, start + 5 * minute + species * 6000);
   }
   assert.deepEqual(room.scenario.herbs[player.team], [1, 1, 1]);
+  assert.ok(modes.craftAntidote(room, player).error);
+  assert.ok(modes.craftAntidote(room, ally).message);
   assert.ok(modes.antidote(room, player, start + 5 * minute + 15_000).message);
   assert.deepEqual(room.scenario.herbs[player.team], [0, 0, 0]);
   assert.equal(ally.protectedUntil, start + 5 * minute);
@@ -118,11 +120,11 @@ test('survival has real day supplies, secret night traps, exposure, and early el
   assert.ok(combat.snapshot(room, night, enemy).scenario.markers.some(marker => marker.team === commander.team));
 
   for (const player of room.players) {
-    if (!player.alive) continue;
+    if (!player.alive || player.team === enemy.team) continue;
     player.alive = false;
-    player.eliminatedAt = night + 30_000;
+    modes.eliminate(room, player, null, night + 30_000);
   }
-  combat.tick(room, night + 30_000, 0, idle);
+  assert.ok(room.players.some(player => player.alive && player.team === enemy.team));
   assert.equal(room.phase, 'ended');
   assert.equal(room.scenario.reason, 'eliminated');
   assert.equal(room.winner, enemy.team);

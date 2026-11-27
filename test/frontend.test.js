@@ -169,18 +169,18 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('selection-team').children.length, 5);
   assert.equal(elements.get('start').disabled, true);
   elements.get('class-next').onclick();
-  assert.deepEqual(emitted.at(-1), ['chooseClass', 'frostguard']);
-  assert.equal(elements.get('class-art').src, '/art/heroes/frostguard-portrait.webp');
-  assert.equal(elements.get('class-name').textContent, '霜甲騎士');
-  assert.equal(elements.get('class-hp').textContent, '980 HP');
-  assert.equal(elements.get('class-frostguard').dataset.position, 'center');
-  assert.equal(elements.get('class-warrior').dataset.position, 'left');
-  assert.equal(elements.get('class-archer').hidden, true);
-  elements.get('hero-archers').onclick();
-  assert.equal(elements.get('class-hp').textContent, '600 HP');
-  assert.equal(elements.get('selection-team').children[0].children[0].src, '/art/heroes/archer-portrait.webp');
-  elements.get('hero-mages').onclick();
-  assert.equal(elements.get('class-art').src, '/art/heroes/mage-portrait.webp');
+  assert.deepEqual(emitted.at(-1), ['chooseClass', 'oshi']);
+  assert.equal(elements.get('class-art').src, '/art/heroes/oshi-portrait.webp');
+  assert.equal(elements.get('class-name').textContent, '歐希');
+  assert.equal(elements.get('class-hp').textContent, '10000 HP');
+  assert.equal(elements.get('class-oshi').dataset.position, 'center');
+  assert.equal(elements.get('class-sky').dataset.position, 'left');
+  assert.equal(elements.get('class-alpha').hidden, true);
+  elements.get('hero-supports').onclick();
+  assert.equal(elements.get('class-hp').textContent, '6000 HP');
+  assert.equal(elements.get('selection-team').children[0].children[0].src, '/art/heroes/sain-portrait.webp');
+  elements.get('class-kosain').onclick();
+  assert.equal(elements.get('class-art').src, '/art/heroes/kosain-portrait.webp');
   elements.get('ready').onclick();
   assert.deepEqual(emitted.at(-1), ['ready']);
   assert.equal(elements.get('class-next').disabled, true);
@@ -192,9 +192,9 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('battle').hidden, true);
   assert.equal(elements.get('loading-blue').children.length, 5);
   assert.equal(elements.get('loading-red').children.length, 5);
-  assert.equal(elements.get('loading-red').children[0].children[0].src, '/art/heroes/mage-model.webp');
+  assert.equal(elements.get('loading-red').children[0].children[0].src, '/art/heroes/kosain-model.webp');
   const player = {
-    id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 1600, y: 1400, hp: 560, maxHp: 560,
+    id: 'self', name: 'Tester', job: 'mage', hero: 'kosain', team: '紅隊', x: 1600, y: 1400, hp: 5300, maxHp: 5300,
     alive: true, facing: 0, attackAt: 0, skillAt: 0, spawnedAt: 0
   };
   socketHandlers.get('room')({ id: 'ABCDE0', host: 'self', players: [player], phase: 'playing' });
@@ -208,7 +208,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   });
   frames.shift()(115);
   assert.ok(pixelDraws > 100);
-  assert.match(elements.get('health').textContent, /紫焰術師 · HP 560\/560/);
+  assert.match(elements.get('health').textContent, /科賽恩 · HP 5300\/5300/);
   const arena = elements.get('arena');
   const keyboard = code => ({ code, target: element('BODY'), preventDefault() {} });
   keyHandlers.get('keydown')(keyboard('KeyD'));
@@ -223,7 +223,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.ok(vm.runInContext('arenaZoom > 1', context));
   assert.equal(emitted.at(-1)[1].skill, false);
   keyHandlers.get('keydown')(keyboard('KeyQ'));
-  assert.equal(emitted.at(-1)[1].skill, true);
+  assert.equal(emitted.at(-1)[0], 'heroSkill');
+  assert.equal(emitted.at(-1)[1].slot, 0);
   keyHandlers.get('keydown')(keyboard('Enter'));
   assert.equal(emitted.at(-1)[0], 'arenaInput');
   assert.equal(emitted.at(-1)[1].x, 0);
@@ -237,7 +238,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
       { ...player, id: 'blue-low', team: '藍隊', name: 'Blue Low', kills: 0, deaths: 3, assists: 0, damage: 75 }
     ]
   });
-  assert.equal(elements.get('mvp-portrait').src, '/art/heroes/mage-model.webp');
+  assert.equal(elements.get('mvp-portrait').src, '/art/heroes/kosain-model.webp');
   assert.equal(elements.get('mvp-name').textContent, 'Tester');
   assert.equal(elements.get('red-outcome').textContent, '勝利');
   assert.equal(elements.get('blue-outcome').textContent, '敗北');

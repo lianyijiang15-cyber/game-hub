@@ -72,14 +72,14 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal((await fetch(base + '/fonts/pixel-clash-display.woff')).status, 200);
   assert.equal((await fetch(base + '/soup-bank.js')).status, 200);
   assert.equal((await fetch(base + '/arena-renderer.js')).status, 200);
-  for (const hero of Object.keys(combat.heroes)) {
+  for (const hero of Object.keys(combat.playableHeroes)) {
     for (const type of ['model', 'portrait']) {
       const art = await fetch(`${base}/art/heroes/${hero}-${type}.webp`, { method: 'HEAD' });
       assert.equal(art.status, 200);
       assert.equal(art.headers.get('content-type'), 'image/webp');
     }
   }
-  assert.equal((await fetch(base + '/art/heroes/sprites.webp', { method: 'HEAD' })).status, 200);
+  assert.equal((await fetch(base + '/art/heroes/campaign-sprites.webp', { method: 'HEAD' })).status, 200);
   for (const job of ['warrior', 'archer', 'mage']) {
     for (const suffix of ['', '-avatar', '-cutout', '-model', '-key-art', '-portrait', '-celebration']) {
       const image = await fetch(`${base}/art/${job}${suffix}.webp`, { method: 'HEAD' });
@@ -104,7 +104,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const filled = receive(guest, 'room', room => room.players.length === 10);
   assert.equal((await send(host, 'fillBots')).room.players.length, 10);
   assert.equal((await filled).players.filter(player => player.bot).length, 8);
-  assert.ok((await send(host, 'chooseClass', 'archer')).error);
+  assert.ok((await send(host, 'chooseClass', 'gamma')).error);
   assert.ok((await send(host, 'start')).error);
   await Promise.all([send(host, 'ready'), send(guest, 'ready')]);
   await wait(160);
@@ -115,13 +115,13 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.ok(ownTeam.every(p => p.job));
   const guestView = receive(guest, 'room');
   const hostView = receive(host, 'room');
-  assert.equal((await send(host, 'chooseClass', 'archer')).ok, true);
+  assert.equal((await send(host, 'chooseClass', 'gamma')).ok, true);
   assert.equal((await hostView).players.find(p => p.id === host.id).job, 'archer');
   const guestRoster = await guestView;
   assert.equal(guestRoster.players.find(p => p.id === host.id).job, undefined);
   assert.equal(guestRoster.players.filter(p => p.team === '藍隊' && p.job).length, 5);
-  assert.equal((await send(guest, 'chooseClass', 'frostmage')).ok, true);
-  assert.equal(rooms.get(id).players.find(player => player.id === guest.id).hero, 'frostmage');
+  assert.equal((await send(guest, 'chooseClass', 'oshi')).ok, true);
+  assert.equal(rooms.get(id).players.find(player => player.id === guest.id).hero, 'oshi');
   let leakedDuringSelection = false;
   host.once('chat', () => { leakedDuringSelection = true; });
   const teamMessage = receive(guest, 'chat');
@@ -157,16 +157,15 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(mine.job, 'archer');
   const moved = receive(host, 'arenaState', state => state.players.find(p => p.id === host.id)?.x > mine.x);
   host.emit('arenaInput', { x: 1, y: 0, hp: 1 });
-  assert.equal((await moved).players.find(player => player.id === host.id).hp, 600);
+  assert.equal((await moved).players.find(player => player.id === host.id).hp, 8000);
   host.emit('arenaInput', { x: 0, y: 0 });
   const stopped = await receive(host, 'arenaState');
   const next = await receive(host, 'arenaState');
   assert.equal(stopped.players.find(p => p.id === host.id).x, next.players.find(p => p.id === host.id).x);
 
-  const fired = receive(host, 'arenaState', state => state.projectiles.length === 3);
-  host.emit('arenaAttack', { x: mine.x + 100, y: mine.y, skill: true });
-  assert.ok((await fired).projectiles.every(p => p.type === 'arrow'));
-
+  const boosted = receive(host, 'arenaState', state => state.heroEffects.some(effect => effect.key === 'surge'));
+  assert.equal((await send(host, 'heroSkill', { slot: 1 })).ok, true);
+  assert.ok((await boosted).skillTimes[1] > initial.now);
   let leaked = false;
   guest.on('chat', () => { leaked = true; });
   outsider.on('chat', () => { leaked = true; });
@@ -269,7 +268,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(resume.room.host, outsider.id);
   assert.notEqual(resume.ticket, solo.ticket);
   const field = await recovered;
-  assert.equal(field.players.length, 5);
+  assert.equal(field.players.filter(p => p.team === field.players.find(p => p.id === outsider.id).team).length, 5);
   assert.equal(field.mode, 'flag');
   assert.equal(field.scenario.markers.length, 5);
   const liveFlag = rooms.get(solo.id);
