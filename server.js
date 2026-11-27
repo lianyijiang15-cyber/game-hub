@@ -63,37 +63,20 @@ function leave(socket){const r=actorRoom(socket);if(!r)return;socket.leave(r.id)
  if(r.host===socket.id)r.host=r.players.find(p=>!p.bot).id;
  notice(r,'玩家離開房間');if(r.started&&r.type==='wolf'&&r.phase!=='ended'){if(!winner(r))resolveVotes(r);}publish(r);
 }
-function startArena(r){r.mode=rand(['拔旗戰','生存戰','據點戰']);r.phase='playing';shuffle(r.players).forEach((p,i)=>{p.team=i%2?'藍隊':'紅隊';p.hp=100;p.job=i<2?'指揮':i<4?'輔助':'打手';});r.round=1;notice(r,'團隊對抗開始！模式：'+r.mode+'。目前為回合制戰鬥原型，非 PDF 的完整即時地圖模式。');publish(r);scheduleArenaBots(r);}
-function arenaAttack(r,attacker,target,heal=false){if(r.phase!=='playing'||!attacker.alive||!target.alive)return false;
- if(heal){if(attacker.job!=='輔助'||attacker.team!==target.team)return false;target.hp=Math.min(100,target.hp+25);notice(r,attacker.name+' 治療 '+target.name+'（+25 HP）');}
- else{if(attacker.team===target.team)return false;target.hp=Math.max(0,target.hp-(attacker.job==='打手'?30:15));if(!target.hp)target.alive=false;notice(r,attacker.name+' 攻擊 '+target.name+'（剩餘 '+target.hp+' HP）');}
- const red=r.players.some(p=>p.alive&&p.team==='紅隊'),blue=r.players.some(p=>p.alive&&p.team==='藍隊');
- if(!red||!blue){r.phase='ended';notice(r,(red?'紅隊':'藍隊')+' 勝利！');}publish(r);return true;
-}
-function scheduleArenaBots(r){
- if(r.arenaTimer)clearInterval(r.arenaTimer);
- r.arenaTimer=setInterval(async()=>{
-  if(!rooms.has(r.id)||r.phase!=='playing'){clearInterval(r.arenaTimer);return;}
-  if(r.arenaBusy)return;r.arenaBusy=true;
-  try{
-   for(const bot of r.players.filter(p=>p.bot&&p.alive)){
-    if(r.phase!=='playing')break;
-    try{
-     const decision=await agent.infer(agent.view(r,bot));
-     if(!rooms.has(r.id)||r.phase!=='playing'||!bot.alive)break;
-     agent.saveNote(bot,decision.note);
-     if(decision.say){for(const teammate of r.players.filter(p=>!p.bot&&p.team===bot.team))io.to(teammate.id).emit('chat',{name:bot.name,text:decision.say,team:bot.team});}
-     const target=player(r,decision.target);
-     if(target)arenaAttack(r,bot,target,decision.action==='heal');
-    }catch(err){notice(r,'⚠️ '+bot.name+' AI 無法決策：'+err.message+'。未執行替代攻擊。');break;}
-   }
-  }finally{r.arenaBusy=false;}
- },Number(process.env.AI_ARENA_INTERVAL_MS||12000));r.arenaTimer.unref?.();
-}
+const W=960,H=576, walls=[[280,80,48,144],[280,352,48,144],[632,80,48,144],[632,352,48,144],[432,240,96,96]];
+const classes={warrior:{hp:150,speed:150,range:52,damage:24,cd:650},archer:{hp:100,speed:185,range:240,damage:17,cd:850},mage:{hp:80,speed:165,range:190,damage:20,cd:950}};
+function blocked(x,y){return x<24||y<24||x>W-24||y>H-24||walls.some(([a,b,w,h])=>x+12>a&&x-12<a+w&&y+12>b&&y-12<b+h);}
+function clearLine(a,b){const d=Math.hypot(b.x-a.x,b.y-a.y);for(let i=0;i<=d;i+=8){const t=i/(d||1);if(blocked(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t))return false;}return true;}
+function spawn(p){p.x=p.team==='紅隊'?80:880;p.y=80+p.slot*100;p.hp=classes[p.job].hp;p.alive=true;p.input={x:0,y:0};p.lastInput=0;p.respawn=0;}
+function startArena(r){r.mode='團隊死鬥';r.phase='playing';r.score={'紅隊':0,'藍隊':0};r.effects=[];r.ends=Date.now()+300000;shuffle(r.players).forEach((p,i)=>{p.team=i<5?'紅隊':'藍隊';p.slot=i%5;p.job=classes[p.job]?p.job:Object.keys(classes)[i%3];p.attackAt=0;p.skillAt=0;spawn(p);});notice(r,'戰鬥開始！率先取得 20 擊殺或五分鐘後領先者獲勝。');publish(r);r.arenaTimer=setInterval(()=>tick(r),50);}
+function hit(r,p,q,damage){if(!q.alive)return;q.hp=Math.max(0,q.hp-damage);if(!q.hp){q.alive=false;q.respawn=Date.now()+3000;r.score[p.team]++;}}
+function attack(r,p,x,y,skill=false){if(!p.alive||r.phase!=='playing'||!Number.isFinite(x)||!Number.isFinite(y))return;const now=Date.now(),c=classes[p.job],key=skill?'skillAt':'attackAt';if(now<p[key])return;p[key]=now+(skill?5000:c.cd);const angle=Math.atan2(y-p.y,x-p.x),range=skill?(p.job==='warrior'?90:c.range):c.range;const targets=r.players.filter(q=>q.alive&&q.team!==p.team&&Math.hypot(q.x-p.x,q.y-p.y)<=range&&clearLine(p,q)).filter(q=>skill&&p.job==='warrior'||Math.abs(Math.atan2(Math.sin(Math.atan2(q.y-p.y,q.x-p.x)-angle),Math.cos(Math.atan2(q.y-p.y,q.x-p.x)-angle)))<(skill?.65:.30)).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));for(const q of targets.slice(0,skill?10:1))hit(r,p,q,c.damage*(skill?1.6:1));r.effects.push({x:p.x,y:p.y,angle,range,skill,team:p.team,until:now+200});}
+function tick(r){if(!rooms.has(r.id)||r.phase!=='playing'){clearInterval(r.arenaTimer);return;}const now=Date.now();for(const p of r.players){if(!p.alive){if(now>=p.respawn)spawn(p);continue;}let v=p.input||{x:0,y:0};if(p.bot){const q=r.players.filter(q=>q.alive&&q.team!==p.team).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0];if(q){const dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy);v=d>classes[p.job].range*.8?{x:dx/(d||1),y:dy/(d||1)}:{x:0,y:0};if(!clearLine(p,q)){v={x:0,y:p.y<288?-1:1};if(p.y<40||p.y>536)v={x:Math.sign(dx),y:0};}attack(r,p,q.x,q.y,now>=p.skillAt);}}else if(now-p.lastInput>350)v={x:0,y:0};const n=Math.max(1,Math.hypot(v.x,v.y)),step=classes[p.job].speed*.05;const x=p.x+v.x/n*step,y=p.y+v.y/n*step;if(!blocked(x,p.y))p.x=x;if(!blocked(p.x,y))p.y=y;}
+r.effects=r.effects.filter(e=>e.until>now);if(now>=r.ends||Object.values(r.score).some(n=>n>=20)){r.phase='ended';clearInterval(r.arenaTimer);notice(r,'比賽結束：'+(r.score['紅隊']===r.score['藍隊']?'平手':r.score['紅隊']>r.score['藍隊']?'紅隊獲勝':'藍隊獲勝'));publish(r);}io.to(r.id).emit('arenaState',{players:r.players.map(p=>({id:p.id,name:p.name,team:p.team,job:p.job,x:p.x,y:p.y,hp:p.hp,maxHp:classes[p.job].hp,alive:p.alive,skillAt:p.skillAt})),walls,score:r.score,remaining:Math.max(0,r.ends-now),effects:r.effects,phase:r.phase});}
 io.on('connection',socket=>{
  socket.on('list',()=>socket.emit('rooms',Array.from(rooms.values()).map(publicRoom)));
  socket.on('create',(data={},ack=()=>{})=>{if(actorRoom(socket))return ack({error:'請先離開目前房間'});const {type,name}=data,size=Number(data.size);
- if(!sizes[type]?.includes(size)||typeof name!=='string'||!name.trim())return ack({error:'請輸入有效暱稱與房間人數'});
+ if(type!=='arena'||size!==10||typeof name!=='string'||!name.trim())return ack({error:'請輸入有效暱稱與房間人數'});
  let id;do{id=crypto.randomBytes(3).toString('hex').toUpperCase();}while(rooms.has(id));
  const r={id,type,size,host:socket.id,started:false,phase:'lobby',day:0,players:[{id:socket.id,name:name.trim().slice(0,24),ready:false,alive:true,bot:false}],votes:{},logs:[]};
  rooms.set(id,r);socket.join(id);socket.data.room=id;ack({id});publish(r);
@@ -113,8 +96,9 @@ io.on('connection',socket=>{
  socket.on('vote',id=>{const r=actorRoom(socket);if(!r||r.type!=='wolf'||!['night','day'].includes(r.phase))return;const actor=player(r,socket.id),target=player(r,id);
  if(!actor.alive||!target?.alive||actor.id===target.id||r.votes[actor.id]||(r.phase==='night'&&!isWolf(actor)))return;
  if(r.phase==='night'&&isWolf(target))return;r.votes[actor.id]=target.id;resolveVotes(r);publish(r);});
- socket.on('arenaAction',(data={})=>{const r=actorRoom(socket);if(!r||r.type!=='arena')return;const p=player(r,socket.id),target=player(r,data.target);if(!target||!['attack','heal'].includes(data.action))return;
- const now=Date.now();if(p.lastAction&&now-p.lastAction<1800)return;if(arenaAttack(r,p,target,data.action==='heal'))p.lastAction=now;});
+ socket.on('arenaInput',data=>{const r=actorRoom(socket);if(r?.phase!=='playing'||!data)return;const p=player(r,socket.id);if(!Number.isFinite(data.x)||!Number.isFinite(data.y))return;p.input={x:Math.max(-1,Math.min(1,data.x)),y:Math.max(-1,Math.min(1,data.y))};p.lastInput=Date.now();});
+ socket.on('arenaAttack',data=>{const r=actorRoom(socket);if(r?.phase==='playing'&&data)attack(r,player(r,socket.id),data.x,data.y,data.skill===true);});
+ socket.on('chooseClass',job=>{const r=actorRoom(socket);if(r&&!r.started&&Object.hasOwn(classes,job)){player(r,socket.id).job=job;publish(r);}});
  socket.on('chat',message=>{const r=actorRoom(socket);if(!r||typeof message!=='string')return;const text=message.trim().slice(0,300);if(!text)return;const p=player(r,socket.id);if(r.type!=='wolf'&&r.started&&!p.alive)return;if(r.type==='wolf'&&r.phase==='night'&&p.alive&&!isWolf(p))return;
  if(r.type==='wolf'&&r.started&&!p.alive){const payload={name:p.name,text,dead:true};for(const ghost of r.players.filter(q=>!q.bot&&!q.alive))io.to(ghost.id).emit('deadChat',payload);return;}
  const payload={name:p.name,text,team:p.team||null};for(const bot of r.players.filter(q=>q.bot&&(r.type!=='arena'||!r.started||q.team===p.team)&&(r.type!=='wolf'||r.phase!=='night'||isWolf(q))))agent.remember(bot,p.name+'：'+text);if(r.type==='arena'&&r.started)for(const teammate of r.players.filter(q=>!q.bot&&q.team===p.team))io.to(teammate.id).emit('chat',payload);else if(r.type==='wolf'&&r.phase==='night'){for(const wolf of r.players.filter(q=>!q.bot&&isWolf(q)))io.to(wolf.id).emit('chat',payload);}else if(r.type!=='arena'||!r.started)io.to(r.id).emit('chat',payload);
