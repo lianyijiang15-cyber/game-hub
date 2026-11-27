@@ -143,6 +143,7 @@ test('control relocates idle flags, awards each only once and supports all three
   combat.tick(room, start + 5 * minute, 0, idle);
   assert.deepEqual({ x: kept.x, y: kept.y }, stationary);
   assert.ok(combat.distance(idlePoint, old) >= 290);
+  assert.ok(room.chests.every(chest => combat.distance(chest, idlePoint) > 112));
   combat.tick(room, start + 6 * minute, 0, idle);
   assert.equal(kept.owner, red.team);
   assert.equal(room.score[red.team], 1);
@@ -172,11 +173,27 @@ test('control relocates idle flags, awards each only once and supports all three
   }
 });
 
-test('special rooms never load another mode’s objectives or classic loot', () => {
+test('special rooms share usable loot without mixing their objective mechanics', () => {
   for (const mode of ['flag', 'survival', 'control']) {
     const room = setup(mode);
     const state = room.scenario;
-    assert.equal(room.chests.length, 0);
+    assert.equal(room.chests.length, 48);
+    for (const chest of room.chests) {
+      assert.ok(state.camps.every(camp => combat.distance(camp, chest) > 320));
+      assert.ok([...state.flags, ...state.supplies].every(object => combat.distance(object, chest) > 112));
+    }
+    const player = room.players[0];
+    const chest = room.chests[0];
+    place(player, chest);
+    player.hp -= 500;
+    const reward = combat.openChest(room, player, chest.id, start + 1);
+    assert.equal(reward.slot, 0);
+    const inventory = combat.snapshot(room, start + 2, player).inventory;
+    assert.equal(inventory[0].id, player.inventory[0].id);
+    assert.equal(inventory[0].label, reward.label);
+    assert.ok(combat.openChest(room, player, chest.id, start + 3).error);
+    assert.equal(combat.useItem(room, player, reward.slot, start + 4).label, reward.label);
+    assert.equal(player.inventory[0], null);
     assert.equal(state.mode, mode);
     assert.equal(state.supplies.length > 0, mode === 'survival');
     assert.equal(state.beasts.length > 0, mode === 'flag');

@@ -8,6 +8,7 @@ const inventorySize = 5;
 const chestSpacing = 160;
 const interactRange = 54;
 const campClearance = 320;
+const objectiveClearance = 112;
 const shockwave = { range: 112, damage: 128 };
 
 const loot = {
@@ -35,13 +36,14 @@ function quality(roll) {
   return 'legendary';
 }
 
-function generateChests(world, random = Math.random) {
+function generateChests(world, random = Math.random, { camps, objectives = [] } = {}) {
   const candidates = [];
-  const camps = [-campOffset, campOffset].map(offset => ({ x: world.width / 2 + offset, y: world.height / 2 }));
+  const spawnCamps = camps ?? [-campOffset, campOffset].map(offset => ({ x: world.width / 2 + offset, y: world.height / 2 }));
   for (let row = 1; row < world.rows - 1; row++) {
     for (let col = 1; col < world.columns - 1; col++) {
       const point = { x: (col + 0.5) * world.tileSize, y: (row + 0.5) * world.tileSize };
-      if (terrainBlocked(world, point.x, point.y) || camps.some(camp => inRange(camp, point, campClearance))) continue;
+      if (terrainBlocked(world, point.x, point.y) || spawnCamps.some(camp => inRange(camp, point, campClearance)) ||
+          objectives.some(object => inRange(object, point, objectiveClearance))) continue;
       candidates.push(point);
     }
   }
@@ -108,4 +110,4 @@ function consumeRune(player, now) {
 }
 
 module.exports = { generateChests, quality, activeBuffs, modifiers, openChest, consumeRune,
-  interactRange, inRange, shockwave, inventorySize, useItem };
+  interactRange, objectiveClearance, inRange, shockwave, inventorySize, useItem };

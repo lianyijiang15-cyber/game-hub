@@ -194,7 +194,10 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     assert.equal(elements.get('mode-guide').open, true);
     assert.equal(elements.get('guide-title').textContent, name + '玩法介紹');
     assert.match(elements.get('guide-caption').textContent, new RegExp(caption));
-    assert.ok(elements.get('guide-steps').children.length >= 3);
+    const guideSteps = elements.get('guide-steps').children;
+    assert.ok(guideSteps.length >= 3);
+    assert.equal(guideSteps.at(-1).children[0].textContent, '寶箱與道具');
+    if (mode === 'flag') assert.doesNotMatch(guideSteps.flatMap(row => row.children).map(node => node.textContent).join(' '), /草藥|毒氣|毒霧|解藥/);
     const pixelsBeforeGuide = pixelDraws;
     context.paintGuideScene(mode, require('../arena/combat').map);
     assert.ok(pixelDraws > pixelsBeforeGuide);
@@ -261,6 +264,17 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('match-loading').hidden, true);
   assert.equal(elements.get('game').classList.contains('in-loading'), false);
   assert.equal(elements.get('battle').hidden, false);
+  socketHandlers.get('arenaState')({
+    id: 'ABCDE0', now: 100, phase: 'playing', mode: 'control', remaining: 299900,
+    scenario: { mode: 'control', points: [], pointCount: 5 },
+    players: [player], inventory: [{ id: 'rune', quality: 'legendary', label: '震波符文 [R]' }],
+    effects: [], kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }
+  });
+  const slot = elements.get('loot-1');
+  assert.equal(elements.get('loot-slots').hidden, false);
+  assert.equal(slot.dataset.item, 'rune');
+  assert.equal(slot.children[1].className, 'loot-icon');
+  assert.match(slot['aria-label'], /震波符文/);
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', now: 100, phase: 'playing', remaining: 299900, players: [player],
     effects: [], kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }

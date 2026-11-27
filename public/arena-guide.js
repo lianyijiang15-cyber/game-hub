@@ -7,8 +7,7 @@ const arenaGuides = {
     clock: '20:00',
     steps: [
       ['搶旗獲勝', '兩隊從不同區域出發。靠近中央旗區，按 E 拔下敵隊旗幟就獲勝。'],
-      ['草藥與解藥', '擊敗妖獸可取得草藥。輔助按 G 將三種草藥各一份融合成解藥，隊員按 F 消耗一顆解藥，為自己延長 5 分鐘毒氣免疫。'],
-      ['時間與淘汰', '初始毒氣免疫為 5 分鐘，耗盡後會扣血。淘汰後無法復活。20 分鐘內無人拔旗，則比較各隊最靠近旗區的存活隊員。']
+      ['時間與淘汰', '淘汰後無法復活。20 分鐘內無人拔旗，則比較各隊最靠近旗區的存活隊員。']
     ]
   },
   survival: {
@@ -44,6 +43,7 @@ function paintGuideScene(mode, map) {
   ctx.save();
   ctx.translate(-camera.x, -camera.y);
   paintWorld(ctx, map, canvas.width, canvas.height, camera);
+  drawChest(ctx, { x: x + 155, y: y + 85, quality: 'legendary', openedAt: null }, 0);
   if (mode === 'survival') {
     drawChest(ctx, { x, y, quality: 'rare', openedAt: null }, 0);
     drawChest(ctx, { x: x - 115, y: y + 70, quality: 'common', openedAt: null }, 0);
@@ -78,7 +78,8 @@ $('room-guide').onclick = () => {
   if (!guide || dialog.open) return;
   $('guide-title').textContent = modeNames[mode] + '玩法介紹';
   $('guide-caption').textContent = guide.caption;
-  $('guide-steps').replaceChildren(...guide.steps.map(([heading, text]) => {
+  const lootStep = ['寶箱與道具', '在地圖上找到寶箱，靠近後按 E 開箱。取得的道具會進入畫面下方的 5 格道具欄，可點擊或按 1–5 使用。'];
+  $('guide-steps').replaceChildren(...[...guide.steps, lootStep].map(([heading, text]) => {
     const item = element('li', '');
     item.append(element('strong', heading), element('p', text));
     return item;

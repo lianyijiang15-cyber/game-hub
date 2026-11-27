@@ -64,7 +64,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.match(html, /<section id="home" hidden\b[^>]*>/);
   assert.match(html, /id="menu-soup-name">海龜湯/);
   assert.match(html, /id="room-guide"[^>]*aria-haspopup="dialog"/);
-  for (const path of ['/arena-guide.js', '/casebook.css', '/art/comics/clock.webp',
+  for (const path of ['/arena-guide.js', '/casebook.css', '/art/loot/item-icons.webp', '/art/comics/clock.webp',
     '/art/comics/class.webp', '/art/comics/snow.webp', '/art/comics/hotel-call.webp',
     '/art/comics/theater-shadow.webp', '/art/comics/blackout-window.webp', '/art/comics/laundry-knock.webp']) {
     assert.equal((await fetch(base + path, { method: 'HEAD' })).status, 200, path);

@@ -2,6 +2,7 @@
 
 const { playableHeroes } = require('../public/heroes');
 const { terrainBlocked } = require('./collision');
+const { objectiveClearance } = require('./loot');
 
 const minute = 60_000;
 const teams = ['紅隊', '藍隊'];
@@ -112,9 +113,10 @@ function setup(room, seed) {
   }
 }
 
-function movePoint(state, flag) {
+function movePoint(state, flag, chests = []) {
   Object.assign(flag, choosePoint(state, point => state.camps.every(camp => distance(point, camp) > 310) &&
-    state.flags.every(other => !Number.isFinite(other.x) || distance(point, other) >= 290)));
+    state.flags.every(other => !Number.isFinite(other.x) || distance(point, other) >= 290) &&
+    chests.every(chest => distance(point, chest) > objectiveClearance)));
 }
 
 function begin(room, now) {
@@ -333,7 +335,7 @@ function tick(room, now, dt, hooks) {
     state.nextChange += 5 * minute;
     for (const flag of state.flags) {
       if (!flag.owner && !flag.mark) {
-        movePoint(state, flag);
+        movePoint(state, flag, room.chests);
       }
     }
   }

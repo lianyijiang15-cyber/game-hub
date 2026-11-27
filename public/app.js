@@ -1048,16 +1048,28 @@ socket.on('arenaState', state => {
   drawTeamVitals(state.teammates ?? []);
   lootButtons.forEach((button, index) => {
     const item = state.inventory?.[index];
-    if (button.dataset.label !== (item?.label || '')) {
-      button.dataset.label = item?.label || '';
+    if (button.dataset.item !== (item?.id ?? '') || button.dataset.quality !== (item?.quality ?? '')) {
+      button.dataset.item = item?.id ?? '';
       button.dataset.quality = item?.quality || '';
-      button.replaceChildren(element('kbd', index + 1), element('span', item?.label || '空欄'));
+      const hotkey = element('kbd', index + 1);
+      const label = element('span', item?.label ?? '空欄');
+      label.className = 'loot-label';
+      const children = [hotkey];
+      if (item) {
+        const icon = element('span', '');
+        icon.className = 'loot-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        children.push(icon);
+      }
+      children.push(label);
+      button.replaceChildren(...children);
+      button.setAttribute('aria-label', `欄位 ${index + 1}：${item?.label ?? '空欄'}`);
+      button.title = item?.label ?? '';
     }
     button.disabled = !alive || !item;
   });
   $('battle-mode-name').textContent = modeNames[state.mode ?? 'deathmatch'];
   $('battle').dataset.mode = state.mode ?? 'deathmatch';
-  $('loot-slots').hidden = Boolean(state.scenario);
   $('red-score').textContent = scoreText(state, '紅隊');
   $('blue-score').textContent = scoreText(state, '藍隊');
   $('kill-feed').replaceChildren(...state.kills.map(kill => element('li', `${kill.attacker} 擊倒 ${kill.victim}`)));

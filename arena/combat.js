@@ -124,7 +124,10 @@ function start(room, now, seed) {
     projectiles: [], kills: [], sequence: 0, endsAt: now + modes.durations[modes.modeOf(room)], winner: null
   });
   modes.setup(room, room.map.seed);
-  room.chests = modes.modeOf(room) === 'deathmatch' ? loot.generateChests(room.map) : [];
+  const scenario = room.scenario;
+  room.chests = loot.generateChests(room.map, Math.random, scenario ? {
+    camps: scenario.camps, objectives: [...scenario.flags, ...scenario.supplies]
+  } : undefined);
   room.roster = [...room.players];
   room.roster.forEach(player => {
     Object.assign(player, {
@@ -404,7 +407,7 @@ function snapshot(room, now, viewer = null) {
       (!local || !room.players.some(player => (player.id === item.actor || player.id === item.target) &&
         !canTarget(viewer, player, now)))), kills: room.kills,
     chests, nearbyChest, openedChestIds: room.chests.filter(chest => chest.openedAt !== null).map(chest => chest.id),
-    inventory: local ? viewer.inventory.map(item => item && { label: item.label, quality: item.quality }) : [],
+    inventory: local ? viewer.inventory.map(item => item && { id: item.id, label: item.label, quality: item.quality }) : [],
     buffs: local ? loot.activeBuffs(viewer, now).map(({ label, until }) => ({ label, until })) : [],
     attackRange, targetInRange,
     teammates: local ? room.roster.filter(player => player !== viewer && player.team === viewer.team)
