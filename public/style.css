@@ -518,3 +518,100 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
   .in-combat .hud { bottom: 68px; }
   .arena-minimap { top: 64px; }
 }
+
+@font-face {
+  font-family: 'Pixel Clash Display';
+  src: url('/fonts/pixel-clash-display.woff') format('woff');
+  font-display: swap;
+}
+#title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  background: #19231b;
+}
+#title-map, #title-screen::before, #title-screen::after {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+#title-map { object-fit: cover; image-rendering: pixelated; }
+#title-screen::before {
+  z-index: 1;
+  content: "";
+  background: radial-gradient(ellipse at center, #171e1c18 12%, #14241b45 49%, #111812b8 100%);
+}
+#title-screen::after {
+  z-index: 1;
+  content: "";
+  box-sizing: border-box;
+  border-block: clamp(8px, 3dvh, 32px) solid #111812;
+}
+.title-interface {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: clamp(24px, 6dvh, 64px);
+  padding: 34px 18px 42px;
+  text-align: center;
+}
+#title-name {
+  display: grid;
+  justify-items: center;
+  margin: 0;
+  color: #fff4d8;
+  font-family: 'Pixel Clash Display', ui-monospace, Consolas, monospace;
+  font-size: clamp(3.4rem, min(15vw, 22dvh), 11rem);
+  font-weight: 400;
+  letter-spacing: .025em;
+  line-height: .95;
+  text-shadow: -2px -2px #211c23, 3px -2px #211c23, -2px 3px #211c23,
+    4px 4px #211c23, 6px 7px #211c23, 9px 10px #211c23, 12px 14px #211c23;
+}
+.title-clash { color: #fed267; }
+.title-chinese {
+  margin-top: 24px;
+  padding: 6px 12px 8px 15px;
+  border: 2px solid #e3b866;
+  background: #252321ec;
+  color: #fff0b9;
+  font: 800 clamp(.9rem, 2.5vw, 1.45rem) / 1 system-ui, sans-serif;
+  letter-spacing: .38em;
+  text-shadow: 0 2px #1b181b;
+  box-shadow: 4px 4px #18191b;
+}
+#title-start {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 2vw, 20px);
+  margin: 0;
+  padding: 9px clamp(10px, 3vw, 22px);
+  border: 3px solid #fbdda0;
+  border-radius: 0;
+  background: #241e26;
+  color: #fff3d9;
+  box-shadow: 5px 5px #101512;
+  font: 400 clamp(1rem, 4vw, 1.8rem) / 1.15 'Pixel Clash Display', ui-monospace, Consolas, monospace;
+  letter-spacing: .08em;
+  animation: title-start-bob 1.6s steps(3, jump-end) infinite;
+}
+#title-start::before, #title-start::after { content: ""; width: .45em; height: .6em; background: #ffd977; }
+#title-start::before { clip-path: polygon(0 0, 100% 50%, 0 100%); }
+#title-start::after { clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+#title-start:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 5px;
+}
+@keyframes title-start-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #title-start { animation: none; }
+}

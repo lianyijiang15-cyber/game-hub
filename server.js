@@ -12,6 +12,9 @@ const { botInput } = require('./arena/bots');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 8192 });
+app.get('/title-map', (_, response) => {
+  response.set('Cache-Control', 'public, max-age=3600').json(combat.map);
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = new Map();
@@ -343,7 +346,7 @@ io.on('connection', socket => {
 
 if (require.main === module) {
   const port = process.env.PORT || 3000;
-  server.listen(port, () => console.log('Game Hub: http://localhost:' + port));
+  server.listen(port, () => console.log('PIXEL CLASH: http://localhost:' + port));
 }
 
 module.exports = { app, server, io, rooms };

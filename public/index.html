@@ -3,16 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Game Hub｜開放世界對抗</title>
-<link rel="stylesheet" href="style.css?v=15">
+<title>PIXEL CLASH 像素衝突</title>
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 <main>
-<header>
-<h1>GAME <em>HUB</em>
+<header hidden>
+<h1>PIXEL <em>CLASH</em>
 </h1>
 </header>
-<section id="home">
+<section id="title-screen" aria-labelledby="title-name">
+  <canvas id="title-map" width="960" height="540" aria-hidden="true"></canvas>
+  <div class="title-interface">
+    <h2 id="title-name" aria-label="PIXEL CLASH 像素衝突">
+      <span class="title-pixel">PIXEL</span><span class="title-clash">CLASH</span>
+      <span class="title-chinese">像素衝突</span>
+    </h2>
+    <button id="title-start" type="button">TAP TO START</button>
+  </div>
+</section>
+<section id="home" hidden>
 <div class="cards">
 <article>
 <div class="symbol">🐢</div>
@@ -217,7 +227,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=15"></script>
-<script src="arena-renderer.js?v=15"></script>
+<script src="app.js?v=16"></script>
+<script src="arena-renderer.js?v=16"></script>
 </body>
 </html>

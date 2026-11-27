@@ -88,6 +88,17 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     setInterval() {}
   });
   for (const script of ['soup-bank.js', 'app.js', 'arena-renderer.js']) vm.runInContext(read(script), context);
+  context.show('title-screen');
+  elements.get('title-start').onclick();
+  assert.equal(elements.get('title-screen').hidden, true);
+  assert.equal(elements.get('home').hidden, false);
+  context.show('title-screen');
+  keyHandlers.get('keydown')({ code: 'Enter', preventDefault() {} });
+  assert.equal(elements.get('title-screen').hidden, true);
+  assert.equal(elements.get('home').hidden, false);
+  context.drawTitleMap(require('../arena/combat').map);
+  assert.ok(pixelDraws > 0);
+  assert.equal(vm.runInContext('arenaCamera.x + arenaCamera.y', context), 0);
   // Separate cameras own their positions, even when driven by the same map and clock.
   vm.runInContext(`
     const cameraMap = { width: 3200, height: 3200 };

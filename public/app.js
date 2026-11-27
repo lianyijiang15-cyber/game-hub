@@ -42,10 +42,12 @@ let lootToastUntil = 0;
 const matchKey = 'game-hub-seat';
 
 function show(id) {
-  for (const panel of ['home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
+  for (const panel of ['title-screen', 'home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
   if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading', 'in-results');
   document.querySelector('header').hidden = id !== 'home';
 }
+
+$('title-start').onclick = () => show('home');
 
 function exitRoom() {
   sessionStorage.removeItem(matchKey);
@@ -86,7 +88,7 @@ function sendRoomCommand(event, ...args) {
     return;
   }
   socket.timeout(3000).emit(event, ...args, (error, result) => {
-    $('room-error').textContent = error ? '伺服器未回應這項操作，請確認已更新並重啟 Game Hub。' : result?.error || '';
+    $('room-error').textContent = error ? '伺服器未回應這項操作，請確認已更新並重啟 PIXEL CLASH。' : result?.error || '';
     if (result?.room) renderRoom(result.room);
   });
 }
@@ -427,7 +429,15 @@ function drawLootHud(state, serverTime) {
 }
 
 window.addEventListener('keydown', event => {
-  if (!room || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (!$('title-screen').hidden) {
+    if (event.code === 'Enter') {
+      event.preventDefault();
+      if (!event.repeat) show('home');
+    }
+    return;
+  }
+  if (!room) return;
   if (event.target.matches?.('input, textarea, select, [contenteditable]')) return;
   if (event.code === 'Enter' && !event.repeat && event.target.tagName !== 'BUTTON') {
     event.preventDefault();

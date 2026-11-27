@@ -120,16 +120,16 @@ function paintTile(ctx, map, col, row, x, y) {
   }
 }
 
-function paintWorld(ctx, map, width, height) {
+function paintWorld(ctx, map, width, height, camera = arenaCamera) {
   if (paintedMap !== map) {
     terrainChunks.clear();
     paintedMap = map;
   }
   const span = map.tileSize * chunkTiles;
-  const left = Math.floor(arenaCamera.x / span);
-  const top = Math.floor(arenaCamera.y / span);
-  const right = Math.min(Math.ceil(map.columns / chunkTiles), Math.ceil((arenaCamera.x + width) / span));
-  const bottom = Math.min(Math.ceil(map.rows / chunkTiles), Math.ceil((arenaCamera.y + height) / span));
+  const left = Math.floor(camera.x / span);
+  const top = Math.floor(camera.y / span);
+  const right = Math.min(Math.ceil(map.columns / chunkTiles), Math.ceil((camera.x + width) / span));
+  const bottom = Math.min(Math.ceil(map.rows / chunkTiles), Math.ceil((camera.y + height) / span));
   for (let row = top; row < bottom; row++) {
     for (let col = left; col < right; col++) {
       const key = row * map.columns + col;
@@ -439,4 +439,23 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   rect(ctx, '#fff0c2', cursor.x + 3, cursor.y, 4, 1);
   rect(ctx, '#fff0c2', cursor.x, cursor.y - 6, 1, 4);
   rect(ctx, '#fff0c2', cursor.x, cursor.y + 3, 1, 4);
+}
+
+function drawTitleMap(map) {
+  const canvas = $('title-map');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const camera = {
+    x: Math.floor(map.width / 2 - canvas.width / 2),
+    y: Math.floor(map.height / 2 - canvas.height / 2)
+  };
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+  paintWorld(ctx, map, canvas.width, canvas.height, camera);
+  ctx.restore();
+}
+
+if (typeof fetch === 'function') {
+  fetch('/title-map').then(response => response.ok ? response.json() : null).then(map => {
+    if (map && !$('title-screen').hidden) drawTitleMap(map);
+  }).catch(() => {});
 }

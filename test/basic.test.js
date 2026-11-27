@@ -6,6 +6,7 @@ const { once } = require('node:events');
 const { io: connect } = require('socket.io-client');
 process.env.NODE_ENV = 'test';
 const { server, io, rooms } = require('../server');
+const combat = require('../arena/combat');
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const send = (client, event, ...args) => client.timeout(2500).emitWithAck(event, ...args);
@@ -38,7 +39,14 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const [host, guest, outsider] = clients;
   const response = await fetch(base);
   assert.equal(response.status, 200);
-  assert.match(await response.text(), /GAME.*海龜湯/s);
+  const html = await response.text();
+  assert.match(html, /<title>PIXEL CLASH 像素衝突<\/title>/);
+  assert.match(html, /id="title-start"[^>]*>TAP TO START<\/button>/);
+  assert.match(html, /<section id="home" hidden>.*海龜湯/s);
+  const titleMap = await fetch(base + '/title-map');
+  assert.equal(titleMap.status, 200);
+  assert.deepEqual(await titleMap.json(), combat.map);
+  assert.equal((await fetch(base + '/fonts/pixel-clash-display.woff')).status, 200);
   assert.equal((await fetch(base + '/soup-bank.js')).status, 200);
   assert.equal((await fetch(base + '/arena-renderer.js')).status, 200);
   for (const job of ['warrior', 'archer', 'mage']) {
