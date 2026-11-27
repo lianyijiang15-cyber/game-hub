@@ -40,6 +40,13 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.match(await response.text(), /GAME.*海龜湯/s);
   assert.equal((await fetch(base + '/soup-bank.js')).status, 200);
   assert.equal((await fetch(base + '/arena-renderer.js')).status, 200);
+  for (const job of ['warrior', 'archer', 'mage']) {
+    for (const suffix of ['', '-avatar']) {
+      const image = await fetch(`${base}/art/${job}${suffix}.webp`, { method: 'HEAD' });
+      assert.equal(image.status, 200);
+      assert.equal(image.headers.get('content-type'), 'image/webp');
+    }
+  }
 
   assert.ok((await send(outsider, 'create', null)).error);
   const { id } = await send(host, 'create', { type: 'arena', size: 10, name: 'Host' });
@@ -103,4 +110,14 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.deepEqual((await again).score, { 紅隊: 0, 藍隊: 0 });
   await send(guest, 'leave');
   assert.equal(rooms.has(id), false);
+
+  const solo = await send(guest, 'create', { type: 'arena', size: 10, name: 'Solo Host' });
+  assert.equal((await send(guest, 'fillBots')).room.players.filter(player => player.bot).length, 9);
+  const ready = receive(guest, 'room', room => room.players.every(player => player.ready));
+  assert.equal((await send(guest, 'ready')).ok, true);
+  await ready;
+  const soloFrame = receive(guest, 'arenaState', state => state.id === solo.id);
+  assert.equal((await send(guest, 'start')).ok, true);
+  assert.equal((await soloFrame).players.filter(player => player.bot).length, 9);
+  await send(guest, 'leave');
 });

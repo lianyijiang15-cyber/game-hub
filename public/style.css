@@ -93,3 +93,55 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
   .hud .health-block { grid-column: 1 / -1; border-bottom: 1px solid #504151; }
   .hud .health-block + .ability { border-left: 0; }
 }
+
+.class-select {
+  --class-color: #f0a875;
+  margin-bottom: 22px;
+}
+.class-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.class-options button { margin: 0; border: 1px solid #665064; border-radius: 4px 4px 0 0; }
+#game .class-options button[aria-pressed="false"] { background: #221c2a; color: #f3e9f0; }
+#game .class-options button[aria-pressed="true"] { border-color: #fff1cc; }
+#class-profile {
+  display: grid;
+  grid-template-columns: 44% 56%;
+  min-height: clamp(365px, 44vw, 465px);
+  background: linear-gradient(138deg, #25202c, #16131c 75%);
+  border: 1px solid #654d61;
+  border-top: 0;
+  overflow: hidden;
+}
+#class-profile[data-job="archer"] { --class-color: #90d7aa; }
+#class-profile[data-job="mage"] { --class-color: #c2a9ff; }
+.class-portrait { position: relative; min-width: 0; overflow: hidden; background: #1c1721; }
+.class-portrait img { position: absolute; width: 100%; height: 100%; object-fit: contain; }
+.class-copy { align-self: center; padding: clamp(14px, 4vw, 46px); }
+#class-role { margin: 0; color: var(--class-color); font-weight: 700; }
+#class-name { font-size: clamp(2rem, 6vw, 4.1rem); line-height: 1.05; margin: .18em 0 .35em; }
+#job-description { color: #e3dbe1; line-height: 1.7; margin: 0 0 18px; }
+.class-stats { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0; padding: 10px 0; border-block: 1px solid #695263; }
+.class-stats dt { color: #cbc0cd; font-size: .8rem; }
+.class-stats dd { margin: 0; color: var(--class-color); font-weight: 750; }
+.class-skill { margin-bottom: 0; color: var(--class-color); }
+#players { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+#players .player-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 125px; padding: 8px 4px; text-align: center; }
+#players .player-tile[data-ready="true"] { border-color: #60846d; }
+.player-avatar { display: block; width: min(60px, 90%); height: auto; aspect-ratio: 1; object-fit: cover; margin-bottom: 5px; border: 1px solid #a293aa; border-radius: 3px; }
+#players .player-tile small { font-size: .73rem; }
+#players .player-tile .ghost { margin: 2px 0 0; padding: 4px; font-size: .72rem; }
+#players .vacant { border-style: dashed; color: #b5a9bc; }
+.vacant span { font-size: 1.45rem; }
+.ready-actions { display: flex; align-items: center; gap: 5px 10px; flex-wrap: wrap; }
+#start-help { color: #e2cba1; margin: 0; }
+@media (max-width: 620px) {
+  #class-profile { grid-template-columns: 1fr; }
+  .class-portrait { min-height: 310px; }
+  #players { grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); }
+}
+
+.class-portrait { background: radial-gradient(ellipse at center, color-mix(in srgb, var(--class-color) 34%, #221b27), #191520 77%); }
+.class-portrait::after { content: ""; position: absolute; inset: 8px; border: 1px solid color-mix(in srgb, var(--class-color) 42%, transparent); pointer-events: none; }
+.class-copy { border-left: 1px solid color-mix(in srgb, var(--class-color) 35%, transparent); }
+#game .class-options button[aria-pressed="true"] { background: #efd3ac; box-shadow: inset 0 -3px #b18b63; }
+#game .class-options #class-archer[aria-pressed="true"] { background: #b9e4c3; box-shadow: inset 0 -3px #73a985; }
+#game .class-options #class-mage[aria-pressed="true"] { background: #dac9f6; box-shadow: inset 0 -3px #aa88cd; }

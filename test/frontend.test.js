@@ -24,7 +24,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   function element(tagName = 'DIV') {
     return {
       tagName, hidden: false, children: [], value: '', textContent: '',
-      width: 960, height: 576,
+      width: 960, height: 576, dataset: {},
+      setAttribute(name, value) { this[name] = value; },
       append(...items) { this.children.push(...items); },
       replaceChildren(...items) { this.children = items; },
       getContext() { return canvasContext; },
@@ -47,6 +48,12 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
         emitted.push([event, ...args.slice(0, -1)]);
         if (event === 'addBot') roster.players.push(bot(1));
         if (event === 'fillBots') while (roster.players.length < 10) roster.players.push(bot(roster.players.length));
+        if (event === 'chooseClass') {
+          hostPlayer.job = args[0];
+          hostPlayer.ready = false;
+        }
+        if (event === 'ready') hostPlayer.ready = !hostPlayer.ready;
+        if (event === 'start') roster.phase = 'playing';
         args.at(-1)(null, { id: 'ABCDE0', room: roster });
       } };
     },
@@ -90,6 +97,20 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[0], 'fillBots');
   assert.equal(elements.get('bot-summary').textContent, '9 名 AI · 0 個空位');
   assert.equal(elements.get('fill-bots').disabled, true);
+  assert.equal(elements.get('start').disabled, true);
+  elements.get('class-archer').onclick();
+  assert.deepEqual(emitted.at(-1), ['chooseClass', 'archer']);
+  assert.equal(elements.get('class-art').src, '/art/archer.webp');
+  assert.equal(elements.get('class-name').textContent, '弓箭手');
+  assert.equal(elements.get('players').children[0].children[0].src, '/art/archer-avatar.webp');
+  elements.get('class-mage').onclick();
+  assert.equal(elements.get('class-art').src, '/art/mage.webp');
+  elements.get('ready').onclick();
+  assert.deepEqual(emitted.at(-1), ['ready']);
+  assert.equal(elements.get('start').disabled, false);
+  elements.get('start').onclick();
+  assert.deepEqual(emitted.at(-1), ['start']);
+  assert.equal(elements.get('battle').hidden, false);
   const player = {
     id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 80, y: 80, hp: 80, maxHp: 80,
     alive: true, facing: 0, attackAt: 0, skillAt: 0, spawnedAt: 0

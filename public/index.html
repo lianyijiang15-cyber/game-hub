@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜地下城對抗</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <main>
@@ -73,25 +73,40 @@
   </div>
   <p id="room-error" role="status"></p>
   <div id="waiting" class="panel">
+    <section class="class-select" aria-label="選擇職業">
+      <div id="class-options" class="class-options" role="group" aria-label="職業">
+        <button type="button" id="class-warrior" data-job="warrior" aria-pressed="true">戰士</button>
+        <button type="button" id="class-archer" data-job="archer" aria-pressed="false">弓箭手</button>
+        <button type="button" id="class-mage" data-job="mage" aria-pressed="false">法師</button>
+      </div>
+      <div id="class-profile" data-job="warrior">
+        <div class="class-portrait"><img id="class-art" src="/art/warrior.webp" alt="戰士立繪" width="512" height="1024" fetchpriority="high"></div>
+        <div class="class-copy" aria-live="polite">
+          <p id="class-role"></p>
+          <h3 id="class-name">戰士</h3>
+          <p id="job-description"></p>
+          <dl class="class-stats">
+            <div><dt>生命值</dt><dd id="class-hp"></dd></div>
+            <div><dt>普攻距離</dt><dd id="class-range"></dd></div>
+          </dl>
+          <p class="class-skill"><kbd>Q</kbd> <strong id="class-skill"></strong></p>
+        </div>
+      </div>
+    </section>
     <h3 id="seat-count"></h3>
-    <div id="players"></div>
-    <label>職業
-      <select id="job">
-        <option value="warrior">戰士</option>
-        <option value="archer">弓箭手</option>
-        <option value="mage">法師</option>
-      </select>
-    </label>
-    <p id="job-description" class="muted"></p>
+    <div id="players" aria-label="玩家席位"></div>
     <div class="bot-settings">
-    <div><strong id="bot-summary"></strong><p id="bot-help"></p></div>
-    <div id="bot-controls" hidden>
-      <button id="add-bot" class="secondary">加入一名 AI</button>
-      <button id="fill-bots">一鍵補滿 AI</button>
+      <div><strong id="bot-summary"></strong><p id="bot-help"></p></div>
+      <div id="bot-controls" hidden>
+        <button id="add-bot" class="secondary">加入一名 AI</button>
+        <button id="fill-bots">一鍵補滿 AI</button>
+      </div>
     </div>
+    <div class="ready-actions">
+      <button id="ready">準備</button>
+      <button id="start">開始遊戲</button>
+      <p id="start-help" role="status"></p>
     </div>
-    <button id="ready" onclick="command('ready')">準備</button>
-    <button id="start" onclick="command('start')">開始遊戲</button>
   </div>
   <div id="battle" hidden>
     <div class="scoreboard">
@@ -118,8 +133,8 @@
       <tbody id="results-body"></tbody>
     </table></div>
     <p id="results-note" class="muted"></p>
-    <button id="return-lobby" class="secondary" onclick="command('returnLobby')">返回大廳</button>
-    <button id="rematch" onclick="command('rematch')">再玩一局</button>
+    <button id="return-lobby" class="secondary">返回大廳</button>
+    <button id="rematch">再玩一局</button>
   </section>
   <section class="panel">
     <h3 id="chat-title">房間聊天</h3>
@@ -133,7 +148,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=2"></script>
-<script src="arena-renderer.js?v=2"></script>
+<script src="app.js?v=3"></script>
+<script src="arena-renderer.js?v=3"></script>
 </body>
 </html>
