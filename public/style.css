@@ -475,7 +475,10 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 .result-player { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .result-player img { width: clamp(23px, 4vw, 37px); aspect-ratio: 1; border-radius: 4px; }
 .result-player strong { overflow-wrap: anywhere; font-size: clamp(.69rem, 1.55vw, .96rem); }
-.result-player small { margin-left: auto; padding: 2px 4px; border-radius: 3px; background: #ffd087; color: #322316; font-size: .59rem; }
+.result-awards { margin-left: auto; display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.result-player small { white-space: nowrap; padding: 2px 4px; border-radius: 3px; background: #ffd087; color: #322316; font-size: .59rem; }
+.result-player .lowest-kda { background: #773c4b; color: #ffe5ea; }
+.results-team tr[data-lowest-kda="true"]:not([data-mvp="true"]) { box-shadow: inset 3px 0 #c77785; }
 .in-results #match-chat { max-width: 620px; margin: 10px auto; }
 @media (max-width: 720px) {
   #game.in-results #results { grid-template-columns: 1fr; width: calc(100% - 20px); }

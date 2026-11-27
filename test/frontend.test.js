@@ -210,9 +210,15 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[1].x, 0);
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', phase: 'ended', winner: '紅隊', mvp: 'self', score: { 紅隊: 7, 藍隊: 2 },
-    results: [{ ...player, kills: 5, deaths: 1, assists: 3, damage: 1100 }]
+    teamAwards: { 紅隊: { mvp: 'self', lowestKda: 'red-low' }, 藍隊: { mvp: 'blue-mvp', lowestKda: 'blue-low' } },
+    results: [
+      { ...player, kills: 5, deaths: 1, assists: 3, damage: 1100 },
+      { ...player, id: 'red-low', name: 'Red Low', kills: 0, deaths: 6, assists: 0, damage: 110 },
+      { ...player, id: 'blue-mvp', team: '藍隊', name: 'Blue MVP', kills: 2, deaths: 2, assists: 2, damage: 750 },
+      { ...player, id: 'blue-low', team: '藍隊', name: 'Blue Low', kills: 0, deaths: 3, assists: 0, damage: 75 }
+    ]
   });
-  assert.equal(elements.get('mvp-portrait').src, '/art/mage-model.webp');
+  assert.equal(elements.get('mvp-portrait').src, '/art/mage-celebration.webp');
   assert.equal(elements.get('mvp-name').textContent, 'Tester');
   assert.equal(elements.get('red-outcome').textContent, '勝利');
   assert.equal(elements.get('blue-outcome').textContent, '敗北');
@@ -225,5 +231,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.ok(!read('index.html').includes('<video'));
   assert.match(elements.get('mvp-kda').textContent, /5 \/ 1 \/ 3/);
   assert.equal(elements.get('results-red').children[0].dataset.mvp, 'true');
+  assert.equal(elements.get('results-red').children[1].dataset.lowestKda, 'true');
+  assert.equal(elements.get('results-blue').children[0].dataset.mvp, 'true');
+  assert.equal(elements.get('results-blue').children[1].dataset.lowestKda, 'true');
 
 });

@@ -187,3 +187,25 @@ test('attack range, timely assists and winner MVP are calculated on the server',
   assert.equal(final.mvp, killer.id);
   assert.equal(final.results.find(p => p.id === helper.id).assists, 1);
 });
+
+test('both teams award MVP and lowest KDA and the winning MVP is featured', () => {
+  const room = match();
+  const [redMvp, blueMvp, redLow, blueLow, redTie, blueTie] = room.players;
+  Object.assign(redMvp, { kills: 7, assists: 3, deaths: 1, damage: 700 });
+  Object.assign(blueMvp, { kills: 9, assists: 0, deaths: 1, damage: 900 });
+  Object.assign(redLow, { kills: 0, assists: 0, deaths: 6, damage: 50 });
+  Object.assign(blueLow, { kills: 0, assists: 0, deaths: 4, damage: 40 });
+  Object.assign(redTie, { kills: 0, assists: 0, deaths: 6, damage: 120 });
+  Object.assign(blueTie, { kills: 0, assists: 0, deaths: 3, damage: 12 });
+  room.score['紅隊'] = 7;
+  room.score['藍隊'] = 5;
+  combat.tick(room, 300000, 0.05, idle);
+  const final = combat.snapshot(room, 300000);
+  assert.deepEqual(final.teamAwards, {
+    紅隊: { mvp: redMvp.id, lowestKda: redLow.id },
+    藍隊: { mvp: blueMvp.id, lowestKda: blueLow.id }
+  });
+  assert.equal(final.mvp, redMvp.id);
+  room.winner = null;
+  assert.equal(combat.snapshot(room, 300000).mvp, blueMvp.id);
+});

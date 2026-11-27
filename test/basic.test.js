@@ -42,7 +42,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal((await fetch(base + '/soup-bank.js')).status, 200);
   assert.equal((await fetch(base + '/arena-renderer.js')).status, 200);
   for (const job of ['warrior', 'archer', 'mage']) {
-    for (const suffix of ['', '-avatar', '-cutout', '-model', '-key-art', '-portrait']) {
+    for (const suffix of ['', '-avatar', '-cutout', '-model', '-key-art', '-portrait', '-celebration']) {
       const image = await fetch(`${base}/art/${job}${suffix}.webp`, { method: 'HEAD' });
       assert.equal(image.status, 200);
       assert.equal(image.headers.get('content-type'), 'image/webp');

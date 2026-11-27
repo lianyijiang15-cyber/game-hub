@@ -270,11 +270,21 @@ function castRune(room, player, now) {
   return true;
 }
 
-function matchMvp(results, winner) {
+function rankMvp(a, b) {
   const score = player => 2 * player.kills + player.assists - player.deaths;
-  return results.filter(player => !winner || player.team === winner).sort((a, b) =>
-    score(b) - score(a) || b.damage - a.damage ||
-    b.kills - a.kills || a.deaths - b.deaths)[0]?.id ?? null;
+  return score(b) - score(a) || b.damage - a.damage ||
+    b.kills - a.kills || a.deaths - b.deaths;
+}
+
+function teamAwards(results) {
+  const kda = player => (player.kills + player.assists) / Math.max(1, player.deaths);
+  return Object.fromEntries(teams.map(team => {
+    const members = results.filter(player => player.team === team);
+    const mvp = [...members].sort(rankMvp)[0]?.id ?? null;
+    const lowestKda = members.sort((a, b) => kda(a) - kda(b) || b.deaths - a.deaths ||
+      a.damage - b.damage || Number(a.id === mvp) - Number(b.id === mvp))[0]?.id ?? null;
+    return [team, { mvp, lowestKda }];
+  }));
 }
 
 function snapshot(room, now, viewer = null) {
@@ -284,6 +294,9 @@ function snapshot(room, now, viewer = null) {
     (player.team === viewer.team ? distance(viewer, player) <= visionRadius : sees(player))) : room.players;
   const results = room.phase === 'ended' ? room.roster.map(({ id, name, team, bot, job, kills, deaths, assists, damage }) =>
     ({ id, name, team, bot, job, kills, deaths, assists, damage })) : null;
+  const awards = results ? teamAwards(results) : null;
+  const mvp = room.winner ? awards?.[room.winner]?.mvp ?? null :
+    results ? [...results].sort(rankMvp)[0]?.id ?? null : null;
   const attackRange = local && viewer.alive ? classes[viewer.job].range : 0;
   const targetInRange = attackRange > 0 && players.some(player => player.alive && player.team !== viewer.team &&
     distance(viewer, player) <= attackRange && clearLine(viewer, player, 0, room.map));
@@ -304,7 +317,7 @@ function snapshot(room, now, viewer = null) {
       action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt }) =>
       ({ id, x, y, name, team, job, hp, maxHp: classes[job].hp, bot, alive, moving, angle, facing,
         action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt })),
-    results, mvp: results ? matchMvp(results, room.winner) : null
+    results, mvp, teamAwards: awards
   };
 }
 

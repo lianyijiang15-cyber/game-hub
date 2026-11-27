@@ -483,7 +483,7 @@ function renderResults(state) {
   $('mvp-feature').hidden = !mvp;
   if (mvp) {
     const portrait = $('mvp-portrait');
-    portrait.src = `/art/${mvp.job}-model.webp`;
+    portrait.src = `/art/${mvp.job}-celebration.webp`;
     portrait.alt = jobNames[mvp.job] + '立繪';
     $('mvp-name').textContent = mvp.name + (mvp.bot ? ' · AI' : '');
     $('mvp-kda').textContent = `${jobNames[mvp.job]} · ${mvp.kills} / ${mvp.deaths} / ${mvp.assists}`;
@@ -492,11 +492,15 @@ function renderResults(state) {
   for (const [team, key] of [['藍隊', 'blue'], ['紅隊', 'red']]) {
     $(`final-${key}`).textContent = state.score[team];
     $(`${key}-outcome`).textContent = !state.winner ? '平手' : state.winner === team ? '勝利' : '敗北';
+    const awards = state.teamAwards?.[team];
     const roster = $(`results-${key}`);
     roster.replaceChildren();
     for (const player of state.results.filter(entry => entry.team === team)) {
       const row = element('tr', '');
-      row.dataset.mvp = String(player.id === state.mvp);
+      const teamMvp = player.id === awards?.mvp;
+      const lowestKda = player.id === awards?.lowestKda;
+      row.dataset.mvp = String(teamMvp);
+      row.dataset.lowestKda = String(lowestKda);
       const identity = element('th', '');
       identity.setAttribute('scope', 'row');
       const profile = element('div', '');
@@ -506,7 +510,18 @@ function renderResults(state) {
       art.alt = '';
       const name = element('strong', player.name + (player.bot ? ' · AI' : ''));
       profile.append(art, name);
-      if (player.id === state.mvp) profile.append(element('small', 'MVP'));
+      if (teamMvp || lowestKda) {
+        const badges = element('div', '');
+        badges.className = 'result-awards';
+        if (teamMvp) badges.append(element('small', 'MVP'));
+        if (lowestKda) {
+          const badge = element('small', '戰犯');
+          badge.className = 'lowest-kda';
+          badge.title = '隊內最低 KDA';
+          badges.append(badge);
+        }
+        profile.append(badges);
+      }
       identity.append(profile);
       row.append(identity, ...[player.kills, player.deaths, player.assists, player.damage]
         .map(value => element('td', String(value))));
