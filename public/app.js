@@ -78,6 +78,7 @@ narrationButton.onclick = () => {
 function showSoupStage(stage) {
   if (stage !== 'comic') stopNarration();
   soupStage = stage;
+  $('soup').dataset.case = stage === 'levels' ? '' : soupStoryId ?? '';
   for (const name of ['levels', 'comic', 'investigation']) $('soup-' + name).hidden = stage !== name;
   $('soup-investigation-layout').hidden = stage !== 'investigation';
   $('soup-level-back').hidden = stage === 'levels';
@@ -844,8 +845,13 @@ function lootCommand(event, ...args) {
   socket.timeout(2500).emit(event, ...args, (failure, result) => {
     if (room !== id || phase !== 'playing') return;
     const reward = result?.reward;
+    if (!failure && result && !result.error) {
+      const sound = event === 'lootOpen' && reward ? 'chest' :
+        reward?.healing ? 'heal' : ['lootUse', 'lootRune', 'modeAntidote', 'modeCraft', 'modeInteract'].includes(event) ? 'item' : null;
+      if (sound) window.playGameSound?.(sound);
+    }
     $('loot-toast').textContent = failure ? '道具操作逾時' : result?.error || result?.message ||
-      (event === 'lootOpen' ? `取得 ${reward.label} · 欄位 ${reward.slot + 1}` :
+      (event === 'lootOpen' && reward ? `取得 ${reward.label} · 欄位 ${reward.slot + 1}` :
         reward ? `使用 ${reward.label}${reward.healing ? ' · +' + reward.healing + ' HP' : ''}` : '已施放震波');
     lootToastUntil = performance.now() + 2500;
   });
@@ -1060,6 +1066,7 @@ function renderResults(state) {
 }
 
 socket.on('achievementUnlocked', title => {
+  window.playGameSound?.('achievement');
   $('loot-toast').textContent = `成就解鎖 · ${title}`;
   lootToastUntil = performance.now() + 5000;
 });
@@ -1141,6 +1148,8 @@ socket.on('arenaState', state => {
     selectSpectator(null);
   }
   if (me?.alive) syncAttackDeadline(me.attackAt, state.now);
+  if (lastPlayer?.alive === true && me?.alive === false) window.playGameSound?.('death');
+  if (lastPlayer?.alive === false && me?.alive === true) window.playGameSound?.('respawn');
   if (me?.alive === false && lastPlayer?.alive !== false) {
     eliminationNoticeUntil = performance.now() + 5000;
   }

@@ -6,7 +6,7 @@
 <title>PIXEL CLASH 像素衝突</title>
 <link rel="stylesheet" href="style.css?v=23">
 <link rel="stylesheet" href="menu.css?v=3">
-<link rel="stylesheet" href="account.css?v=5">
+<link rel="stylesheet" href="account.css?v=6">
 <link rel="stylesheet" href="casebook.css?v=4">
 </head>
 <body>
@@ -146,7 +146,7 @@
       <p id="achievement-summary"></p>
       <button class="menu-back" id="achievement-history" type="button">對局紀錄</button>
     </div>
-    <div class="achievement-book">
+    <div class="achievement-book" id="achievement-book">
       <section class="achievement-page">
         <h3>戰場</h3>
         <ul class="achievement-grid" id="arena-achievements"></ul>
@@ -155,7 +155,13 @@
         <h3>探索與推理</h3>
         <ul class="achievement-grid" id="soup-achievements"></ul>
       </section>
+      <span class="achievement-turn" id="achievement-turn" aria-hidden="true"></span>
     </div>
+    <nav class="achievement-pagination" aria-label="成就圖鑑頁碼">
+      <button id="achievement-prev" type="button" data-game-sound="custom">‹ 上一頁</button>
+      <span id="achievement-page-index" aria-live="polite"></span>
+      <button id="achievement-next" type="button" data-game-sound="custom">下一頁 ›</button>
+    </nav>
     <div id="achievement-detail" class="achievement-detail" aria-live="polite"></div>
   </section>
   <section id="player-history" hidden>
@@ -485,12 +491,12 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=4"></script>
 <script src="heroes.js?v=4"></script>
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 <script src="arena-renderer.js?v=23"></script>
 <script src="menu-art.js?v=5"></script>
 <script src="arena-guide.js?v=2"></script>
 <script src="account.js?v=4"></script>
-<script src="game-audio.js?v=1"></script>
-<script src="player-panel.js?v=6"></script>
+<script src="game-audio.js?v=2"></script>
+<script src="player-panel.js?v=7"></script>
 </body>
 </html>

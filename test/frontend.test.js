@@ -15,6 +15,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   const frames = [];
   let pixelDraws = 0;
   let narration;
+  const battleSounds = [];
   const narrationTimers = new Map();
   let wallTime = 100;
   let pointerCapture;
@@ -61,6 +62,9 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     timeout() {
       return { emit(event, ...args) {
         emitted.push([event, ...args.slice(0, -1)]);
+        if (event === 'lootOpen') return args.at(-1)(null, args[0] === 1
+          ? { reward: { label: '生命藥水', slot: 0 } } : { error: '寶箱已領取' });
+        if (event === 'lootUse') return args.at(-1)(null, { reward: { label: '生命藥水', healing: 15 } });
         if (event === 'arenaAttack') return args.at(-1)(null, { now: wallTime, attackAt: wallTime + 650 });
         if (event === 'addBot') roster.players.push(bot(1));
         if (event === 'fillBots') while (roster.players.length < 10) roster.players.push(bot(roster.players.length));
@@ -95,6 +99,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     window: {
       addEventListener(event, handler) { keyHandlers.set(event, handler); },
       matchMedia() { return { matches: true }; },
+      playGameSound(name) { battleSounds.push(name); },
       SpeechSynthesisUtterance: class { constructor(text) { this.text = text; } },
       speechSynthesis: {
         getVoices: () => [{ lang: 'zh-TW' }],
@@ -156,6 +161,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   elements.get('soup-hard').onclick();
   assert.equal(elements.get('soup-comic').hidden, false);
   assert.equal(elements.get('soup-difficulty').textContent, '困難');
+  assert.ok(elements.get('soup').dataset.case);
   assert.equal(elements.get('comic-page-count').textContent, '1 / 2');
   assert.ok(elements.get('comic-caption').textContent);
   assert.equal(elements.get('soup-investigation').hidden, true);
@@ -314,6 +320,10 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(slot.dataset.item, 'rune');
   assert.equal(slot.children[1].className, 'loot-icon');
   assert.match(slot['aria-label'], /震波符文/);
+  context.lootCommand('lootOpen', 1);
+  context.lootCommand('lootOpen', 2);
+  context.lootCommand('lootUse', 0);
+  assert.deepEqual(battleSounds, ['chest', 'heal']);
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', now: 100, phase: 'playing', remaining: 299900, players: [player],
     effects: [], kills: [], projectiles: [], score: { 紅隊: 0, 藍隊: 0 }
@@ -400,6 +410,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('respawn').hidden, false);
   frames.shift()(5190);
   assert.equal(elements.get('respawn').hidden, true);
+  assert.deepEqual(battleSounds, ['chest', 'heal', 'death']);
   watch.onclick();
   assert.equal(watch['aria-pressed'], 'true');
   socketHandlers.get('arenaState')({
@@ -455,7 +466,8 @@ test('account menu presents registration, achievements, detailed records and fri
     login: { username: 'Player7', profile: null },
     profile: { profile },
     achievements: {
-      arena: [{ rarity: 'hidden', hint: '在樹根旁找找。', count: 0, goal: 1 }],
+      arena: [{ rarity: 'hidden', hint: '在樹根旁找找。', count: 0, goal: 1 },
+        ...Array.from({ length: 6 }, (_, index) => ({ description: '戰場任務 ' + (index + 1), count: 0, goal: 1 }))],
       soup: [{ title: '初露鋒芒', description: '解開一題', reward: '入門偵探徽章', count: 1, goal: 1 }]
     },
     history: { arena: [], soup: [{ id: 'saved-soup', title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' }] },
@@ -465,7 +477,11 @@ test('account menu presents registration, achievements, detailed records and fri
     logout: { ok: true }
   };
   let openedArena = false;
+  const pageSounds = [];
+  const pageAnimations = [];
+  find('achievement-turn').animate = frames => { pageAnimations.push(frames); return { cancel() {} }; };
   const context = vm.createContext({
+    window: { playGameSound: name => pageSounds.push(name) },
     $: find, AbortSignal, openModes() { openedArena = true; }, openSoup() {},
     socket: { disconnect() { return this; }, connect() {} },
     element(_tag, text) { return { ...node(), textContent: text }; },
@@ -505,7 +521,7 @@ test('account menu presents registration, achievements, detailed records and fri
   await find('menu-history').onclick();
   assert.equal(find('player-title').textContent, '成就圖鑑');
   assert.equal(find('player-history').hidden, true);
-  assert.equal(find('achievement-summary').textContent, '已解鎖 1 / 2 · 金幣 0');
+  assert.equal(find('achievement-summary').textContent, '已解鎖 1 / 8 · 金幣 0');
   assert.equal(find('arena-achievements').children[0]['data-unlocked'], 'false');
   assert.equal(find('soup-achievements').children[0]['data-unlocked'], 'true');
   const hiddenBadge = find('arena-achievements').children[0].children[0];
@@ -514,6 +530,17 @@ test('account menu presents registration, achievements, detailed records and fri
   assert.match(find('achievement-detail').children[1].textContent, /樹根/);
   find('soup-achievements').children[0].children[0].onclick();
   assert.match(find('achievement-detail').children[2].textContent, /入門偵探徽章/);
+  assert.match(find('soup-achievements').children[0].children[0].children[0].className, /illustrated/);
+  assert.equal(find('achievement-prev').disabled, true);
+  find('achievement-next').onclick();
+  assert.equal(find('achievement-page-index').textContent, '2 / 2');
+  assert.equal(find('achievement-next').disabled, true);
+  find('arena-achievements').children[0].children[0].onclick();
+  assert.equal(find('achievement-detail').children[1].textContent, '戰場任務 6');
+  find('player-dialog').onkeydown({ key: 'ArrowLeft', preventDefault() {} });
+  assert.equal(find('achievement-page-index').textContent, '1 / 2');
+  assert.deepEqual(pageSounds, ['page', 'page']);
+  assert.equal(pageAnimations.length, 2);
   await find('achievement-history').onclick();
   const historyButton = find('soup-history').children[0].children[0];
   assert.equal(historyButton.children[0].textContent, '第一題');

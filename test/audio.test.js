@@ -12,7 +12,7 @@ test('audio waits for interaction, plays scene-specific notes and respects the s
   const label = {};
   const settings = new Map();
   const button = { querySelector: () => label, setAttribute(name, value) { this[name] = value; } };
-  const nodes = { 'sound-toggle': button, game: { hidden: false }, battle: { dataset: { scene: 'forest' } }, soup: { hidden: true } };
+  const nodes = { 'sound-toggle': button, game: { hidden: false }, battle: { dataset: { scene: 'forest' } }, soup: { hidden: true, dataset: {} } };
   let click;
   let time = 0;
   let update;
@@ -24,6 +24,10 @@ test('audio waits for interaction, plays scene-specific notes and respects the s
     setTimeout() {},
     window: { AudioContext: class {
       state = 'suspended';
+      sampleRate = 8000;
+      createBuffer(_, size) { return { getChannelData: () => new Float32Array(size) }; }
+      createBufferSource() { return { connect() {}, start() {} }; }
+      createBiquadFilter() { return { frequency: {}, Q: {}, connect() {} }; }
       get currentTime() { return time; }
       async resume() { this.state = 'running'; }
       createGain() {
@@ -49,10 +53,30 @@ test('audio waits for interaction, plays scene-specific notes and respects the s
   update();
   assert.equal(notes.length, 6);
   assert.notEqual(notes[0], notes[4]);
+  const playSound = vm.runInContext('window.playGameSound', client);
+  playSound('chest');
+  playSound('death');
+  playSound('item');
+  playSound('page');
+  assert.equal(notes.length, 16);
+
+  nodes.battle.hidden = true;
+  nodes.soup.hidden = false;
+  nodes.soup.dataset.case = 'hotel-call';
+  time = 1;
+  update();
+  assert.equal(notes.length, 18);
+  const hotel = notes.at(-2);
+  nodes.soup.dataset.case = 'snow';
+  time = 1.5;
+  update();
+  assert.equal(notes.length, 20);
+  assert.notEqual(notes.at(-2), hotel);
   button.onclick();
   assert.equal(label.textContent, '靜音');
   assert.equal(settings.get('pixel-clash-muted'), 'yes');
-  time = 1;
+  time = 2;
   update();
-  assert.equal(notes.length, 6);
+  playSound('chest');
+  assert.equal(notes.length, 20);
 });

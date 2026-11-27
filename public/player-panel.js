@@ -6,6 +6,12 @@ const showPlayerPanel = (() => {
   let activePanel;
   let activeRead = 0;
   let submitting = false;
+  let turnPage;
+  const iconThemes = [
+    /kill|finisher|strik|lone/, /win|undying/, /flag|modes/, /surviv|aid|assist/,
+    /chest/, /low-hp/, /snow/, /inferno|damage/, /versatile|chase/, /case|hint/,
+    /unknown|silent/, /match|difficulty/, /forest|wild/, /marsh|visitor/, /fortress|control/, /ruins|secrets/
+  ];
   const dateLabel = new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeStyle: 'short' });
 
   function rows(id, items, label, createRow) {
@@ -21,7 +27,10 @@ const showPlayerPanel = (() => {
     const detail = $('achievement-detail');
     detail.replaceChildren(element('p', '選擇一格查看詳細資訊。'));
     let selected;
-    const glyphs = ['✦', '◆', '⚑', '✷', '✚', '▲', '⌘', '✧'];
+    const pageSize = 6;
+    const pages = Math.max(1, Math.ceil(Math.max(arena.length, soup.length) / pageSize));
+    let page = 0;
+    let animation;
     const card = (item, index) => {
       const unlocked = item.count >= item.goal;
       const rarity = item.rarity ?? 'standard';
@@ -30,8 +39,14 @@ const showPlayerPanel = (() => {
       row.setAttribute('data-unlocked', String(unlocked));
       row.setAttribute('data-rarity', rarity);
       const button = element('button', '');
-      const icon = element('span', unlocked ? glyphs[index % glyphs.length] : '?');
+      const icon = element('span', unlocked ? '' : '?');
       icon.className = 'achievement-emblem';
+      if (unlocked) {
+        const theme = iconThemes.findIndex(pattern => pattern.test(item.id ?? ''));
+        const indexInAtlas = theme >= 0 ? theme : index % 16;
+        icon.className += ' illustrated';
+        icon.setAttribute('style', `background-position:${(indexInAtlas % 4) * 100 / 3}% ${Math.floor(indexInAtlas / 4) * 100 / 3}%`);
+      }
       icon.setAttribute('aria-hidden', 'true');
       button.append(icon);
       if (unlocked) button.append(element('small', item.title));
@@ -51,8 +66,38 @@ const showPlayerPanel = (() => {
       row.append(button);
       return row;
     };
-    rows('arena-achievements', arena, '目前沒有對戰成就。', card);
-    rows('soup-achievements', soup, '目前沒有探索或推理成就。', card);
+    const previous = $('achievement-prev');
+    const next = $('achievement-next');
+    function paint() {
+      const start = page * pageSize;
+      const end = start + pageSize;
+      rows('arena-achievements', arena.slice(start, end), '本頁沒有戰場成就。', card);
+      rows('soup-achievements', soup.slice(start, end), '本頁沒有探索或推理成就。', card);
+      previous.disabled = page === 0;
+      next.disabled = page === pages - 1;
+      $('achievement-page-index').textContent = `${page + 1} / ${pages}`;
+      selected = null;
+      detail.replaceChildren(element('p', '選擇一枚徽章查看詳細資訊。'));
+    }
+    turnPage = direction => {
+      const to = page + direction;
+      if (to < 0 || to >= pages) return;
+      page = to;
+      paint();
+      window.playGameSound?.('page');
+      const leaf = $('achievement-turn');
+      animation?.cancel();
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+      leaf.setAttribute('data-direction', direction > 0 ? 'next' : 'prev');
+      animation = leaf.animate?.([
+        { opacity: 1, transform: 'rotateY(0deg)' },
+        { opacity: 1, transform: `rotateY(${-direction * 95}deg)`, offset: .5 },
+        { opacity: 0, transform: `rotateY(${-direction * 178}deg)` }
+      ], { duration: 530, easing: 'cubic-bezier(.35,.12,.35,1)' });
+    };
+    previous.onclick = () => turnPage?.(-1);
+    next.onclick = () => turnPage?.(1);
+    paint();
   }
 
   function historyRow(item, title, summary) {
@@ -172,6 +217,7 @@ const showPlayerPanel = (() => {
 
   async function refresh(section, notice = '') {
     const request = ++activeRead;
+    if (section === 'achievements') turnPage = null;
     message.textContent = '載入中…';
     try {
       const result = await accountRequest(section);
@@ -224,6 +270,12 @@ const showPlayerPanel = (() => {
     selectPanel('achievements');
     $('achievement-history').focus();
     return refresh('achievements');
+  };
+
+  panel.onkeydown = event => {
+    if ($('player-achievements').hidden || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    turnPage?.(event.key === 'ArrowRight' ? 1 : -1);
   };
 
   $('player-close').onclick = () => panel.close();

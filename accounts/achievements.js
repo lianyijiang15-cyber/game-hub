@@ -10,6 +10,10 @@ function achievementProgress(account) {
   const arena = account.arenaHistory ?? [];
   const wins = arena.filter(record => record.result === 'win');
   const solved = (account.soupHistory ?? []).filter(record => record.result === 'solved');
+  const maxInMatch = key => arena.reduce((best, record) => Math.max(best, record[key] ?? 0), 0);
+  const uniqueCases = new Set(solved.map(record => record.storyId || record.title).filter(Boolean));
+  const wonModes = new Set(wins.map(record => record.mode ?? 'deathmatch'));
+  const secretCount = Object.keys(secretTitles).filter(id => Boolean(account.secrets?.[id])).length;
   const sum = key => arena.reduce((total, record) => total + (record[key] ?? 0), 0);
   const achievement = (id, title, description, reward, count, goal = 1, hint = '', rarity = 'standard') =>
     ({ id, title, description, reward, count, goal, hint, rarity });
@@ -31,7 +35,14 @@ function achievementProgress(account) {
       achievement('finisher', '一擊制勝', '在團隊死鬥取得直接結束對局的擊殺。', '終結者擊殺特效', wins.filter(record => record.finisher).length, 1, '', 'legendary'),
       achievement('lone', '獨行者', '獲勝時是隊上唯一的存活成員。', '獨行者稱號', wins.filter(record => record.loneSurvivor).length),
       achievement('survivor', '極限生存', '在生存戰存活到比賽結束。', '生存者稱號', arena.filter(record => record.mode === 'survival' && record.survived).length),
-      achievement('versatile', '全能戰士', '使用 5 位不同英雄，各贏得至少一場對局。', '全能武器外觀', new Set(wins.filter(record => record.hero).map(record => record.hero)).size, 5)
+      achievement('versatile', '全能戰士', '使用 5 位不同英雄，各贏得至少一場對局。', '全能武器外觀', new Set(wins.filter(record => record.hero).map(record => record.hero)).size, 5),
+      achievement('ten-matches', '久經戰陣', '完成 10 場像素衝突對局。', '老兵徽章', arena.length, 10),
+      achievement('ten-wins', '常勝旗手', '累計贏得 10 場對局。', '金旗徽章', wins.length, 10),
+      achievement('all-modes', '四方戰記', '在四種對戰模式中各贏一場。', '四象徽章', wonModes.size, 4),
+      achievement('five-kills', '突擊先鋒', '單場擊殺至少 5 名敵方成員。', '銳鋒徽章', maxInMatch('kills'), 5),
+      achievement('aid-five', '可靠戰友', '單場取得至少 5 次助攻。', '交鋒之盾徽章', maxInMatch('assists'), 5),
+      achievement('damage-50k', '破陣者', '累計造成 50,000 點有效傷害。', '赤焰徽章', sum('damage'), 50000),
+      achievement('first-chest', '旅途的收穫', '在對局開啟第一個寶箱。', '拾寶徽章', sum('chestsOpened'))
     ],
     soup: [
       secret('forest-secret', '在螢光古林找到自然景物間的隱藏區域。', '古林造型', '樹根旁偶爾會長出一朵不一樣的菇。'),
@@ -45,6 +56,13 @@ function achievementProgress(account) {
       achievement('three-cases', '連環解謎', '完成 3 次推理。', '解謎者徽章', solved.length, 3),
       achievement('hard-case', '疑案剋星', '完成一題困難推理。', '名偵探徽章', solved.filter(record => record.difficulty === '困難').length),
       achievement('no-hints', '獨立推理', '完成推理且沒有使用提示。', '獨立偵探徽章', solved.filter(record => record.hints === 0).length),
+      achievement('ten-cases', '案卷收藏家', '解開 10 個不同題目。', '卷宗徽章', uniqueCases.size, 10),
+      achievement('three-difficulties', '循跡而行', '完成簡單、中等、困難各至少一題。', '階梯徽章',
+        new Set(solved.map(record => record.difficulty).filter(Boolean)).size, 3),
+      achievement('three-no-hints', '靜默推理', '不使用提示，解開 3 個不同題目。', '月眼徽章',
+        new Set(solved.filter(record => record.hints === 0).map(record => record.storyId || record.title).filter(Boolean)).size, 3),
+      achievement('three-secrets', '荒野手札', '找到 3 種不同的探索彩蛋。', '荒野羅盤徽章', secretCount, 3),
+      achievement('all-secrets', '邊境密約', '找齊六個場景的彩蛋並遇見隱藏旅人。', '星路徽章', secretCount, 7, '', 'legendary'),
       achievement('unknown', '未知的存在', '解開「停電後亮起的窗」的所有線索，且未使用提示。', '夜巡者造型',
         solved.filter(record => (record.storyId === 'blackout-window' || record.title === '停電後亮起的窗') && record.hints === 0).length, 1, '', 'legendary')
     ],

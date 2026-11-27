@@ -67,5 +67,7 @@ test('achievement catalog redacts unknown entries and derives unlocks and coin r
   assert.equal(value.coins, 100);
   assert.equal(value.arena.find(item => item.id === 'chest-hunter').count, 100);
   assert.equal(value.arena.find(item => item.id === 'finisher').rarity, 'legendary');
+  assert.equal(value.arena.find(item => item.id === 'five-kills').title, '突擊先鋒');
+  assert.equal(value.arena.find(item => item.id === 'ten-matches').count, 2);
   assert.equal(value.soup.find(item => item.id === 'snow-secret').title, '雪封來信');
 });
