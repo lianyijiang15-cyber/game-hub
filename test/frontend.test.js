@@ -158,9 +158,10 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   elements.get('class-prev').onclick();
   assert.equal(elements.get('class-art').src, '/art/warrior-portrait.webp');
   assert.equal(elements.get('class-hp').textContent, '800 HP');
+  assert.match(elements.get('class-defense').textContent, /35/);
   elements.get('class-prev').onclick();
   assert.equal(elements.get('class-art').src, '/art/mage-portrait.webp');
-  assert.equal(elements.get('class-hp').textContent, '580 HP');
+  assert.equal(elements.get('class-hp').textContent, '560 HP');
   assert.equal(elements.get('class-mage').dataset.position, 'center');
   elements.get('ready').onclick();
   assert.deepEqual(emitted.at(-1), ['ready']);
@@ -175,7 +176,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('loading-red').children.length, 5);
   assert.equal(elements.get('loading-red').children[0].children[0].src, '/art/mage-cutout.webp');
   const player = {
-    id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 1600, y: 1400, hp: 580, maxHp: 580,
+    id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 1600, y: 1400, hp: 560, maxHp: 560,
     alive: true, facing: 0, attackAt: 0, skillAt: 0, spawnedAt: 0
   };
   socketHandlers.get('room')({ id: 'ABCDE0', host: 'self', players: [player], phase: 'playing' });
@@ -189,7 +190,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   });
   frames.shift()(115);
   assert.ok(pixelDraws > 100);
-  assert.match(elements.get('health').textContent, /法師 · HP 580\/580/);
+  assert.match(elements.get('health').textContent, /法師 · HP 560\/560/);
   const arena = elements.get('arena');
   const keyboard = code => ({ code, target: element('BODY'), preventDefault() {} });
   keyHandlers.get('keydown')(keyboard('KeyD'));
@@ -207,4 +208,12 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   keyHandlers.get('keydown')(keyboard('Enter'));
   assert.equal(emitted.at(-1)[0], 'arenaInput');
   assert.equal(emitted.at(-1)[1].x, 0);
+  socketHandlers.get('arenaState')({
+    id: 'ABCDE0', phase: 'ended', winner: '紅隊', mvp: 'self', score: { 紅隊: 7, 藍隊: 2 },
+    results: [{ ...player, kills: 5, deaths: 1, assists: 3, damage: 1100 }]
+  });
+  assert.equal(elements.get('mvp-video').src, '/art/mage-victory.mp4');
+  assert.match(elements.get('mvp-kda').textContent, /5 \/ 1 \/ 3/);
+  assert.equal(elements.get('results-red').children[0].dataset.mvp, 'true');
+
 });

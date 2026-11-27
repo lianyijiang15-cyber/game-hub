@@ -7,9 +7,9 @@ const visionRadius = 360;
 const grassRevealRadius = 80;
 const sightObstacle = tile => solid(tile) || tile === 'b';
 const classes = {
-  warrior: { hp: 800, speed: 150, range: 52, damage: 24, cooldown: 650 },
-  archer: { hp: 600, speed: 185, range: 240, damage: 17, cooldown: 850 },
-  mage: { hp: 580, speed: 165, range: 190, damage: 20, cooldown: 950 }
+  warrior: { hp: 800, defense: 35, speed: 150, range: 52, damage: 90, skillDamage: 135, cooldown: 650 },
+  archer: { hp: 600, defense: 12, speed: 185, range: 240, damage: 72, skillDamage: 47, cooldown: 850 },
+  mage: { hp: 560, defense: 8, speed: 165, range: 190, damage: 86, skillDamage: 128, cooldown: 950 }
 };
 const jobs = Object.keys(classes);
 const teams = ['紅隊', '藍隊'];
@@ -84,7 +84,7 @@ function spawn(room, player, now) {
     Object.assign(player, position, {
       hp: classes[player.job].hp, alive: true, input: { x: 0, y: 0 }, inputAt: 0,
       angle: side === 1 ? 0 : Math.PI, facing: side === 1 ? 0 : Math.PI, moving: false,
-      attackAt: 0, skillAt: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
+      contributors: new Map(), attackAt: 0, skillAt: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
     });
     return;
   }
@@ -109,7 +109,7 @@ function start(room, now, seed) {
   room.roster.forEach(player => {
     Object.assign(player, {
       alive: false,
-      kills: 0, deaths: 0, damage: 0, route: null, routeAt: 0, lastSeen: null, patrolHome: false
+      kills: 0, deaths: 0, assists: 0, damage: 0, route: null, routeAt: 0, lastSeen: null, patrolHome: false
     });
   });
   room.roster.forEach(player => spawn(room, player, now));
@@ -123,7 +123,8 @@ function finish(room) {
 
 function hit(room, source, target, damage, now) {
   if (room.phase !== 'playing' || !target.alive || source.team === target.team) return;
-  const actual = Math.min(target.hp, damage);
+  const actual = Math.min(target.hp, Math.round(damage * 100 / (100 + classes[target.job].defense)));
+  target.contributors.set(source, now);
   target.hp -= actual;
   source.damage += actual;
   target.hurtAt = now;
@@ -133,6 +134,10 @@ function hit(room, source, target, damage, now) {
   target.input = { x: 0, y: 0 };
   target.respawnAt = now + 3000;
   source.kills++;
+  for (const [teammate, hitAt] of target.contributors) {
+    if (teammate !== source && teammate.team === source.team && now - hitAt <= 8000) teammate.assists++;
+  }
+  target.contributors.clear();
   target.deaths++;
   room.score[source.team]++;
   room.kills.push({ id: ++room.sequence, attacker: source.name, victim: target.name, team: source.team });
@@ -159,7 +164,7 @@ function attack(room, player, x, y, skill, now) {
       room.projectiles.push({
         id: ++room.sequence, source: player, type: arrows ? 'arrow' : 'fireball',
         x: player.x, y: player.y, angle: angle + spread,
-        speed: arrows ? 480 : 330, remaining: arrows ? 265 : 225
+        damage: job.skillDamage, speed: arrows ? 480 : 330, remaining: arrows ? 265 : 225
       });
     }
     return;
@@ -170,7 +175,7 @@ function attack(room, player, x, y, skill, now) {
     distance(player, other) <= range && clearLine(player, other, 0, room.map) &&
     (skill || Math.cos(Math.atan2(other.y - player.y, other.x - player.x) - angle) >= Math.cos(0.30)));
   enemies.sort((a, b) => distance(player, a) - distance(player, b));
-  for (const enemy of skill ? enemies : enemies.slice(0, 1)) hit(room, player, enemy, skill ? 38 : job.damage, now);
+  for (const enemy of skill ? enemies : enemies.slice(0, 1)) hit(room, player, enemy, skill ? job.skillDamage : job.damage, now);
   effect(room, skill ? 'spin' : player.job, player, angle, range, player.team, now);
 }
 
@@ -190,7 +195,7 @@ function advanceProjectile(room, projectile, dt, now) {
     const target = room.players.find(player => player.alive && player.team !== projectile.source.team &&
       distance(player, projectile) <= radius + 2 && clearLine(projectile, player, 0, room.map));
     if (!target) continue;
-    if (projectile.type === 'arrow') hit(room, projectile.source, target, 13, now);
+    if (projectile.type === 'arrow') hit(room, projectile.source, target, projectile.damage, now);
     impact = true;
     break;
   }
@@ -200,7 +205,7 @@ function advanceProjectile(room, projectile, dt, now) {
     effect(room, 'blast', projectile, 0, 66, projectile.source.team, now);
     for (const target of room.players) {
       if (distance(target, projectile) <= 66 && clearLine(projectile, target, 0, room.map)) {
-        hit(room, projectile.source, target, 34, now);
+        hit(room, projectile.source, target, projectile.damage, now);
       }
     }
   }
@@ -231,22 +236,33 @@ function tick(room, now, dt, botInput) {
   room.effects = room.effects.filter(item => item.until > now);
 }
 
+function matchMvp(results, winner) {
+  const score = player => 2 * player.kills + player.assists - player.deaths;
+  return results.filter(player => !winner || player.team === winner).sort((a, b) =>
+    score(b) - score(a) || b.damage - a.damage ||
+    b.kills - a.kills || a.deaths - b.deaths)[0]?.id ?? null;
+}
+
 function snapshot(room, now, viewer = null) {
   const local = viewer && room.phase === 'playing';
   const sees = point => !local || canSee(viewer, point, room.map);
   const players = local ? room.players.filter(player => player === viewer ||
     (player.team === viewer.team ? distance(viewer, player) <= visionRadius : sees(player))) : room.players;
+  const results = room.phase === 'ended' ? room.roster.map(({ id, name, team, bot, job, kills, deaths, assists, damage }) =>
+    ({ id, name, team, bot, job, kills, deaths, assists, damage })) : null;
+  const attackRange = local && viewer.alive ? classes[viewer.job].range : 0;
+  const targetInRange = attackRange > 0 && players.some(player => player.alive && player.team !== viewer.team &&
+    distance(viewer, player) <= attackRange && clearLine(viewer, player, 0, room.map));
   return {
     id: room.id, phase: room.phase, winner: room.winner, score: room.score, now,
     remaining: Math.max(0, room.endsAt - now), effects: room.effects.filter(sees), kills: room.kills,
-    visionRadius, concealed: !!local && inTallGrass(viewer, room.map),
+    attackRange, targetInRange, visionRadius, concealed: !!local && inTallGrass(viewer, room.map),
     projectiles: room.projectiles.filter(sees).map(({ id, x, y, angle, type }) => ({ id, x, y, angle, type })),
     players: players.map(({ id, x, y, name, team, job, hp, bot, alive, moving, angle, facing,
       action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt }) =>
       ({ id, x, y, name, team, job, hp, maxHp: classes[job].hp, bot, alive, moving, angle, facing,
         action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt })),
-    results: room.phase === 'ended' ? room.roster.map(({ id, name, team, bot, job, kills, deaths, damage }) =>
-      ({ id, name, team, bot, job, kills, deaths, damage })) : null
+    results, mvp: results ? matchMvp(results, room.winner) : null
   };
 }
 

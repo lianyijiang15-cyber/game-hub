@@ -340,6 +340,15 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
     fog.addColorStop(1, '#101718f0');
     rect(ctx, fog, 0, 0, width, height);
   }
+  if (position && state.attackRange) {
+    ctx.save();
+    ctx.strokeStyle = state.targetInRange ? '#a8f8a6' : '#fff0c2bd';
+    ctx.lineWidth = state.targetInRange ? 2 : 1.5;
+    ctx.beginPath();
+    ctx.arc(position.x - arenaCamera.x, position.y - arenaCamera.y, state.attackRange, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   const cursor = aim || { x: width / 2 + 45, y: height / 2 };
   rect(ctx, '#fff0c2', cursor.x - 6, cursor.y, 4, 1);
   rect(ctx, '#fff0c2', cursor.x + 3, cursor.y, 4, 1);

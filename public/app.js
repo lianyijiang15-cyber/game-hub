@@ -20,9 +20,9 @@ function hint(){if(hintCount>=3)return;$('answer').textContent='提示：'+soup.
 const jobNames = { warrior: '戰士', archer: '弓箭手', mage: '法師' };
 const skills = { warrior: '旋風斬', archer: '三重箭', mage: '火球術' };
 const classDetails = {
-  warrior: { role: '近戰前排', hp: 800, range: 52, speed: 150, damage: 24, cooldown: 650, description: '以盾甲扛住第一波攻勢，逼近敵人後用長劍封住狹窄通道。敵人圍上來時，旋風斬能同時攻擊周圍目標。' },
-  archer: { role: '遠距游擊', hp: 600, range: 240, speed: 185, damage: 17, cooldown: 850, description: '利用長弓和最快的移動速度，從遠處牽制敵人。三重箭向不同角度飛出，適合封住通道或在近距離打中多支。' },
-  mage: { role: '遠程範圍傷害', hp: 580, range: 190, speed: 165, damage: 20, cooldown: 950, description: '靠隊友掩護尋找施法角度。火球撞擊後會爆炸，適合攻擊聚在一起的敵人。' }
+  warrior: { role: '近戰前排', hp: 800, defense: 35, range: 52, speed: 150, damage: 90, cooldown: 650, description: '以盾甲扛住第一波攻勢，逼近敵人後用長劍封住狹窄通道。敵人圍上來時，旋風斬能同時攻擊周圍目標。' },
+  archer: { role: '遠距游擊', hp: 600, defense: 12, range: 240, speed: 185, damage: 72, cooldown: 850, description: '利用長弓和最快的移動速度，從遠處牽制敵人。三重箭向不同角度飛出，適合封住通道或在近距離打中多支。' },
+  mage: { role: '遠程範圍傷害', hp: 560, defense: 8, range: 190, speed: 165, damage: 86, cooldown: 950, description: '靠隊友掩護尋找施法角度。火球撞擊後會爆炸，適合攻擊聚在一起的敵人。' }
 };
 let phase = 'lobby';
 let loadingDeadline = 0;
@@ -40,7 +40,8 @@ const matchKey = 'game-hub-seat';
 
 function show(id) {
   for (const panel of ['home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
-  if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading');
+  if (id !== 'game') $('mvp-video').pause?.();
+  if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading', 'in-results');
   document.querySelector('header').hidden = id !== 'home';
 }
 
@@ -169,9 +170,10 @@ function renderClass(job) {
   $('class-range').textContent = details.range + ' px';
   $('class-speed').textContent = details.speed + ' px/s';
   $('class-damage').textContent = details.damage;
+  $('class-defense').textContent = `${details.defense}（減傷 ${Math.round(100 * details.defense / (100 + details.defense))}%）`;
   $('class-cooldown').textContent = details.cooldown + ' ms';
   const values = [details.hp / Math.max(...Object.values(classDetails).map(entry => entry.hp)), details.speed / 185, details.range / 240,
-    details.damage / 24, 650 / details.cooldown];
+    details.damage / 90, 650 / details.cooldown];
   const points = values.map((value, index) => {
     const angle = index * Math.PI * 2 / values.length - Math.PI / 2;
     return `${50 + 42 * value * Math.cos(angle)}% ${50 + 42 * value * Math.sin(angle)}%`;
@@ -246,7 +248,9 @@ function renderRoom(state) {
   $('game').classList.toggle('in-selection', selecting);
   $('game').classList.toggle('in-lobby', waiting);
   $('game').classList.toggle('in-loading', phase === 'loading');
+  $('game').classList.toggle('in-results', phase === 'ended');
   $('results').hidden = phase !== 'ended';
+  if (phase !== 'ended') $('mvp-video').pause?.();
   $('chat-title').textContent = waiting ? '房間聊天' : '隊伍聊天';
   $('return-lobby').hidden = $('rematch').hidden = !host;
   $('results-note').textContent = host ? '' : '等待房主返回大廳或開始下一局。';
@@ -429,16 +433,38 @@ $('arena').onpointerdown = event => {
 };
 
 function renderResults(state) {
-  const headline = state.winner ? state.winner + '獲勝' : '平手';
-  $('winner').textContent = `${headline} · ${state.score['紅隊']} : ${state.score['藍隊']}`;
-  const body = $('results-body');
-  body.replaceChildren();
-  for (const player of state.results) {
-    const row = document.createElement('tr');
-    row.className = player.team === '紅隊' ? 'red' : 'blue';
-    for (const value of [player.name + (player.bot ? ' [AI]' : ''), player.team, jobNames[player.job],
-      player.kills, player.deaths, player.damage]) row.append(element('td', value));
-    body.append(row);
+  $('winner').textContent = state.winner ? state.winner + '獲勝' : '平手';
+  $('final-blue').textContent = state.score['藍隊'];
+  $('final-red').textContent = state.score['紅隊'];
+  const mvp = state.results.find(player => player.id === state.mvp);
+  $('mvp-stage').hidden = !mvp;
+  if (mvp) {
+    const video = $('mvp-video');
+    video.src = `/art/${mvp.job}-victory.mp4`;
+    video.muted = true;
+    video.setAttribute('aria-label', jobNames[mvp.job] + 'MVP 慶祝影片');
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+      video.play?.().catch(() => {});
+    }
+    $('mvp-name').textContent = mvp.name + (mvp.bot ? ' · AI' : '');
+    $('mvp-kda').textContent = `${jobNames[mvp.job]} · ${mvp.kills} / ${mvp.deaths} / ${mvp.assists}`;
+  }
+  for (const [team, id] of [['藍隊', 'results-blue'], ['紅隊', 'results-red']]) {
+    const roster = $(id);
+    roster.replaceChildren();
+    for (const player of state.results.filter(entry => entry.team === team)) {
+      const card = element('div', '');
+      card.className = 'result-card';
+      card.dataset.mvp = String(player.id === state.mvp);
+      const art = element('img', '');
+      art.src = `/art/${player.job}-avatar.webp`;
+      art.alt = '';
+      card.append(art, element('strong', player.name + (player.bot ? ' · AI' : '')),
+        element('span', `${player.kills} / ${player.deaths} / ${player.assists}`),
+        element('small', `傷害 ${player.damage}`));
+      if (player.id === state.mvp) card.append(element('small', 'MVP'));
+      roster.append(card);
+    }
   }
 }
 
@@ -480,7 +506,7 @@ function renderFrame(time) {
     $('health-bar').max = me.maxHp;
     $('health-bar').value = me.hp;
     $('health').textContent = `${jobNames[me.job]} · HP ${me.hp}/${me.maxHp}`;
-    $('attack-status').textContent = '普攻 ' + cooldown(me.attackAt);
+    $('attack-status').textContent = `${frame.attackRange || '—'} px · ${cooldown(me.attackAt)}`;
     $('skill-status').textContent = `${skills[me.job]} · ${cooldown(me.skillAt)}`;
     $('respawn').hidden = me.alive;
     if (!me.alive) $('respawn').textContent = `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜開放世界對抗</title>
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <main>
@@ -110,6 +110,7 @@
           <div><dt>生命值</dt><dd id="class-hp"></dd></div>
           <div><dt>速度</dt><dd id="class-speed"></dd></div>
           <div><dt>普攻距離</dt><dd id="class-range"></dd></div>
+          <div><dt>防禦力</dt><dd id="class-defense"></dd></div>
           <div><dt>普攻傷害</dt><dd id="class-damage"></dd></div>
           <div><dt>普攻冷卻</dt><dd id="class-cooldown"></dd></div>
         </dl>
@@ -158,12 +159,16 @@
     <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>Enter</kbd> 聊天</p>
     <ul id="kill-feed" aria-label="擊殺通知"></ul>
   </div>
-  <section id="results" class="panel" hidden>
-    <h3 id="winner"></h3>
-    <div class="table-wrap"><table>
-      <thead><tr><th>玩家</th><th>隊伍</th><th>職業</th><th>擊殺</th><th>死亡</th><th>傷害</th></tr></thead>
-      <tbody id="results-body"></tbody>
-    </table></div>
+  <section id="results" class="panel" aria-labelledby="winner" hidden>
+    <h2 id="winner"></h2>
+    <div id="mvp-stage" class="mvp-stage">
+      <video id="mvp-video" width="480" height="360" muted playsinline controls preload="none" aria-label="MVP 慶祝影片"></video>
+      <div class="mvp-caption"><b>MVP</b><h3 id="mvp-name"></h3><p id="mvp-kda"></p></div>
+    </div>
+    <p class="results-legend">K / D / A · 擊殺 / 死亡 / 助攻</p>
+    <section class="results-team blue" aria-label="藍隊戰績"><div id="results-blue" class="results-roster"></div></section>
+    <div class="results-score"><span class="blue">藍隊 <b id="final-blue"></b></span><strong>VS</strong><span class="red"><b id="final-red"></b> 紅隊</span></div>
+    <section class="results-team red" aria-label="紅隊戰績"><div id="results-red" class="results-roster"></div></section>
     <p id="results-note" class="muted"></p>
     <button id="return-lobby" class="secondary">返回大廳</button>
     <button id="rematch">再玩一局</button>
@@ -180,7 +185,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=11"></script>
-<script src="arena-renderer.js?v=11"></script>
+<script src="app.js?v=12"></script>
+<script src="arena-renderer.js?v=12"></script>
 </body>
 </html>

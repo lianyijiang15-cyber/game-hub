@@ -50,6 +50,11 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   }
 
   assert.equal((await fetch(base + '/art/selection-stage.webp', { method: 'HEAD' })).status, 200);
+  for (const job of ['warrior', 'archer', 'mage']) {
+    const clip = await fetch(`${base}/art/${job}-victory.mp4`, { method: 'HEAD' });
+    assert.equal(clip.status, 200);
+    assert.equal(clip.headers.get('content-type'), 'video/mp4');
+  }
   const backdrop = await fetch(base + '/art/ravine-city.webp', { method: 'HEAD' });
   assert.equal(backdrop.status, 200);
   assert.equal(backdrop.headers.get('content-type'), 'image/webp');

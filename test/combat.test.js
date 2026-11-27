@@ -101,26 +101,26 @@ test('ordinary attack, cooldown, whirlwind, death, respawn and 20 kills', () => 
   const room = match();
   const [source, target] = room.players;
   Object.assign(source, { x: 1200, y: 1600 });
-  Object.assign(target, { x: 1240, y: 1600, hp: 80 });
+  Object.assign(target, { x: 1240, y: 1600, hp: 280 });
   combat.attack(room, source, 1240, 1600, false, 50);
-  assert.equal(target.hp, 56);
+  assert.equal(target.hp, 197);
   combat.attack(room, source, 1240, 1600, false, 200);
-  assert.equal(target.hp, 56);
+  assert.equal(target.hp, 197);
   combat.attack(room, source, 1240, 1600, true, 250);
-  assert.equal(target.hp, 18);
+  assert.equal(target.hp, 72);
   combat.attack(room, source, 1240, 1600, false, 700);
   assert.equal(target.alive, false);
   assert.equal(room.score[source.team], 1);
   combat.tick(room, 3699, 0.05, idle);
   assert.equal(target.alive, false);
   combat.tick(room, 3700, 0.05, idle);
-  assert.equal(target.hp, 580);
+  assert.equal(target.hp, 560);
   room.score[source.team] = 19;
   Object.assign(target, { x: 1240, y: 1600, hp: 1 });
   combat.attack(room, source, 1240, 1600, false, 3750);
   assert.equal(room.winner, source.team);
   assert.equal(room.phase, 'ended');
-  assert.deepEqual([source.kills, source.damage, target.deaths], [2, 81, 2]);
+  assert.deepEqual([source.kills, source.damage, target.deaths], [2, 281, 2]);
 });
 
 test('arrows and fireball travel on the server, explode and respect rocks', () => {
@@ -131,7 +131,7 @@ test('arrows and fireball travel on the server, explode and respect rocks', () =
   combat.attack(room, archer, 1290, 1600, true, 50);
   assert.equal(room.projectiles.length, 3);
   for (let time = 100; time <= 650; time += 50) combat.tick(room, time, 0.05, idle);
-  assert.ok(mage.hp < 580);
+  assert.ok(mage.hp < 560);
   Object.assign(archer, { x: 1350, y: 1392 });
   Object.assign(ally, { x: 1328, y: 1392 });
   Object.assign(mage, { x: 1462, y: 1392 });
@@ -142,15 +142,15 @@ test('arrows and fireball travel on the server, explode and respect rocks', () =
   for (let time = 800; time <= 1050; time += 50) combat.tick(room, time, 0.05, idle);
   assert.equal(archer.hp, 600);
   assert.equal(ally.hp, 600);
-  assert.equal(victim.hp, 580);
+  assert.equal(victim.hp, 560);
   Object.assign(mage, { x: 1245, y: 1500 });
   Object.assign(archer, { x: 1300, y: 1500 });
   Object.assign(ally, { x: 1300, y: 1535 });
   combat.attack(room, mage, archer.x, archer.y, true, 5750);
   for (let time = 5800; time <= 6150; time += 50) combat.tick(room, time, 0.05, idle);
-  assert.equal(archer.hp, 566);
-  assert.equal(ally.hp, 566);
-  assert.equal(victim.hp, 580);
+  assert.equal(archer.hp, 486);
+  assert.equal(ally.hp, 486);
+  assert.equal(victim.hp, 560);
 });
 
 test('AI navigates around the central rocks and completes a match without Ollama', () => {
@@ -163,4 +163,27 @@ test('AI navigates around the central rocks and completes a match without Ollama
   assert.equal(room.phase, 'ended');
   assert.ok(Object.values(room.score).includes(20), JSON.stringify(room.score));
   assert.ok(room.players.some(p => p.damage > 0));
+});
+
+test('attack range, timely assists and winner MVP are calculated on the server', () => {
+  const room = match();
+  const [killer, target, helper, other, late] = room.players;
+  Object.assign(killer, { x: 1200, y: 1600 });
+  Object.assign(helper, { x: 1195, y: 1600 });
+  Object.assign(late, { x: 1218, y: 1610 });
+  Object.assign(target, { x: 1260, y: 1600 });
+  assert.equal(combat.snapshot(room, 0, killer).targetInRange, false);
+  Object.assign(target, { x: 1240, y: 1600, hp: 230 });
+  assert.equal(combat.snapshot(room, 0, killer).attackRange, 52);
+  assert.equal(combat.snapshot(room, 0, killer).targetInRange, true);
+  combat.attack(room, late, target.x, target.y, false, 100);
+  combat.attack(room, helper, target.x, target.y, false, 8200);
+  combat.attack(room, killer, target.x, target.y, false, 8300);
+  assert.deepEqual([killer.kills, target.deaths, helper.assists, late.assists], [1, 1, 1, 0]);
+  assert.equal(target.contributors.size, 0);
+  Object.assign(other, { assists: 50, damage: 9999 });
+  combat.tick(room, 300000, 0.05, idle);
+  const final = combat.snapshot(room, 300000);
+  assert.equal(final.mvp, killer.id);
+  assert.equal(final.results.find(p => p.id === helper.id).assists, 1);
 });
