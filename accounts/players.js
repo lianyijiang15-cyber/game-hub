@@ -246,7 +246,14 @@ function mountPlayerRoutes(router, store, session, setSessionProfile, setSession
     });
   }
 
-  return { saveArena, recordSecret };
+  async function friendAccount(key, id) {
+    if (typeof id !== 'string' || !idPattern.test(id)) return null;
+    const accounts = await store.read();
+    return accounts[key]?.friends?.find(friend => accounts[friend]?.profile?.id === id &&
+      accounts[friend].friends?.includes(key)) ?? null;
+  }
+
+  return { saveArena, recordSecret, friendAccount };
 }
 
 module.exports = { mountPlayerRoutes };

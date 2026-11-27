@@ -6,11 +6,12 @@
 <title>PIXEL CLASH 像素衝突</title>
 <link rel="stylesheet" href="style.css?v=24">
 <link rel="stylesheet" href="menu.css?v=3">
-<link rel="stylesheet" href="account.css?v=6">
+<link rel="stylesheet" href="account.css?v=7">
 <link rel="stylesheet" href="casebook.css?v=4">
 </head>
 <body>
 <button id="sound-toggle" type="button" aria-pressed="true" aria-label="遊戲音效及音樂">♪ <span>音效</span></button>
+<button id="invite-inbox" type="button" aria-haspopup="dialog" aria-live="polite" hidden>對戰邀請</button>
 <main>
 <section id="title-screen" aria-labelledby="title-name">
   <canvas id="title-map" width="960" height="540" aria-hidden="true"></canvas>
@@ -184,6 +185,21 @@
     <h3>收到的邀請</h3><ul id="friend-incoming"></ul>
     <h3>已送出的邀請</h3><ul id="friend-sent"></ul>
     <h3>好友名單</h3><ul id="friend-list"></ul>
+  </section>
+</dialog>
+<dialog id="invite-dialog" aria-labelledby="invite-title">
+  <div class="account-heading">
+    <h2 id="invite-title">對戰邀請</h2>
+    <button id="invite-close" class="ghost" type="button" aria-label="關閉邀請">✕</button>
+  </div>
+  <p id="invite-message" role="status"></p>
+  <section id="invite-incoming" aria-label="收到的對戰邀請">
+    <h3>收到的對戰邀請</h3>
+    <ul id="invite-received"></ul>
+  </section>
+  <section id="invite-outgoing" aria-label="好友名單" hidden>
+    <h3>好友名單</h3>
+    <ul id="invite-friends"></ul>
   </section>
 </dialog>
 <section id="soup" hidden aria-labelledby="soup-heading">
@@ -368,7 +384,10 @@
     </section>
     <section id="room-waiting" aria-labelledby="waiting-title">
     <h3 id="waiting-title">等待大廳</h3><p id="waiting-rule"></p>
-    <h3 id="seat-count"></h3>
+    <div class="waiting-roster-heading">
+      <h3 id="seat-count"></h3>
+      <button id="lobby-invite" type="button" class="secondary" aria-haspopup="dialog">邀請好友</button>
+    </div>
     <div id="players" aria-label="玩家席位"></div>
     <div class="bot-settings">
       <div><strong id="bot-summary"></strong><p id="bot-help"></p></div>
@@ -491,12 +510,13 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=4"></script>
 <script src="heroes.js?v=4"></script>
-<script src="app.js?v=31"></script>
+<script src="app.js?v=32"></script>
 <script src="arena-renderer.js?v=23"></script>
 <script src="menu-art.js?v=5"></script>
 <script src="arena-guide.js?v=2"></script>
 <script src="account.js?v=4"></script>
 <script src="game-audio.js?v=2"></script>
 <script src="player-panel.js?v=7"></script>
+<script src="room-invites.js?v=1"></script>
 </body>
 </html>

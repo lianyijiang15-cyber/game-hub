@@ -571,3 +571,48 @@ test('account menu presents registration, achievements, detailed records and fri
   await find('account-logout').onclick();
   assert.equal(find('profile-name').textContent, '登入／註冊');
 });
+
+test('players can send a room invitation and join it through the inbox', async () => {
+  const ids = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  function node(textContent = '') {
+    return {
+      textContent, children: [], append(...items) { this.children.push(...items); },
+      replaceChildren() { this.children = []; },
+      showModal() { this.open = true; }, close() { this.open = false; }
+    };
+  }
+  const nodes = new Map([...ids.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, node()]));
+  const find = id => nodes.get(id);
+  const handlers = new Map();
+  const sent = [];
+  const context = vm.createContext({
+    $: find, element: (_tag, text) => node(text),
+    room: 'MYROOM', phase: 'lobby', modeNames: { flag: '拔旗戰' },
+    setTimeout() {}, clearTimeout() {},
+    accountRequest: async () => ({ friends: [{ id: 'AB123456', name: '好友' }] }),
+    socket: {
+      connected: false, on(name, cb) { handlers.set(name, cb); },
+      timeout: () => ({ emit(name, ...args) {
+        sent.push([name, ...args.slice(0, -1)]);
+        args.at(-1)(null, name === 'listRoomInvites' ? { invites: [] } : { ok: true });
+      } })
+    },
+    enter(name, { id, accept }, done) { sent.push([name, id, accept]); done(); }
+  });
+  const source = fs.readFileSync(path.join(__dirname, '../public/room-invites.js'), 'utf8');
+  vm.runInContext(source, context);
+  context.socket.connected = true;
+  await find('lobby-invite').onclick();
+  await find('invite-friends').children[0].children[1].onclick();
+  assert.deepEqual(sent.at(-1), ['inviteFriend', 'AB123456']);
+  assert.match(find('invite-message').textContent, /已邀請/);
+  find('invite-close').onclick();
+  context.room = null;
+  handlers.get('roomInvites')([{ name: '好友', mode: 'flag', id: 'invite-1', expiresAt: Date.now() + 30000 }]);
+  assert.equal(find('invite-inbox').hidden, false);
+  void find('invite-inbox').onclick();
+  const join = find('invite-received').children[0].children[1].children[0];
+  join.onclick();
+  assert.deepEqual(sent.at(-1), ['replyRoomInvite', 'invite-1', true]);
+  assert.equal(find('invite-dialog').open, false);
+});

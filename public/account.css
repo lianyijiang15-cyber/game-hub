@@ -181,3 +181,25 @@
 .achievement-detail { margin-top: 12px; border: 1px solid #967b55; border-left-width: 3px; padding: 9px 12px; background: #222d41; min-height: 3rem; }
 .achievement-detail strong { color: #f2d895; }
 .achievement-detail p { margin: 6px 0; }
+
+#invite-inbox {
+  position: fixed; top: 12px; right: 12px; z-index: 12; margin: 0;
+  background: #332b48; border: 1px solid #be9d62; color: #ffedc5;
+}
+body:has(#game:not([hidden])) #invite-inbox { top: 58px; }
+#invite-dialog {
+  width: min(480px, calc(100% - 24px)); max-height: 85dvh; overflow: auto;
+  padding: 18px; border: 1px solid #ae915c; border-radius: 12px;
+  color: #f6eddd; background: #1c273a;
+}
+#invite-dialog::backdrop { background: #0b1421b8; }
+#invite-dialog h3 { color: #e5cea0; font-size: .95rem; }
+#invite-dialog ul { display: grid; gap: 6px; list-style: none; padding: 0; }
+#invite-dialog li {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 7px; padding: 6px 10px; background: #263448; border-radius: 6px; overflow-wrap: anywhere;
+}
+#invite-dialog button { margin: 0; padding: 6px 9px; }
+#invite-message:empty { display: none; }
+.waiting-roster-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.in-lobby .waiting-roster-heading #seat-count, #lobby-invite { margin: 0; }

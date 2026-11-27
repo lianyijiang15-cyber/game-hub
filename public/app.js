@@ -401,9 +401,11 @@ function sendRoomCommand(event, ...args) {
   });
 }
 
-function enter(event, data) {
+function enter(event, data, onResult) {
   if (!socket.connected || joining) {
-    if (!socket.connected) $('error').textContent = '尚未連線，請稍後再試';
+    const message = !socket.connected ? '尚未連線，請稍後再試' : '正在加入房間';
+    if (onResult) onResult(message);
+    else $('error').textContent = message;
     return;
   }
   joining = true;
@@ -411,12 +413,15 @@ function enter(event, data) {
   socket.timeout(3500).emit(event, { ...data, name: $('nickname').value }, (error, result) => {
     if (request !== roomRequest) {
       if (result?.id && !room) socket.emit('leave');
+      onResult?.('加入已取消');
       return;
     }
     joining = false;
-    if (error || result.error) {
+    if (error || !result?.id || result.error) {
       if (event === 'resume') exitRoom();
-      $('error').textContent = error ? '連線逾時' : result.error;
+      const message = result?.error || '連線逾時，請稍後再試';
+      if (onResult) onResult(message);
+      else $('error').textContent = message;
       return;
     }
     room = result.id;
@@ -434,6 +439,7 @@ function enter(event, data) {
     if (result.room) renderRoom(result.room);
     if (result.map) worldMap = result.map;
     worldChests = result.chests || [];
+    onResult?.();
   });
 }
 
@@ -888,7 +894,7 @@ function drawLootHud(state, serverTime) {
 }
 
 window.addEventListener('keydown', event => {
-  if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || $('invite-dialog').open) return;
   if (!$('title-screen').hidden) {
     if (event.code === 'Enter') {
       event.preventDefault();

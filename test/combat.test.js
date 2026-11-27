@@ -268,3 +268,26 @@ test('nine heroes apply their server-side traits, including frost slow and storm
   assert.ok(opponent.slowUntil > 350);
   assert.equal(combat.snapshot(room, 350, frost).players.find(player => player.id === opponent.id).hero, 'frostguard');
 });
+
+test('random team assignment varies both roster order and starting side while balancing humans', () => {
+  for (const humanCount of [1, 2, 3, 5, 10]) {
+    const players = Array.from({ length: 10 }, (_, index) => ({ id: index, bot: index >= humanCount }));
+    const samples = Array.from({ length: 6 }, (_, sample) => {
+      let state = sample + 1;
+      combat.assignTeams(players, max => {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return Math.floor(state / 2 ** 32 * max);
+      });
+      const red = players.filter(player => player.team === '紅隊');
+      const blue = players.filter(player => player.team === '藍隊');
+      assert.equal(red.length, 5);
+      assert.equal(blue.length, 5);
+      assert.ok(Math.abs(red.filter(player => !player.bot).length - blue.filter(player => !player.bot).length) <= 1);
+      assert.equal(new Set(red.map(player => player.slot)).size, 5);
+      assert.equal(new Set(blue.map(player => player.slot)).size, 5);
+      return players.map(({ team, slot }) => team + slot).join();
+    });
+    assert.ok(new Set(samples).size > 1);
+    assert.deepEqual(players.map(player => player.id), Array.from({ length: 10 }, (_, index) => index));
+  }
+});

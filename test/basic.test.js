@@ -49,7 +49,15 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(named.status, 200);
   const avatar = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCUAomv/9k=';
   assert.equal((await accountAction('avatar', { photo: avatar }, cookie)).status, 200);
-  const clients = [cookie, null, null].map(value => connect(base, {
+  const friendCredentials = { ...credentials, username: 'ClashFriend18' };
+  assert.equal((await accountAction('register', friendCredentials)).status, 201);
+  const friendLogin = await accountAction('login', friendCredentials);
+  const friendCookie = friendLogin.headers.get('set-cookie').split(';')[0];
+  const friendProfile = (await (await accountAction('profile', { name: 'Registered Friend' }, friendCookie)).json()).profile;
+  const hostProfile = (await named.json()).profile;
+  assert.equal((await accountAction('friends/request', { by: 'id', query: friendProfile.id }, cookie)).status, 201);
+  assert.equal((await accountAction('friends/respond', { id: hostProfile.id, accept: true }, friendCookie)).status, 200);
+  const clients = [cookie, null, null, friendCookie].map(value => connect(base, {
     transports: ['websocket'], extraHeaders: value ? { Cookie: value } : {}
   }));
   t.after(async () => {
@@ -57,7 +65,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
     await io.close();
   });
   await Promise.all(clients.map(client => once(client, 'connect')));
-  const [host, guest, outsider] = clients;
+  const [host, guest, outsider, friend] = clients;
   const response = await fetch(base);
   assert.equal(response.status, 200);
   const html = await response.text();
@@ -125,6 +133,30 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const filled = receive(guest, 'room', room => room.players.length === 10);
   assert.equal((await send(host, 'fillBots')).room.players.length, 10);
   assert.equal((await filled).players.filter(player => player.bot).length, 8);
+  const received = receive(friend, 'roomInvites', inbox => inbox.length === 1);
+  assert.equal((await send(host, 'inviteFriend', friendProfile.id)).ok, true);
+  const [invite] = await received;
+  assert.equal(invite.name, 'Registered Host');
+  assert.equal(invite.mode, 'deathmatch');
+  assert.ok(!Object.hasOwn(invite, 'roomId'));
+  assert.deepEqual((await send(friend, 'listRoomInvites')).invites, [invite]);
+  assert.deepEqual((await send(outsider, 'listRoomInvites')).invites, []);
+  assert.match((await send(outsider, 'replyRoomInvite', { id: invite.id, accept: true })).error, /無效/);
+  const arrived = await send(friend, 'replyRoomInvite', { id: invite.id, accept: true });
+  assert.equal(arrived.id, id);
+  assert.equal(arrived.room.players.length, 10);
+  assert.equal(arrived.room.players.filter(player => player.bot).length, 7);
+  assert.ok(arrived.room.players.some(player => player.name === 'Registered Friend'));
+  await wait(160);
+  assert.match((await send(friend, 'replyRoomInvite', { id: invite.id, accept: true })).error, /過期/);
+  await send(friend, 'leave');
+  assert.equal((await send(host, 'fillBots')).room.players.length, 10);
+  await wait(700);
+  const laterInvite = receive(friend, 'roomInvites', inbox => inbox.length === 1);
+  assert.equal((await send(host, 'inviteFriend', friendProfile.id)).ok, true);
+  const missing = receive(friend, 'roomInvites', inbox => !inbox.length);
+  assert.equal((await send(friend, 'replyRoomInvite', { id: (await laterInvite)[0].id, accept: false })).ok, true);
+  await missing;
   assert.ok((await send(host, 'chooseClass', 'gamma')).error);
   assert.ok((await send(host, 'start')).error);
   await Promise.all([send(host, 'ready'), send(guest, 'ready')]);
@@ -133,7 +165,9 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal((await send(host, 'start')).ok, true);
   const selected = await selection;
   assert.ok(selected.players.every(player => player.avatar === undefined));
-  const ownTeam = selected.players.filter(p => p.team === '紅隊');
+  const hostTeam = selected.players.find(p => p.id === host.id).team;
+  const guestTeam = hostTeam === '紅隊' ? '藍隊' : '紅隊';
+  const ownTeam = selected.players.filter(p => p.team === hostTeam);
   assert.equal(ownTeam.length, 5);
   assert.ok(ownTeam.every(p => p.job));
   const guestView = receive(guest, 'room');
@@ -142,14 +176,14 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal((await hostView).players.find(p => p.id === host.id).job, 'archer');
   const guestRoster = await guestView;
   assert.equal(guestRoster.players.find(p => p.id === host.id).job, undefined);
-  assert.equal(guestRoster.players.filter(p => p.team === '藍隊' && p.job).length, 5);
+  assert.equal(guestRoster.players.filter(p => p.team === guestTeam && p.job).length, 5);
   assert.equal((await send(guest, 'chooseClass', 'oshi')).ok, true);
   assert.equal(rooms.get(id).players.find(player => player.id === guest.id).hero, 'oshi');
   let leakedDuringSelection = false;
   host.once('chat', () => { leakedDuringSelection = true; });
   const teamMessage = receive(guest, 'chat');
   assert.equal((await send(guest, 'chat', '選角中的隊伍訊息')).ok, true);
-  assert.equal((await teamMessage).team, '藍隊');
+  assert.equal((await teamMessage).team, guestTeam);
   await wait(160);
   assert.equal(leakedDuringSelection, false);
   host.removeAllListeners('chat');
@@ -175,9 +209,9 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(firstMap.map.secrets, undefined);
   assert.equal(initial.map, undefined);
   assert.equal(initial.now, shared.now);
-  assert.equal(initial.players.filter(player => player.team === '紅隊').length, 5);
-  assert.ok(initial.players.every(player => player.team === '紅隊'));
-  assert.ok(shared.players.every(player => player.team === '藍隊'));
+  assert.equal(initial.players.filter(player => player.team === hostTeam).length, 5);
+  assert.ok(initial.players.every(player => player.team === hostTeam));
+  assert.ok(shared.players.every(player => player.team === guestTeam));
   const mine = initial.players.find(player => player.id === host.id);
   assert.equal(mine.job, 'archer');
   const moved = receive(host, 'arenaState', state => state.players.find(p => p.id === host.id)?.x > mine.x);

@@ -120,10 +120,19 @@ function spawn(room, player, now) {
   player.respawnAt = now + 50;
 }
 
-function assignTeams(players) {
-  const order = [...players].sort((a, b) => Number(a.bot) - Number(b.bot));
+function assignTeams(players, randomIndex) {
+  const order = [...players];
+  if (randomIndex) {
+    for (let index = order.length - 1; index > 0; index--) {
+      const other = randomIndex(index + 1);
+      [order[index], order[other]] = [order[other], order[index]];
+    }
+  }
+  // Keep the shuffled order within each group, then distribute humans before filling with bots.
+  order.sort((a, b) => Number(Boolean(a.bot)) - Number(Boolean(b.bot)));
+  const firstTeam = randomIndex?.(2) ?? 0;
   order.forEach((player, index) => {
-    player.team = teams[index % 2];
+    player.team = teams[(index + firstTeam) % 2];
     player.slot = Math.floor(index / 2);
   });
 }

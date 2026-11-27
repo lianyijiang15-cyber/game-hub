@@ -23,6 +23,8 @@ app.get('/title-map', (_, response) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = new Map();
+const invites = new Map();
+const inviteDuration = 3 * 60_000;
 const seats = 10;
 const maxRooms = 50;
 const reconnectWindow = 45000;
@@ -72,6 +74,61 @@ function member(socket) {
   return player ? { room, player } : {};
 }
 
+function inviteSender(invite) {
+  const room = rooms.get(invite.roomId);
+  if (room?.phase !== 'lobby') return null;
+  return room.players.find(player => !player.bot && player.accountKey === invite.from) ?? null;
+}
+
+function pruneInvites(key) {
+  const inbox = invites.get(key);
+  if (!inbox) return;
+  for (const [id, invite] of inbox) {
+    if (invite.expiresAt <= Date.now() || !inviteSender(invite)) inbox.delete(id);
+  }
+  if (!inbox.size) invites.delete(key);
+}
+
+function inviteInbox(key) {
+  pruneInvites(key);
+  return [...(invites.get(key)?.values() ?? [])].map(({ id, name, mode, expiresAt }) =>
+    ({ id, name, mode, expiresAt }));
+}
+
+function publishInvites(key) {
+  const inbox = inviteInbox(key);
+  for (const client of io.of('/').sockets.values()) {
+    if (accounts.session(client.request)?.key === key) client.emit('roomInvites', inbox);
+  }
+}
+
+function refreshRoomInvites(roomId) {
+  for (const [key, inbox] of invites) {
+    if ([...inbox.values()].some(invite => invite.roomId === roomId && !inviteSender(invite))) publishInvites(key);
+  }
+}
+
+function botSeat(room, inviter) {
+  return room.host === inviter && room.players.length >= seats ? room.players.findIndex(player => player.bot) : -1;
+}
+
+function joinLobby(socket, room, name, account, inviter) {
+  if (room?.phase !== 'lobby') return { error: '房間不存在或已開始' };
+  if (account && room.players.some(player => player.accountKey === account.key)) {
+    return { error: '這個帳號已在房間內' };
+  }
+  if (room.players.some(player => player.name.toLowerCase() === name.toLowerCase())) {
+    return { error: '房間內已有相同玩家名稱' };
+  }
+  if (room.players.length >= seats) {
+    const bot = botSeat(room, inviter);
+    if (bot < 0) return { error: '房間已滿，請等候空位' };
+    room.players.splice(bot, 1);
+  }
+  const ticket = join(socket, room, name, account);
+  return { id: room.id, ticket, room: roomState(room, socket.id) };
+}
+
 function addBot(room) {
   let number = 1;
   while (room.players.some(player => player.bot && player.name === 'AI ' + number)) number++;
@@ -86,6 +143,7 @@ function closeRoom(room) {
   clearTimeout(room.expiry);
   clearTimeout(room.vacancyTimer);
   rooms.delete(room.id);
+  refreshRoomInvites(room.id);
   list();
 }
 
@@ -111,6 +169,7 @@ function leave(socket, reconnect = false) {
     });
   } else {
     room.players = room.players.filter(entry => entry !== player);
+    refreshRoomInvites(room.id);
   }
   if (room.host === socket.id) room.host = successor?.id ?? null;
   if (!successor) {
@@ -225,12 +284,17 @@ io.on('connection', socket => {
   }
 
   function command(event, handler, interval = 150) {
-    socket.on(event, (...args) => {
+    socket.on(event, async (...args) => {
       const callback = typeof args.at(-1) === 'function' ? args.pop() : () => {};
       if (!accept(event, interval)) return callback({ error: '操作太快，請稍後再試' });
-      const result = handler(args[0], member(socket));
-      callback(result || { ok: true });
-      if (result?.id) publish(rooms.get(result.id));
+      try {
+        const result = await handler(args[0], member(socket));
+        callback(result || { ok: true });
+        if (result?.id && rooms.has(result.id)) publish(rooms.get(result.id));
+      } catch (error) {
+        console.error('Room command failed:', event, error.code ?? error.name);
+        callback({ error: '伺服器暫時無法完成操作' });
+      }
     });
   }
 
@@ -271,17 +335,57 @@ io.on('connection', socket => {
     const target = rooms.get(id);
     const requestedMode = data?.mode ?? 'deathmatch';
     if (target && target.mode !== requestedMode) return { error: '此房間屬於其他玩法，請回到副本選單切換' };
-    if (!target || target.phase !== 'lobby' || target.players.length >= seats) {
-      return { error: '房間不存在、已開始或已滿' };
+    return joinLobby(socket, target, name, account);
+  });
+
+  command('listRoomInvites', () => {
+    const account = accounts.session(socket.request);
+    return { invites: account?.profile ? inviteInbox(account.key) : [] };
+  });
+
+  command('inviteFriend', async (friendId, { room, player }) => {
+    const account = accounts.session(socket.request);
+    if (!account?.profile || player?.accountKey !== account.key || room?.phase !== 'lobby') {
+      return { error: '請先登入並進入等待大廳' };
     }
-    if (account && target.players.some(player => player.accountKey === account.key)) {
-      return { error: '這個帳號已在房間內' };
+    const recipient = await accounts.friendAccount(account.key, friendId);
+    if (!recipient) return { error: '只能邀請已加入好友名單的玩家' };
+    if (member(socket).room !== room || room.phase !== 'lobby' || accounts.session(socket.request)?.key !== account.key) {
+      return { error: '房間已開始或你已離開' };
     }
-    if (target.players.some(player => player.name.toLowerCase() === name.toLowerCase())) {
-      return { error: '房間內已有相同玩家名稱' };
+    if (room.players.some(entry => entry.accountKey === recipient)) return { error: '好友已在這個房間' };
+    if (room.players.length >= seats && botSeat(room, socket.id) < 0) return { error: '房間目前沒有空位' };
+    for (const key of invites.keys()) pruneInvites(key);
+    const inbox = invites.get(recipient) ?? new Map();
+    if (inbox.size >= 20) return { error: '好友的待處理邀請已滿' };
+    if ([...inbox.values()].some(invite => invite.roomId === room.id && invite.from === account.key)) {
+      return { error: '已邀請這位好友，請等候回覆' };
     }
-    const ticket = join(socket, target, name, account);
-    return { id, ticket, room: roomState(target, socket.id) };
+    const id = crypto.randomUUID();
+    inbox.set(id, { id, from: account.key, name: account.profile.name, mode: room.mode,
+      roomId: room.id, expiresAt: Date.now() + inviteDuration });
+    invites.set(recipient, inbox);
+    publishInvites(recipient);
+    return { ok: true };
+  }, 700);
+
+  command('replyRoomInvite', (data, { room }) => {
+    const account = accounts.session(socket.request);
+    if (!account?.profile || typeof data?.id !== 'string' || data.id.length !== 36 || typeof data.accept !== 'boolean') {
+      return { error: '邀請無效，請重新登入' };
+    }
+    const invite = invites.get(account.key)?.get(data.id);
+    const sender = invite && inviteSender(invite);
+    if (!sender || invite.expiresAt <= Date.now()) {
+      publishInvites(account.key);
+      return { error: '邀請已過期，或房間已關閉' };
+    }
+    if (data.accept && room) return { error: '請先離開目前房間，再接受邀請' };
+    const result = data.accept ? joinLobby(socket, rooms.get(invite.roomId), account.profile.name, account, sender.id) : { ok: true };
+    if (result.error) return result;
+    invites.get(account.key).delete(data.id);
+    publishInvites(account.key);
+    return result;
   });
   command('resume', (data, { room }) => {
     if (room || typeof data?.id !== 'string' || typeof data?.ticket !== 'string') {
@@ -354,8 +458,9 @@ io.on('connection', socket => {
       runMatch(room);
       return;
     }
-    combat.assignTeams(room.players);
+    combat.assignTeams(room.players, crypto.randomInt);
     room.phase = 'selection';
+    refreshRoomInvites(room.id);
     room.map = null;
     room.players.forEach(player => { player.ready = player.bot; });
     publish(room);
