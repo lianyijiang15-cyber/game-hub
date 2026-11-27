@@ -89,11 +89,19 @@ function reveal() { return submitSoupAction('reveal'); }
 
 const jobNames = { warrior: '戰士', archer: '弓箭手', mage: '法師' };
 const skills = { warrior: '旋風斬', archer: '三重箭', mage: '火球術' };
-const classDetails = {
+const baseStats = {
   warrior: { role: '近戰前排', hp: 800, defense: 35, range: 52, speed: 150, damage: 90, cooldown: 650, description: '以盾甲扛住第一波攻勢，逼近敵人後用長劍封住狹窄通道。敵人圍上來時，旋風斬能同時攻擊周圍目標。' },
   archer: { role: '遠距游擊', hp: 600, defense: 12, range: 240, speed: 185, damage: 72, cooldown: 850, description: '利用長弓和最快的移動速度，從遠處牽制敵人。三重箭向不同角度飛出，適合封住通道或在近距離打中多支。' },
   mage: { role: '遠程範圍傷害', hp: 560, defense: 8, range: 190, speed: 165, damage: 86, cooldown: 950, description: '靠隊友掩護尋找施法角度。火球撞擊後會爆炸，適合攻擊聚在一起的敵人。' }
 };
+const classDetails = Object.fromEntries(Object.entries(heroes).map(([id, hero]) =>
+  [id, { ...baseStats[hero.job], ...hero.stats, ...hero }]));
+const heroSkill = { frostmage: '冰晶爆裂', stormmage: '雷霆法球' };
+function heroName(player) { return heroes[player.hero ?? player.job]?.name ?? jobNames[player.job]; }
+function heroArt(id, type, job = id) {
+  const variant = type === 'avatar' ? 'portrait' : type;
+  return Object.hasOwn(heroes, id) ? `/art/heroes/${id}-${variant}.webp` : `/art/${job}-${type}.webp`;
+}
 let phase = 'lobby';
 let isRoomHost = false;
 let loadingDeadline = 0;
@@ -122,6 +130,7 @@ function show(id) {
   for (const panel of ['title-screen', 'home', 'modes', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
   if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading', 'in-results');
   if (id === 'home') $('menu-arena').focus();
+  if (id === 'modes') { roomRequest++; joining = false; }
   if (id === 'title-screen') $('title-start').focus();
 }
 
@@ -222,7 +231,7 @@ function enter(event, data) {
 }
 
 function createRoom() { enter('create', { type: 'arena', size: 10, mode: selectedMode }); }
-function joinRoom(id) { enter('join', { id: id || $('room-code').value }); }
+function joinRoom(id) { enter('join', { id: id || $('room-code').value, mode: selectedMode }); }
 function element(tag, text) {
   const node = document.createElement(tag);
   node.textContent = text;
@@ -257,12 +266,12 @@ function renderClass(job) {
   const profile = $('class-profile');
   if (profile.dataset.job !== job || !$('class-role').textContent) {
     const art = $('class-art');
-    art.src = `/art/${job}-portrait.webp`;
-    art.alt = jobNames[job] + '頭肩立繪';
+    art.src = heroArt(job, 'portrait');
+    art.alt = details.name + '頭肩立繪';
   }
   profile.dataset.job = job;
-  $('class-name').textContent = jobNames[job];
-  $('class-role').textContent = details.role;
+  $('class-name').textContent = details.name;
+  $('class-role').textContent = jobNames[details.job] + ' · ' + details.trait;
   $('job-description').textContent = details.description;
   $('class-hp').textContent = details.hp + ' HP';
   $('class-range').textContent = details.range + ' px';
@@ -270,25 +279,35 @@ function renderClass(job) {
   $('class-damage').textContent = details.damage;
   $('class-defense').textContent = `${details.defense}（減傷 ${Math.round(100 * details.defense / (100 + details.defense))}%）`;
   $('class-cooldown').textContent = details.cooldown + ' ms';
-  const values = [details.hp / Math.max(...Object.values(classDetails).map(entry => entry.hp)), details.speed / 185, details.range / 240,
-    details.damage / 90, 650 / details.cooldown];
+  const values = [details.hp / Math.max(...Object.values(classDetails).map(entry => entry.hp)), details.speed / 211, details.range / 286,
+    details.damage / 114, 540 / details.cooldown];
   const points = values.map((value, index) => {
     const angle = index * Math.PI * 2 / values.length - Math.PI / 2;
     return `${50 + 42 * value * Math.cos(angle)}% ${50 + 42 * value * Math.sin(angle)}%`;
   });
   $('chart-shape').setAttribute('style', `clip-path: polygon(${points.join(',')})`);
-  $('class-skill').textContent = skills[job];
+  $('class-skill').textContent = (heroSkill[job] ?? skills[details.job]) +
+    ` · ${(details.skillCooldown ?? 5000) / 1000} 秒冷卻`;
+  for (const [category, button] of Object.entries(categoryButtons)) {
+    button.setAttribute('aria-pressed', String(category === details.job));
+  }
+  const ordered = classOrder.filter(id => heroes[id].job === details.job);
   for (const [id, button] of Object.entries(classButtons)) {
     button.setAttribute('aria-pressed', String(id === job));
-    button.dataset.position = ['center', 'right', 'left'][(classOrder.indexOf(id) - classOrder.indexOf(job) + classOrder.length) % classOrder.length];
+    button.hidden = heroes[id].job !== details.job;
+    button.dataset.position = ['center', 'right', 'left'][(ordered.indexOf(id) - ordered.indexOf(job) + 3) % 3];
   }
 }
 
-const classOrder = Object.keys(classDetails);
+const classOrder = heroAtlasOrder;
 const classButtons = Object.fromEntries(classOrder.map(job => [
   job, $('class-' + job)
 ]));
+const categoryButtons = { warrior: $('hero-warriors'), archer: $('hero-archers'), mage: $('hero-mages') };
+for (const [job, button] of Object.entries(categoryButtons)) button.onclick = () => sendRoomCommand('chooseClass', job);
 for (const [job, button] of Object.entries(classButtons)) {
+  button.replaceChildren(Object.assign(element('img', ''), { src: heroArt(job, 'model'), alt: '', width: 220, height: 310 }),
+    element('span', heroes[job].name));
   button.onclick = () => {
     if ($('class-profile').dataset.job !== job) sendRoomCommand('chooseClass', job);
   };
@@ -296,8 +315,9 @@ for (const [job, button] of Object.entries(classButtons)) {
 
 function rotateClass(direction) {
   if ($('class-prev').disabled) return;
-  const current = classOrder.indexOf($('class-profile').dataset.job);
-  const job = classOrder[(current + direction + classOrder.length) % classOrder.length];
+  const active = $('class-profile').dataset.job;
+  const available = classOrder.filter(id => heroes[id].job === heroes[active].job);
+  const job = available[(available.indexOf(active) + direction + available.length) % available.length];
   sendRoomCommand('chooseClass', job);
 }
 $('class-prev').onclick = () => rotateClass(-1);
@@ -313,10 +333,10 @@ function renderLoading(state) {
       card.className = 'loading-card';
       card.dataset.local = String(player.id === socket.id);
       const art = element('img', '');
-      art.src = `/art/${player.job}-cutout.webp`;
+      art.src = heroArt(player.hero ?? player.job, 'model');
       art.alt = '';
       card.append(art, element('strong', player.name),
-        element('small', jobNames[player.job] + (player.role ? ' · ' + roleNames[player.role] : '') + (player.bot ? ' · AI' : '')));
+        element('small', heroName(player) + (player.role ? ' · ' + roleNames[player.role] : '') + (player.bot ? ' · AI' : '')));
       roster.append(card);
     }
   }
@@ -361,8 +381,8 @@ function renderRoom(state) {
   const full = state.players.length === state.size;
   const unready = state.players.filter(player => !player.ready).length;
   if (selecting) {
-    renderClass(me.job);
-    for (const button of Object.values(classButtons)) button.disabled = me.ready;
+    renderClass(me.hero ?? me.job);
+    for (const button of [...Object.values(classButtons), ...Object.values(categoryButtons)]) button.disabled = me.ready;
     $('class-prev').disabled = $('class-next').disabled = me.ready;
     $('ready').hidden = me.ready;
     $('unlock').hidden = !me.ready;
@@ -377,15 +397,18 @@ function renderRoom(state) {
       tile.className = 'selection-teammate';
       tile.dataset.ready = String(player.ready);
       const art = element('img', '');
-      art.src = `/art/${player.job}-avatar.webp`;
+      art.src = heroArt(player.hero ?? player.job, 'avatar');
       art.alt = '';
       tile.append(art, element('strong', player.name),
-        element('small', jobNames[player.job] + (player.ready ? ' · 已確認' : ' · 選角中')));
+        element('small', heroName(player) + (player.ready ? ' · 已確認' : ' · 選角中')));
       team.append(tile);
     }
     return;
   }
   if (!waiting) return;
+  $('waiting-title').textContent = modeNames[selectedMode] + ' · 等待大廳';
+  $('waiting-rule').textContent = { deathmatch: '5 分鐘 · 20 擊殺', flag: '20 分鐘 · 爭奪中央旗幟',
+    survival: '24 分鐘 · 比較平均生存時間', control: '20 分鐘 · 標記及守住據點' }[selectedMode];
   $('seat-count').textContent = `玩家 ${state.players.length}/${state.size}`;
   $('players').replaceChildren();
   for (const player of state.players) {
@@ -488,8 +511,8 @@ function attack(skill) {
   if (phase !== 'playing' || !socket.connected || !frame || !worldMap) return;
   const canvas = $('arena');
   const cursor = aim || { x: canvas.width / 2 + 45, y: canvas.height / 2 };
-  const x = Math.max(0, Math.min(worldMap.width, cursor.x + arenaCamera.x));
-  const y = Math.max(0, Math.min(worldMap.height, cursor.y + arenaCamera.y));
+  const x = Math.max(0, Math.min(worldMap.width, cursor.x / arenaZoom + arenaCamera.x));
+  const y = Math.max(0, Math.min(worldMap.height, cursor.y / arenaZoom + arenaCamera.y));
   socket.volatile.emit('arenaAttack', { x, y, skill });
 }
 
@@ -635,8 +658,8 @@ function drawModeHud(state, now) {
     const bounds = canvas.getBoundingClientRect();
     interaction.dataset.anchored = 'true';
     interaction.style.left = Math.min(bounds.width - 95, Math.max(95,
-      (point.x - arenaCamera.x) * bounds.width / canvas.width)) + 'px';
-    interaction.style.top = Math.max(100, (point.y - arenaCamera.y) * bounds.height / canvas.height - 74) + 'px';
+      (point.x - arenaCamera.x) * arenaZoom * bounds.width / canvas.width)) + 'px';
+    interaction.style.top = Math.max(100, (point.y - arenaCamera.y) * arenaZoom * bounds.height / canvas.height - 74) + 'px';
   }
   interaction.textContent = '[E] ' + { flag: '拔下敵方旗幟', survival: '開啟補給包', control: '開始標記 · 3 分鐘' }[info.mode];
 }
@@ -650,10 +673,10 @@ function renderResults(state) {
   $('mvp-feature').hidden = !mvp;
   if (mvp) {
     const portrait = $('mvp-portrait');
-    portrait.src = `/art/${mvp.job}-celebration.webp`;
-    portrait.alt = jobNames[mvp.job] + '立繪';
+    portrait.src = heroArt(mvp.hero ?? mvp.job, 'model');
+    portrait.alt = heroName(mvp) + '立繪';
     $('mvp-name').textContent = mvp.name + (mvp.bot ? ' · AI' : '');
-    $('mvp-kda').textContent = `${jobNames[mvp.job]} · ${mvp.kills} / ${mvp.deaths} / ${mvp.assists}`;
+    $('mvp-kda').textContent = `${heroName(mvp)} · ${mvp.kills} / ${mvp.deaths} / ${mvp.assists}`;
   }
 
   for (const [team, key] of [['藍隊', 'blue'], ['紅隊', 'red']]) {
@@ -673,7 +696,7 @@ function renderResults(state) {
       const profile = element('div', '');
       profile.className = 'result-player';
       const art = element('img', '');
-      art.src = `/art/${player.job}-avatar.webp`;
+      art.src = heroArt(player.hero ?? player.job, 'avatar');
       art.alt = '';
       const name = element('strong', player.name + (player.bot ? ' · AI' : ''));
       profile.append(art, name);
@@ -723,9 +746,9 @@ socket.on('arenaState', state => {
     }
     button.disabled = !alive || !item;
   });
-  $('concealed').hidden = !state.concealed;
   $('battle-mode-name').textContent = modeNames[state.mode ?? 'deathmatch'];
   $('battle').dataset.mode = state.mode ?? 'deathmatch';
+  $('loot-slots').hidden = Boolean(state.scenario);
   $('red-score').textContent = scoreText(state, '紅隊');
   $('blue-score').textContent = scoreText(state, '藍隊');
   $('kill-feed').replaceChildren(...state.kills.map(kill => element('li', `${kill.attacker} 擊倒 ${kill.victim}`)));
@@ -749,9 +772,9 @@ function renderFrame(time) {
     const cooldown = at => at > serverTime ? ((at - serverTime) / 1000).toFixed(1) + ' 秒' : '就緒';
     $('health-bar').max = me.maxHp;
     $('health-bar').value = me.hp;
-    $('health').textContent = `${jobNames[me.job]} · HP ${me.hp}/${me.maxHp}`;
+    $('health').textContent = `${heroName(me)} · HP ${me.hp}/${me.maxHp}`;
     $('attack-status').textContent = `${frame.attackRange || '—'} px · ${cooldown(me.attackAt)}`;
-    $('skill-status').textContent = `${skills[me.job]} · ${cooldown(me.skillAt)}`;
+    $('skill-status').textContent = `${heroSkill[me.hero] ?? skills[me.job]} · ${cooldown(me.skillAt)}`;
     $('respawn').hidden = me.alive;
     if (!me.alive) $('respawn').textContent = ['flag', 'survival'].includes(frame.mode)
       ? '已淘汰 · 可查看隊友定位' : `${Math.ceil(Math.max(0, me.respawnAt - serverTime) / 1000)} 秒後復活`;

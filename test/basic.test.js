@@ -72,6 +72,14 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal((await fetch(base + '/fonts/pixel-clash-display.woff')).status, 200);
   assert.equal((await fetch(base + '/soup-bank.js')).status, 200);
   assert.equal((await fetch(base + '/arena-renderer.js')).status, 200);
+  for (const hero of Object.keys(combat.heroes)) {
+    for (const type of ['model', 'portrait']) {
+      const art = await fetch(`${base}/art/heroes/${hero}-${type}.webp`, { method: 'HEAD' });
+      assert.equal(art.status, 200);
+      assert.equal(art.headers.get('content-type'), 'image/webp');
+    }
+  }
+  assert.equal((await fetch(base + '/art/heroes/sprites.webp', { method: 'HEAD' })).status, 200);
   for (const job of ['warrior', 'archer', 'mage']) {
     for (const suffix of ['', '-avatar', '-cutout', '-model', '-key-art', '-portrait', '-celebration']) {
       const image = await fetch(`${base}/art/${job}${suffix}.webp`, { method: 'HEAD' });
@@ -112,7 +120,8 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const guestRoster = await guestView;
   assert.equal(guestRoster.players.find(p => p.id === host.id).job, undefined);
   assert.equal(guestRoster.players.filter(p => p.team === '藍隊' && p.job).length, 5);
-  assert.equal((await send(guest, 'chooseClass', 'mage')).ok, true);
+  assert.equal((await send(guest, 'chooseClass', 'frostmage')).ok, true);
+  assert.equal(rooms.get(id).players.find(player => player.id === guest.id).hero, 'frostmage');
   let leakedDuringSelection = false;
   host.once('chat', () => { leakedDuringSelection = true; });
   const teamMessage = receive(guest, 'chat');
@@ -234,6 +243,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
 
   const solo = await send(guest, 'create', { type: 'arena', size: 10, name: 'Solo Host', mode: 'flag' });
   assert.equal((await send(guest, 'fillBots')).room.players.filter(player => player.bot).length, 9);
+  assert.match((await send(outsider, 'join', { id: solo.id, mode: 'survival', name: 'Outsider' })).error, /其他玩法/);
   const ready = receive(guest, 'room', room => room.players.every(player => player.ready));
   assert.equal((await send(guest, 'ready')).ok, true);
   await ready;

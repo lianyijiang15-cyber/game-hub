@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 <link rel="stylesheet" href="menu.css?v=3">
 <link rel="stylesheet" href="account.css?v=2">
 </head>
@@ -202,15 +202,26 @@
   <div id="waiting" class="panel">
     <section id="class-profile" class="class-select" hidden data-job="warrior" aria-label="個人選角">
       <div class="picker-stage">
-        <h3 class="picker-title">選擇出戰職業</h3>
+        <h3 class="picker-title">選擇出戰角色</h3>
+        <div class="hero-categories" aria-label="角色分類">
+          <button type="button" id="hero-warriors">戰士</button>
+          <button type="button" id="hero-archers">弓箭手</button>
+          <button type="button" id="hero-mages">法師</button>
+        </div>
         <div class="picker-carousel">
-          <button class="class-arrow" id="class-prev" type="button" aria-label="上一個職業">‹</button>
-          <div id="class-options" class="class-options" role="group" aria-label="職業">
+          <button class="class-arrow" id="class-prev" type="button" aria-label="上一個角色">‹</button>
+          <div id="class-options" class="class-options" role="group" aria-label="角色">
             <button type="button" id="class-warrior" data-job="warrior" data-position="center" aria-pressed="true"><img src="/art/warrior-model.webp" alt="" width="220" height="310"><span>戰士</span></button>
             <button type="button" id="class-archer" data-job="archer" data-position="right" aria-pressed="false"><img src="/art/archer-model.webp" alt="" width="220" height="310"><span>弓箭手</span></button>
             <button type="button" id="class-mage" data-job="mage" data-position="left" aria-pressed="false"><img src="/art/mage-model.webp" alt="" width="220" height="310"><span>法師</span></button>
+            <button type="button" id="class-frostguard" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
+            <button type="button" id="class-berserker" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
+            <button type="button" id="class-scout" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
+            <button type="button" id="class-marksman" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
+            <button type="button" id="class-frostmage" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
+            <button type="button" id="class-stormmage" aria-pressed="false" hidden><img alt="" width="220" height="310"><span></span></button>
           </div>
-          <button class="class-arrow" id="class-next" type="button" aria-label="下一個職業">›</button>
+          <button class="class-arrow" id="class-next" type="button" aria-label="下一個角色">›</button>
         </div>
         <div class="class-copy" aria-live="polite">
           <p id="class-role"></p>
@@ -244,7 +255,7 @@
       </aside>
     </section>
     <section id="room-waiting" aria-labelledby="waiting-title">
-    <h3 id="waiting-title">等待大廳</h3>
+    <h3 id="waiting-title">等待大廳</h3><p id="waiting-rule"></p>
     <h3 id="seat-count"></h3>
     <div id="players" aria-label="玩家席位"></div>
     <div class="bot-settings">
@@ -276,7 +287,6 @@
     <div class="arena-frame">
       <canvas id="arena" width="960" height="576" aria-label="開放世界團隊對抗地圖"></canvas>
       <p id="respawn" hidden></p>
-      <p id="concealed" hidden>高草隱蔽中</p>
     </div>
     <aside class="arena-minimap" aria-label="小地圖">
       <canvas id="minimap" width="160" height="160" aria-label="地形、寶箱和可見敵人"></canvas>
@@ -353,10 +363,11 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=2"></script>
-<script src="app.js?v=19"></script>
-<script src="arena-renderer.js?v=18"></script>
-<script src="menu-art.js?v=2"></script>
+<script src="heroes.js?v=1"></script>
+<script src="app.js?v=20"></script>
+<script src="arena-renderer.js?v=19"></script>
+<script src="menu-art.js?v=3"></script>
 <script src="account.js?v=2"></script>
-<script src="player-panel.js?v=2"></script>
+<script src="player-panel.js?v=3"></script>
 </body>
 </html>

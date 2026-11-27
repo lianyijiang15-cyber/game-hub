@@ -49,7 +49,7 @@ test('seeded 100 × 100 worlds contain all terrain, connected land and safe sepa
   }
 });
 
-test('team camps are out of sight and high grass conceals enemies outside close range', () => {
+test('team camps are separated and local rendering does not hide opponents in tall grass', () => {
   const room = match();
   const [observer, enemy] = room.players;
   assert.equal(observer.hp, 800);
@@ -67,8 +67,7 @@ test('team camps are out of sight and high grass conceals enemies outside close 
   assert.equal(combat.blocked(enemy.x, enemy.y, 12, room.map), false);
   assert.equal(combat.canSee(observer, enemy, room.map), false);
   assert.equal(combat.canSee(enemy, observer, room.map), true);
-  assert.ok(!combat.snapshot(room, 50, observer).players.some(player => player.id === enemy.id));
-  assert.equal(combat.snapshot(room, 50, enemy).concealed, true);
+  assert.ok(combat.snapshot(room, 50, observer).players.some(player => player.id === enemy.id));
   enemy.x = 832;
   assert.equal(combat.canSee(observer, enemy, room.map), false);
   assert.equal(combat.clearLine(observer, enemy, 0, room.map), true);
@@ -208,4 +207,30 @@ test('both teams award MVP and lowest KDA and the winning MVP is featured', () =
   assert.equal(final.mvp, redMvp.id);
   room.winner = null;
   assert.equal(combat.snapshot(room, 300000).mvp, blueMvp.id);
+});
+
+test('nine heroes apply their server-side traits, including frost slow and storm cooldown', () => {
+  const ids = Object.keys(combat.heroes);
+  assert.equal(ids.length, 9);
+  for (const job of combat.jobs) assert.equal(ids.filter(id => combat.heroes[id].job === job).length, 3);
+
+  const room = match();
+  const [frost, opponent, storm] = room.players;
+  Object.assign(frost, { hero: 'frostmage', job: 'mage' });
+  Object.assign(storm, { hero: 'stormmage', job: 'mage' });
+  Object.assign(opponent, { hero: 'frostguard', job: 'warrior' });
+  combat.start(room, 0);
+  assert.equal(opponent.hp, 980);
+  room.map = { ...room.map, tiles: Array(100).fill('g'.repeat(100)) };
+  Object.assign(frost, { x: 1200, y: 1500 });
+  Object.assign(opponent, { x: 1255, y: 1500 });
+  Object.assign(storm, { x: 1200, y: 1800 });
+  combat.attack(room, frost, opponent.x, opponent.y, true, 100);
+  combat.attack(room, storm, 1400, 1800, true, 100);
+  assert.equal(storm.skillAt, 4000);
+  assert.equal(room.projectiles.find(projectile => projectile.source === storm).speed, 500);
+  for (let now = 150; now <= 350; now += 50) combat.tick(room, now, .05, idle);
+  assert.ok(opponent.hp < 980);
+  assert.ok(opponent.slowUntil > 350);
+  assert.equal(combat.snapshot(room, 350, frost).players.find(player => player.id === opponent.id).hero, 'frostguard');
 });

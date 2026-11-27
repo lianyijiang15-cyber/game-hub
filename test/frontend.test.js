@@ -18,7 +18,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     fillRect() { pixelDraws++; },
     createRadialGradient() { return { addColorStop() {} }; }
   };
-  for (const name of ['save', 'restore', 'translate', 'rotate', 'strokeText', 'fillText', 'drawImage',
+  for (const name of ['save', 'restore', 'translate', 'scale', 'rotate', 'strokeText', 'fillText', 'drawImage',
     'beginPath', 'arc', 'moveTo', 'lineTo', 'stroke']) canvasContext[name] = () => {};
 
   function element(tagName = 'DIV') {
@@ -55,7 +55,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
         if (event === 'addBot') roster.players.push(bot(1));
         if (event === 'fillBots') while (roster.players.length < 10) roster.players.push(bot(roster.players.length));
         if (event === 'chooseClass') {
-          hostPlayer.job = args[0];
+          hostPlayer.hero = args[0];
+          hostPlayer.job = require('../public/heroes').heroes[args[0]].job;
           hostPlayer.ready = false;
         }
         if (event === 'ready') hostPlayer.ready = !hostPlayer.ready;
@@ -87,7 +88,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     requestAnimationFrame: callback => frames.push(callback),
     setInterval() {}
   });
-  for (const script of ['soup-bank.js', 'app.js', 'arena-renderer.js', 'menu-art.js']) vm.runInContext(read(script), context);
+  for (const script of ['soup-bank.js', 'heroes.js', 'app.js', 'arena-renderer.js', 'menu-art.js']) vm.runInContext(read(script), context);
   assert.ok(pixelDraws > 0);
   context.show('title-screen');
   elements.get('title-start').onclick();
@@ -168,21 +169,18 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('selection-team').children.length, 5);
   assert.equal(elements.get('start').disabled, true);
   elements.get('class-next').onclick();
-  assert.deepEqual(emitted.at(-1), ['chooseClass', 'archer']);
-  assert.equal(elements.get('class-art').src, '/art/archer-portrait.webp');
-  assert.equal(elements.get('class-name').textContent, '弓箭手');
-  assert.equal(elements.get('class-hp').textContent, '600 HP');
-  assert.equal(elements.get('selection-team').children[0].children[0].src, '/art/archer-avatar.webp');
-  assert.equal(elements.get('class-archer').dataset.position, 'center');
+  assert.deepEqual(emitted.at(-1), ['chooseClass', 'frostguard']);
+  assert.equal(elements.get('class-art').src, '/art/heroes/frostguard-portrait.webp');
+  assert.equal(elements.get('class-name').textContent, '霜甲騎士');
+  assert.equal(elements.get('class-hp').textContent, '980 HP');
+  assert.equal(elements.get('class-frostguard').dataset.position, 'center');
   assert.equal(elements.get('class-warrior').dataset.position, 'left');
-  elements.get('class-prev').onclick();
-  assert.equal(elements.get('class-art').src, '/art/warrior-portrait.webp');
-  assert.equal(elements.get('class-hp').textContent, '800 HP');
-  assert.match(elements.get('class-defense').textContent, /35/);
-  elements.get('class-prev').onclick();
-  assert.equal(elements.get('class-art').src, '/art/mage-portrait.webp');
-  assert.equal(elements.get('class-hp').textContent, '560 HP');
-  assert.equal(elements.get('class-mage').dataset.position, 'center');
+  assert.equal(elements.get('class-archer').hidden, true);
+  elements.get('hero-archers').onclick();
+  assert.equal(elements.get('class-hp').textContent, '600 HP');
+  assert.equal(elements.get('selection-team').children[0].children[0].src, '/art/heroes/archer-portrait.webp');
+  elements.get('hero-mages').onclick();
+  assert.equal(elements.get('class-art').src, '/art/heroes/mage-portrait.webp');
   elements.get('ready').onclick();
   assert.deepEqual(emitted.at(-1), ['ready']);
   assert.equal(elements.get('class-next').disabled, true);
@@ -194,7 +192,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(elements.get('battle').hidden, true);
   assert.equal(elements.get('loading-blue').children.length, 5);
   assert.equal(elements.get('loading-red').children.length, 5);
-  assert.equal(elements.get('loading-red').children[0].children[0].src, '/art/mage-cutout.webp');
+  assert.equal(elements.get('loading-red').children[0].children[0].src, '/art/heroes/mage-model.webp');
   const player = {
     id: 'self', name: 'Tester', job: 'mage', team: '紅隊', x: 1600, y: 1400, hp: 560, maxHp: 560,
     alive: true, facing: 0, attackAt: 0, skillAt: 0, spawnedAt: 0
@@ -210,7 +208,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   });
   frames.shift()(115);
   assert.ok(pixelDraws > 100);
-  assert.match(elements.get('health').textContent, /法師 · HP 560\/560/);
+  assert.match(elements.get('health').textContent, /紫焰術師 · HP 560\/560/);
   const arena = elements.get('arena');
   const keyboard = code => ({ code, target: element('BODY'), preventDefault() {} });
   keyHandlers.get('keydown')(keyboard('KeyD'));
@@ -220,8 +218,9 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[1].x, 0);
   arena.onpointerdown({ button: 0, clientX: 90, clientY: 45 });
   assert.equal(emitted.at(-1)[0], 'arenaAttack');
-  assert.equal(emitted.at(-1)[1].x, 1300);
-  assert.equal(emitted.at(-1)[1].y, 1202);
+  assert.equal(emitted.at(-1)[1].x, vm.runInContext('arenaCamera.x + 180 / arenaZoom', context));
+  assert.equal(emitted.at(-1)[1].y, vm.runInContext('arenaCamera.y + 90 / arenaZoom', context));
+  assert.ok(vm.runInContext('arenaZoom > 1', context));
   assert.equal(emitted.at(-1)[1].skill, false);
   keyHandlers.get('keydown')(keyboard('KeyQ'));
   assert.equal(emitted.at(-1)[1].skill, true);
@@ -238,7 +237,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
       { ...player, id: 'blue-low', team: '藍隊', name: 'Blue Low', kills: 0, deaths: 3, assists: 0, damage: 75 }
     ]
   });
-  assert.equal(elements.get('mvp-portrait').src, '/art/mage-celebration.webp');
+  assert.equal(elements.get('mvp-portrait').src, '/art/heroes/mage-model.webp');
   assert.equal(elements.get('mvp-name').textContent, 'Tester');
   assert.equal(elements.get('red-outcome').textContent, '勝利');
   assert.equal(elements.get('blue-outcome').textContent, '敗北');

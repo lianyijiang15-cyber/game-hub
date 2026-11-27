@@ -4,6 +4,7 @@ const { generateWorld, solid, impassable, campOffset } = require('./world');
 const { terrainBlocked, playerBlocked, movePlayer } = require('./collision');
 const loot = require('./loot');
 const modes = require('./modes');
+const { heroes } = require('../public/heroes');
 const map = generateWorld();
 const visionRadius = 360;
 const grassRevealRadius = 80;
@@ -14,6 +15,9 @@ const classes = {
   mage: { hp: 560, defense: 8, speed: 165, range: 190, damage: 86, skillDamage: 128, cooldown: 950 }
 };
 const jobs = Object.keys(classes);
+const heroStats = Object.fromEntries(Object.entries(heroes).map(([id, hero]) =>
+  [id, { ...classes[hero.job], ...hero.stats }]));
+function stats(player) { return heroStats[player.hero] ?? classes[player.job]; }
 const teams = ['紅隊', '藍隊'];
 const radius = 12;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -87,9 +91,9 @@ function spawn(room, player, now) {
     if (terrainBlocked(room.map, position.x, position.y) ||
         playerBlocked(room.players, player, position.x, position.y)) continue;
     Object.assign(player, position, {
-      hp: classes[player.job].hp, alive: true, input: { x: 0, y: 0 }, inputAt: 0,
+      hp: stats(player).hp, alive: true, input: { x: 0, y: 0 }, inputAt: 0,
       angle: side === 1 ? 0 : Math.PI, facing: side === 1 ? 0 : Math.PI, moving: false,
-      contributors: new Map(), buffs: new Map(), attackAt: 0, skillAt: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
+      contributors: new Map(), buffs: new Map(), attackAt: 0, skillAt: 0, slowUntil: 0, respawnAt: 0, spawnedAt: now, hurtAt: 0, action: null
     });
     return;
   }
@@ -111,7 +115,7 @@ function start(room, now, seed) {
     projectiles: [], kills: [], sequence: 0, endsAt: now + modes.durations[modes.modeOf(room)], winner: null
   });
   modes.setup(room, room.map.seed);
-  room.chests = ['flag', 'survival'].includes(modes.modeOf(room)) ? [] : loot.generateChests(room.map);
+  room.chests = modes.modeOf(room) === 'deathmatch' ? loot.generateChests(room.map) : [];
   room.roster = [...room.players];
   room.roster.forEach(player => {
     Object.assign(player, {
@@ -157,7 +161,7 @@ function hit(room, source, target, damage, now) {
   if (!target.team) return modes.hitBeast(room, source, target, damage);
   const defense = loot.modifiers(target, now);
   if (defense.immune) return;
-  const actual = Math.min(target.hp, Math.round(damage * 100 / (100 + classes[target.job].defense + defense.defense)));
+  const actual = Math.min(target.hp, Math.round(damage * 100 / (100 + stats(target).defense + defense.defense)));
   target.contributors.set(source, now);
   target.hp -= actual;
   source.damage += actual;
@@ -165,7 +169,7 @@ function hit(room, source, target, damage, now) {
   if (target.hp <= 0) defeat(room, target, source, now, source.name);
 }
 
-const scenarioHooks = { clearLine, classes, environmentHit, movePlayer };
+const scenarioHooks = { clearLine, stats, environmentHit, movePlayer };
 
 function effect(room, type, position, angle, range, team, now) {
   room.effects.push({ type, x: position.x, y: position.y, angle, range, team, until: now + 240 });
@@ -175,10 +179,10 @@ function attack(room, player, x, y, skill, now) {
   if (room.phase !== 'playing' || !player.alive || now >= room.endsAt) return;
   const key = skill ? 'skillAt' : 'attackAt';
   if (now < player[key]) return;
-  const job = classes[player.job];
+  const job = stats(player);
   const attackBoost = loot.modifiers(player, now).attack;
   const angle = Math.atan2(y - player.y, x - player.x);
-  player[key] = now + (skill ? 5000 : job.cooldown);
+  player[key] = now + (skill ? job.skillCooldown ?? 5000 : job.cooldown);
   Object.assign(player, { angle, facing: angle, action: { skill, until: now + 240 } });
 
   if (skill && player.job !== 'warrior') {
@@ -187,7 +191,8 @@ function attack(room, player, x, y, skill, now) {
       room.projectiles.push({
         id: ++room.sequence, source: player, type: arrows ? 'arrow' : 'fireball',
         x: player.x, y: player.y, angle: angle + spread,
-        damage: job.skillDamage * attackBoost, speed: arrows ? 480 : 330, remaining: arrows ? 265 : 225
+        damage: job.skillDamage * attackBoost, speed: job.projectileSpeed ?? (arrows ? 480 : 330),
+        remaining: arrows ? 265 : 225, blast: job.blast ?? 66, slow: job.slow, tint: heroes[player.hero]?.color
       });
     }
     return;
@@ -225,10 +230,13 @@ function advanceProjectile(room, projectile, dt, now) {
   projectile.remaining -= travel;
   if (!impact && projectile.remaining > 0) return true;
   if (projectile.type === 'fireball') {
-    effect(room, 'blast', projectile, 0, 66, projectile.source.team, now);
+    const blast = projectile.blast ?? 66;
+    effect(room, 'blast', projectile, 0, blast, projectile.source.team, now);
     for (const target of attackTargets(room)) {
-      if (distance(target, projectile) <= 66 && clearLine(projectile, target, 0, room.map)) {
+      if (distance(target, projectile) <= blast && clearLine(projectile, target, 0, room.map)) {
+        const hp = target.hp;
         hit(room, projectile.source, target, projectile.damage, now);
+        if (projectile.slow && target.team && target.alive && target.hp < hp) target.slowUntil = now + 1800;
       }
     }
   }
@@ -237,7 +245,7 @@ function advanceProjectile(room, projectile, dt, now) {
 
 function move(room, player, vector, dt, now) {
   const length = Math.max(1, Math.hypot(vector.x, vector.y));
-  const step = classes[player.job].speed * loot.modifiers(player, now).speed * dt / length;
+  const step = stats(player).speed * (player.slowUntil > now ? .72 : 1) * loot.modifiers(player, now).speed * dt / length;
   player.moving = movePlayer(room.map, room.players, player, vector.x * step, vector.y * step);
   if (player.moving) player.facing = Math.atan2(vector.y, vector.x);
 }
@@ -270,7 +278,7 @@ function openChest(room, player, id, now) {
 
 function useItem(room, player, slot, now) {
   if (room.phase !== 'playing' || !player.alive || now >= room.endsAt) return { error: '目前無法使用道具' };
-  return loot.useItem(player, slot, classes[player.job].hp, now);
+  return loot.useItem(player, slot, stats(player).hp, now);
 }
 
 function chestLayout(room) {
@@ -309,18 +317,19 @@ function teamAwards(results) {
 
 function snapshot(room, now, viewer = null) {
   const local = viewer && room.phase === 'playing';
-  const sees = point => !local || canSee(viewer, point, room.map);
+  // The client draws the visible camera rectangle. Keep distant opponents out of its feed.
+  const sees = point => !local || Math.abs(viewer.x - point.x) <= 1010 && Math.abs(viewer.y - point.y) <= 730;
   const players = local ? room.players.filter(player => player === viewer ||
-    (player.team === viewer.team ? distance(viewer, player) <= visionRadius : sees(player))) : room.players;
+    sees(player)) : room.players;
   const results = room.phase === 'ended' ? room.roster.map(player => {
-    const { id, name, team, bot, job, kills, deaths, assists, damage, role, eliminatedAt } = player;
-    return { id, name, team, bot, job, kills, deaths, assists, damage, role,
+    const { id, name, team, bot, job, hero, kills, deaths, assists, damage, role, eliminatedAt } = player;
+    return { id, name, team, bot, job, hero, kills, deaths, assists, damage, role,
       survival: room.scenario?.mode === 'survival' ? Math.max(0, (eliminatedAt ?? Math.min(now, room.endsAt)) - room.scenario.startedAt) : null };
   }) : null;
   const awards = results ? teamAwards(results) : null;
   const mvp = room.winner ? awards?.[room.winner]?.mvp ?? null :
     results ? [...results].sort(rankMvp)[0]?.id ?? null : null;
-  const attackRange = local && viewer.alive ? classes[viewer.job].range : 0;
+  const attackRange = local && viewer.alive ? stats(viewer).range : 0;
   const targetInRange = attackRange > 0 && players.concat(room.scenario?.beasts.filter(sees) ?? []).some(player => player.alive && player.team !== viewer.team &&
     distance(viewer, player) <= attackRange && clearLine(viewer, player, 0, room.map));
   const chests = room.chests.filter(chest => sees(chest) ||
@@ -334,11 +343,11 @@ function snapshot(room, now, viewer = null) {
     chests, nearbyChest, openedChestIds: room.chests.filter(chest => chest.openedAt !== null).map(chest => chest.id),
     inventory: local ? viewer.inventory.map(item => item && { label: item.label, quality: item.quality }) : [],
     buffs: local ? loot.activeBuffs(viewer, now).map(({ label, until }) => ({ label, until })) : [],
-    attackRange, targetInRange, visionRadius, concealed: !!local && inTallGrass(viewer, room.map),
-    projectiles: room.projectiles.filter(sees).map(({ id, x, y, angle, type }) => ({ id, x, y, angle, type })),
-    players: players.map(({ id, x, y, name, team, job, role, hp, bot, alive, moving, angle, facing,
+    attackRange, targetInRange,
+    projectiles: room.projectiles.filter(sees).map(({ id, x, y, angle, type, tint }) => ({ id, x, y, angle, type, tint })),
+    players: players.map(({ id, x, y, name, team, job, hero, role, hp, bot, alive, moving, angle, facing,
       action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt }) =>
-      ({ id, x, y, name, team, job, role, hp, maxHp: classes[job].hp, bot, alive, moving, angle, facing,
+      ({ id, x, y, name, team, job, hero, role, hp, maxHp: stats({ hero, job }).hp, bot, alive, moving, angle, facing,
         action, attackAt, skillAt, respawnAt, hurtAt, spawnedAt })),
     results, mvp, teamAwards: awards
   };
@@ -347,4 +356,4 @@ function snapshot(room, now, viewer = null) {
 function interact(room, player, id, now) { return modes.interact(room, player, id, now, scenarioHooks); }
 function scenarioGoal(room, player, now) { return modes.botGoal(room, player, now, scenarioHooks); }
 
-module.exports = { interact, scenarioGoal, map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };
+module.exports = { heroes, stats, interact, scenarioGoal, map, classes, jobs, blocked, clearLine, distance, start, attack, tick, snapshot, canSee, assignTeams, openChest, castRune, useItem, chestLayout };

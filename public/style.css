@@ -660,3 +660,7 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 #mode-interact[data-anchored="true"] { bottom: auto; margin: 0; }
 #battle[data-mode="survival"] .scoreboard .red strong,
 #battle[data-mode="survival"] .scoreboard .blue strong { font-size: clamp(.9rem, 3vw, 1.55rem); }
+
+.hero-categories { display: flex; justify-content: center; gap: 6px; }
+#game .hero-categories button { margin: 0; background: #2c2928e8; color: #fff2d4; border: 1px solid #b59a72; padding: 4px 9px; }
+#game .hero-categories button[aria-pressed="true"] { background: #e9cb8b; color: #2a2125; }

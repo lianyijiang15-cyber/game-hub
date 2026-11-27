@@ -160,9 +160,9 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
       for (const [key, player] of participants) {
         const account = accounts[key];
         if (!account || account.arenaHistory?.some(record => record.id === matchId)) continue;
-        const { team, job, kills, deaths, assists, damage } = player;
+        const { team, job, hero, kills, deaths, assists, damage } = player;
         (account.arenaHistory ??= []).unshift({
-          id: matchId, date, team, job, kills, deaths, assists, damage, score: result.score, mode: result.mode, detail,
+          id: matchId, date, team, job, hero, kills, deaths, assists, damage, score: result.score, mode: result.mode, detail,
           result: result.winner === null ? 'draw' : team === result.winner ? 'win' : 'loss'
         });
       }

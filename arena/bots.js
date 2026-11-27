@@ -1,6 +1,6 @@
 'use strict';
 
-const { map, classes, blocked, clearLine, distance, attack, canSee, scenarioGoal } = require('./combat');
+const { map, stats, blocked, clearLine, distance, attack, canSee, scenarioGoal } = require('./combat');
 const { campOffset } = require('./world');
 const graphs = new WeakMap();
 function navigation(world) {
@@ -99,7 +99,7 @@ function botInput(room, bot, now) {
   if (distance(bot, patrolPoint()) < 24) bot.patrolHome = !bot.patrolHome;
   const target = enemy || (bot.lastSeen?.until > now && distance(bot, bot.lastSeen) > 24 ? bot.lastSeen : objective ?? patrolPoint());
 
-  const job = classes[bot.job];
+  const job = stats(bot);
   const gap = distance(bot, target);
   const visible = enemy && gap <= job.range;
   if (visible) {

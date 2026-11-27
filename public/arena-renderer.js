@@ -24,8 +24,8 @@ function createArenaCamera() {
       const blend = reset ? 1 : 1 - Math.exp(-elapsed / 65);
       x = clamp(x + (targetX - x) * blend, maxX);
       y = clamp(y + (targetY - y) * blend, maxY);
-      this.x = Math.round(x);
-      this.y = Math.round(y);
+      this.x = Math.min(maxX, Math.round(x));
+      this.y = Math.min(maxY, Math.round(y));
       world = map;
       playerId = player.id;
       spawnedAt = player.spawnedAt;
@@ -34,6 +34,17 @@ function createArenaCamera() {
   };
 }
 const arenaCamera = createArenaCamera();
+let arenaZoom = 1.38;
+const heroSprites = typeof Image === 'undefined' ? null : new Image();
+if (heroSprites) heroSprites.src = '/art/heroes/sprites.webp';
+
+function drawHeroPixels(ctx, id, x, y, width, height) {
+  const index = heroAtlasOrder.indexOf(id);
+  if (!heroSprites?.complete || !heroSprites.naturalWidth || index < 0) return false;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(heroSprites, index * 28, 0, 28, 30, x, y, width, height);
+  return true;
+}
 const colors = {
   '紅隊': { light: '#fb8d74', mid: '#bb453d', dark: '#672939' },
   '藍隊': { light: '#87d4f8', mid: '#3d78ad', dark: '#284669' }
@@ -257,8 +268,15 @@ function sprite(ctx, p, old, blend, time, localId) {
   const headX = Math.abs(Math.cos(facing)) > 0.7 ? Math.sign(Math.cos(facing)) * 3 : 0;
   ctx.save();
   ctx.translate(x, y - bob);
-  armor(ctx, p.job, color, headX, stride, Math.sin(facing) < -0.7);
-  weapon(ctx, p, color, time);
+  ctx.save();
+  if (Math.cos(facing) < -.3) ctx.scale(-1, 1);
+  ctx.rotate(p.action?.until > time ? .10 : 0);
+  const painted = drawHeroPixels(ctx, p.hero ?? p.job, -23, -49 + stride / 2, 46, 50);
+  ctx.restore();
+  if (!painted) {
+    armor(ctx, p.job, color, headX, stride, Math.sin(facing) < -0.7);
+    weapon(ctx, p, color, time);
+  }
   if (time - p.hurtAt < 145 && p.hurtAt > 0) rect(ctx, '#fff1db83', -8, -25, 16, 14);
   ctx.restore();
   if (time - p.spawnedAt < 650) {
@@ -420,10 +438,14 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   const older = new Map(old?.players.map(p => [p.id, p]));
   const player = state.players.find(p => p.id === localId);
   const position = player && displayPosition(player, older.get(localId), blend);
-  if (position) arenaCamera.follow(position, player, map, width, height, frameTime);
+  arenaZoom = Math.max(1.38, width / 980, height / 700);
+  const worldWidth = width / arenaZoom;
+  const worldHeight = height / arenaZoom;
+  if (position) arenaCamera.follow(position, player, map, worldWidth, worldHeight, frameTime);
   ctx.save();
+  ctx.scale(arenaZoom, arenaZoom);
   ctx.translate(-arenaCamera.x, -arenaCamera.y);
-  paintWorld(ctx, map, width, height);
+  paintWorld(ctx, map, worldWidth, worldHeight);
   for (const chest of state.chests || []) drawChest(ctx, chest, time);
   const scenario = state.scenario;
   if (scenario?.flag) drawObjective(ctx, scenario.flag, time, true);
@@ -434,7 +456,7 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
   for (const beast of scenario?.beasts ?? []) drawBeast(ctx, beast, time);
   for (const p of [...state.players].sort((a, b) => a.y - b.y)) {
     if (p.x < arenaCamera.x - 96 || p.y < arenaCamera.y - 96 ||
-        p.x > arenaCamera.x + width + 96 || p.y > arenaCamera.y + height + 96) continue;
+        p.x > arenaCamera.x + worldWidth + 96 || p.y > arenaCamera.y + worldHeight + 96) continue;
     sprite(ctx, p, older.get(p.id), blend, time, localId);
   }
   for (const effect of state.effects) {
@@ -463,29 +485,19 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime) {
       rect(ctx, '#ffffce', 2, -2, 4, 4);
     } else {
       rect(ctx, '#c74638', -11, -4, 17, 8);
-      rect(ctx, '#ff9a44', -5, -6, 12, 12);
+      rect(ctx, p.tint ?? '#ff9a44', -5, -6, 12, 12);
       rect(ctx, '#ffe3a0', 0, -3, 6, 6);
     }
     ctx.restore();
   }
   ctx.restore();
-  if (position && state.visionRadius) {
-    const x = position.x - arenaCamera.x;
-    const y = position.y - arenaCamera.y;
-    const radius = state.visionRadius;
-    const fog = ctx.createRadialGradient(x, y, radius * 0.74, x, y, radius + 6);
-    fog.addColorStop(0, '#10171800');
-    fog.addColorStop(0.96, '#101718e8');
-    fog.addColorStop(1, '#101718f0');
-    rect(ctx, fog, 0, 0, width, height);
-  }
-  if (scenario?.night) rect(ctx, '#11173669', 0, 0, width, height);
+  if (scenario?.night) rect(ctx, '#5e7ac024', 0, 0, width, height);
   if (position && state.attackRange) {
     ctx.save();
     ctx.strokeStyle = state.targetInRange ? '#a8f8a6' : '#fff0c2bd';
     ctx.lineWidth = state.targetInRange ? 2 : 1.5;
     ctx.beginPath();
-    ctx.arc(position.x - arenaCamera.x, position.y - arenaCamera.y, state.attackRange, 0, Math.PI * 2);
+    ctx.arc((position.x - arenaCamera.x) * arenaZoom, (position.y - arenaCamera.y) * arenaZoom, state.attackRange * arenaZoom, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }

@@ -169,3 +169,20 @@ test('control relocates idle flags, awards each only once and supports all three
     assert.equal(flag.mark.ends, start + 2000 + 3 * minute);
   }
 });
+
+test('special rooms never load another mode’s objectives or classic loot', () => {
+  for (const mode of ['flag', 'survival', 'control']) {
+    const room = setup(mode);
+    const state = room.scenario;
+    assert.equal(room.chests.length, 0);
+    assert.equal(state.mode, mode);
+    assert.equal(state.supplies.length > 0, mode === 'survival');
+    assert.equal(state.beasts.length > 0, mode === 'flag');
+    assert.equal(state.flags.some(flag => flag.id === 'flag'), mode === 'flag');
+    assert.equal(state.flags.some(flag => flag.id.startsWith('point-')), mode === 'control');
+    if (mode !== 'flag') assert.ok(modes.antidote(room, room.players[0], start).error);
+  }
+  const classic = setup('deathmatch');
+  assert.equal(classic.scenario, null);
+  assert.ok(classic.chests.length > 0);
+});

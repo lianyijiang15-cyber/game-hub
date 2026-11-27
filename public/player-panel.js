@@ -72,7 +72,7 @@ const showPlayerPanel = (() => {
         const row = element('tr', '');
         const awards = detail.awards?.[team];
         const badge = [p.id === awards?.mvp && 'MVP', p.id === awards?.lowestKda && '戰犯'].filter(Boolean).join(' / ');
-        const values = [p.name + (p.bot ? ' · AI' : ''), [jobNames[p.job], roleNames[p.role]].filter(Boolean).join('／'),
+        const values = [p.name + (p.bot ? ' · AI' : ''), [heroName(p), roleNames[p.role]].filter(Boolean).join('／'),
           `${p.kills}/${p.deaths}/${p.assists}`, p.damage, ...(survival ? [formatDuration(p.survival)] : []), badge];
         row.append(...values.map(value => element('td', String(value))));
         tbody.append(row);

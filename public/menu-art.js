@@ -1,7 +1,20 @@
 'use strict';
 
 for (const [job, team] of [['warrior', '紅隊'], ['archer', '藍隊'], ['mage', '藍隊']]) {
-  const ctx = $('menu-' + job).getContext('2d');
+  const canvas = $('menu-' + job);
+  const ctx = canvas.getContext('2d');
+  if (heroSprites) {
+    const render = () => {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+      drawHeroPixels(ctx, job, 2, 1, 48, 50);
+      ctx.restore();
+    };
+    if (heroSprites.complete) queueMicrotask(render);
+    else heroSprites.addEventListener('load', render, { once: true });
+  }
   ctx.translate(20, 46);
   const color = colors[team];
   armor(ctx, job, color, 0, 0, false);

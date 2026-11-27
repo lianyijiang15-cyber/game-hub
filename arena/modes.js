@@ -232,7 +232,7 @@ function interact(room, player, id, now, hooks) {
     return { message: object.kind === 'medicine' ? '藥材包是妖獸' : '你打開了炸彈' };
   }
   player.protectedUntil = Math.max(now, player.protectedUntil) + (object.kind === 'medicine' ? 110_000 : 55_000);
-  player.hp = Math.min(hooks.classes[player.job].hp, player.hp + (object.kind === 'medicine' ? 150 : 75));
+  player.hp = Math.min(hooks.stats(player).hp, player.hp + (object.kind === 'medicine' ? 150 : 75));
   return { message: '已補充生存資源' };
 }
 

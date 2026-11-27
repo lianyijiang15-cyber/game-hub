@@ -41,8 +41,8 @@ function roomState(room, viewerId) {
   return {
     id: room.id, host: room.host, size: seats, phase: room.phase, mode: room.mode,
     loadingRemaining: Math.max(0, (room.loadingUntil ?? 0) - now()),
-    players: room.players.map(({ id, name, job, ready, bot, team, slot }) => ({
-      id, name, ready, bot, ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot) } : {}) } : id === viewerId ? { job } : {})
+    players: room.players.map(({ id, name, job, hero, ready, bot, team, slot }) => ({
+      id, name, ready, bot, ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, hero, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot) } : {}) } : id === viewerId ? { job, hero } : {})
     }))
   };
 }
@@ -65,7 +65,8 @@ function addBot(room) {
   while (room.players.some(player => player.bot && player.name === 'AI ' + number)) number++;
   room.players.push({
     id: 'bot-' + crypto.randomUUID(), name: 'AI ' + number, bot: true, ready: true,
-    job: combat.jobs[(number - 1) % combat.jobs.length]
+    hero: Object.keys(combat.heroes)[(number - 1) % 9],
+    job: Object.values(combat.heroes)[(number - 1) % 9].job
   });
 }
 
@@ -171,13 +172,13 @@ function runMatch(room) {
   }, 50);
 }
 
-function playerStats({ team, job, kills, deaths, assists, damage }) {
-  return { team, job, kills, deaths, assists, damage };
+function playerStats({ team, job, hero, kills, deaths, assists, damage }) {
+  return { team, job, hero, kills, deaths, assists, damage };
 }
 
 function join(socket, room, name, accountKey) {
   const ticket = crypto.randomUUID();
-  room.players.push({ id: socket.id, name, accountKey, job: 'warrior', ready: false, bot: false, ticket });
+  room.players.push({ id: socket.id, name, accountKey, job: 'warrior', hero: 'warrior', ready: false, bot: false, ticket });
   socket.join(channel(room));
   socket.data.room = room.id;
   return ticket;
@@ -241,6 +242,8 @@ io.on('connection', socket => {
     const id = typeof data?.id === 'string' ? data.id.trim().toUpperCase() : '';
     if (!name || !/^[A-F0-9]{6}$/.test(id)) return { error: '請輸入暱稱與 6 碼房間代碼' };
     const target = rooms.get(id);
+    const requestedMode = data?.mode ?? 'deathmatch';
+    if (target && target.mode !== requestedMode) return { error: '此房間屬於其他玩法，請回到副本選單切換' };
     if (!target || target.phase !== 'lobby' || target.players.length >= seats) {
       return { error: '房間不存在、已開始或已滿' };
     }
@@ -300,9 +303,10 @@ io.on('connection', socket => {
     room.players = room.players.filter(player => player.id !== id);
     publish(room);
   });
-  command('chooseClass', (job, { room, player }) => {
-    if (room?.phase !== 'selection' || player.ready || !combat.jobs.includes(job)) return { error: '目前無法選擇此職業' };
-    player.job = job;
+  command('chooseClass', (hero, { room, player }) => {
+    if (room?.phase !== 'selection' || player.ready || typeof hero !== 'string' || !Object.hasOwn(combat.heroes, hero)) return { error: '目前無法選擇此職業' };
+    player.hero = hero;
+    player.job = combat.heroes[hero].job;
     player.ready = false;
     publish(room);
   });
