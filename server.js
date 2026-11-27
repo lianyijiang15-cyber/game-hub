@@ -286,17 +286,15 @@ io.on('connection', socket => {
     room.players.forEach(player => { player.ready = player.bot; });
     publish(room);
   });
-  hostCommand('returnLobby', 'ended', room => {
+  function returnToLobby(room) {
     clearTimeout(room.expiry);
     for (const player of room.players) if (player.bot) player.ticket = null;
     room.phase = 'lobby';
     room.players.forEach(player => { player.ready = player.bot; });
     publish(room);
-  });
-  hostCommand('rematch', 'ended', room => {
-    while (room.players.length < seats) addBot(room);
-    runMatch(room);
-  });
+  }
+  hostCommand('returnLobby', 'ended', returnToLobby);
+  hostCommand('rematch', 'ended', returnToLobby);
 
   socket.on('arenaInput', data => {
     const { room, player } = member(socket);

@@ -153,19 +153,37 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal([...hostLoot.inventory, ...guestLoot.inventory].filter(Boolean).length, 1);
   assert.ok(!hostLoot.players.some(player => Object.hasOwn(player, 'inventory')));
 
-  const replacement = receive(guest, 'room', room => room.host === guest.id);
-  host.disconnect();
-  assert.equal((await replacement).players.filter(player => player.bot).length, 9);
   const final = receive(guest, 'arenaState', state => state.phase === 'ended');
-  rooms.get(id).endsAt = 0;
+  liveRoom.endsAt = 0;
   const result = await final;
   assert.equal(result.winner, null);
   assert.equal(result.results.length, 10);
+  const retainedPlayers = liveRoom.players.map(({ id, name, bot, job }) => ({ id, name, bot, job }));
+  const waiting = [host, guest].map(client => receive(client, 'room', state => state.id === id && state.phase === 'lobby'));
+  assert.ok((await send(guest, 'rematch')).error);
+  assert.equal((await send(host, 'rematch')).ok, true);
+  for (const state of await Promise.all(waiting)) {
+    assert.equal(state.host, host.id);
+    assert.deepEqual(state.players.map(p => p.id), retainedPlayers.map(p => p.id));
+    assert.ok(state.players.every(p => p.ready === p.bot));
+  }
+  assert.deepEqual(liveRoom.players.map(({ id, name, bot, job }) => ({ id, name, bot, job })), retainedPlayers);
+  assert.equal(liveRoom.phase, 'lobby');
+  assert.equal(liveRoom.timer, null);
+
+  await Promise.all([send(host, 'ready'), send(guest, 'ready')]);
+  assert.equal((await send(host, 'start')).ok, true);
+  await wait(160);
+  await Promise.all([send(host, 'ready'), send(guest, 'ready')]);
   const rematchMap = receive(guest, 'arenaMap');
   const again = receive(guest, 'arenaState', state => state.phase === 'playing');
-  assert.equal((await send(guest, 'rematch')).ok, true);
+  assert.equal((await send(host, 'start')).ok, true);
   assert.deepEqual((await again).score, { 紅隊: 0, 藍隊: 0 });
   assert.notDeepEqual((await rematchMap).map.tiles, firstMap.map.tiles);
+
+  const replacement = receive(guest, 'room', room => room.host === guest.id);
+  host.disconnect();
+  assert.equal((await replacement).players.filter(player => player.bot).length, 9);
   await send(guest, 'leave');
   assert.equal(rooms.has(id), false);
 
