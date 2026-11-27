@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Hub｜開放世界對抗</title>
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 <main>
@@ -175,19 +175,35 @@
     <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd> 技能 · <kbd>E</kbd> 開箱 · <kbd>Enter</kbd> 聊天</p>
     <ul id="kill-feed" aria-label="擊殺通知"></ul>
   </div>
-  <section id="results" class="panel" aria-labelledby="winner" hidden>
-    <h2 id="winner"></h2>
-    <div id="mvp-stage" class="mvp-stage">
-      <video id="mvp-video" width="480" height="360" muted playsinline controls preload="none" aria-label="MVP 慶祝影片"></video>
-      <div class="mvp-caption"><b>MVP</b><h3 id="mvp-name"></h3><p id="mvp-kda"></p></div>
+  <section id="results" aria-labelledby="winner" hidden>
+    <aside class="mvp-stage">
+      <div id="mvp-feature" class="mvp-feature">
+        <p class="mvp-title">MVP</p>
+        <img id="mvp-portrait" width="380" height="580" alt="">
+        <div class="mvp-caption"><h3 id="mvp-name"></h3><p id="mvp-kda"></p></div>
+      </div>
+      <div class="result-actions">
+        <button id="return-lobby">回到大廳</button>
+        <button id="rematch" class="secondary">再玩一局</button>
+      </div>
+    </aside>
+    <div id="results-board" class="results-board">
+      <h2 id="winner"></h2>
+      <section class="results-team blue" aria-labelledby="results-blue-title">
+        <h3 id="results-blue-title"><span id="blue-outcome"></span> 藍隊 <b id="final-blue"></b></h3>
+        <table>
+          <thead><tr><th scope="col">玩家</th><th scope="col">擊殺</th><th scope="col">死亡</th><th scope="col">助攻</th><th scope="col">有效傷害</th></tr></thead>
+          <tbody id="results-blue"></tbody>
+        </table>
+      </section>
+      <section class="results-team red" aria-labelledby="results-red-title">
+        <h3 id="results-red-title"><span id="red-outcome"></span> 紅隊 <b id="final-red"></b></h3>
+        <table>
+          <thead><tr><th scope="col">玩家</th><th scope="col">擊殺</th><th scope="col">死亡</th><th scope="col">助攻</th><th scope="col">有效傷害</th></tr></thead>
+          <tbody id="results-red"></tbody>
+        </table>
+      </section>
     </div>
-    <p class="results-legend">K / D / A · 擊殺 / 死亡 / 助攻</p>
-    <section class="results-team blue" aria-label="藍隊戰績"><div id="results-blue" class="results-roster"></div></section>
-    <div class="results-score"><span class="blue">藍隊 <b id="final-blue"></b></span><strong>VS</strong><span class="red"><b id="final-red"></b> 紅隊</span></div>
-    <section class="results-team red" aria-label="紅隊戰績"><div id="results-red" class="results-roster"></div></section>
-    <p id="results-note" class="muted"></p>
-    <button id="return-lobby" class="secondary">返回大廳</button>
-    <button id="rematch">再玩一局</button>
   </section>
   <section id="match-chat" class="panel">
     <h3 id="chat-title">房間聊天</h3>
@@ -201,7 +217,7 @@
 </main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js"></script>
-<script src="app.js?v=13"></script>
-<script src="arena-renderer.js?v=13"></script>
+<script src="app.js?v=14"></script>
+<script src="arena-renderer.js?v=14"></script>
 </body>
 </html>

@@ -318,7 +318,21 @@ function drawChest(ctx, chest, time) {
 
 const minimapGround = document.createElement('canvas');
 let minimapWorld;
-function drawMinimap(state, map, chests, localId) {
+function minimapView(map, center) {
+  const width = map.width / 4;
+  const height = map.height / 4;
+  return {
+    x: Math.max(0, Math.min(map.width - width, center.x - width / 2)),
+    y: Math.max(0, Math.min(map.height - height, center.y - height / 2)),
+    width, height
+  };
+}
+
+function drawMinimap(state, old, blend, map, chests, localId) {
+  const me = state.players.find(player => player.id === localId);
+  if (!me) return;
+  const center = displayPosition(me, old?.players.find(player => player.id === localId), blend);
+  const view = minimapView(map, center);
   const canvas = $('minimap');
   const ctx = canvas.getContext('2d', { alpha: false });
   if (minimapWorld !== map) {
@@ -329,22 +343,24 @@ function drawMinimap(state, map, chests, localId) {
     map.tiles.forEach((row, y) => [...row].forEach((tile, x) => rect(terrain, terrainColors[tile][1], x, y, 1, 1)));
   }
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(minimapGround, 0, 0, canvas.width, canvas.height);
-  const x = value => value / map.width * canvas.width;
-  const y = value => value / map.height * canvas.height;
+  ctx.drawImage(minimapGround, view.x / map.tileSize, view.y / map.tileSize,
+    view.width / map.tileSize, view.height / map.tileSize, 0, 0, canvas.width, canvas.height);
+  const x = value => (value - view.x) / view.width * canvas.width;
+  const y = value => (value - view.y) / view.height * canvas.height;
+  const inView = point => point.x >= view.x && point.x < view.x + view.width &&
+    point.y >= view.y && point.y < view.y + view.height;
   const open = new Set(state.openedChestIds);
   for (const chest of chests) {
+    if (!inView(chest)) continue;
     const mark = open.has(chest.id) ? '#aca996' : chestPaint[chest.quality][2];
     const size = open.has(chest.id) ? 2 : 3;
     rect(ctx, mark, x(chest.x) - 1, y(chest.y) - 1, size, size);
   }
-  const me = state.players.find(player => player.id === localId);
-  if (!me) return;
   for (const player of state.players) {
-    if (!player.alive || player === me) continue;
+    if (!player.alive || player === me || !inView(player)) continue;
     rect(ctx, player.team === me.team ? '#78d5ff' : '#ff6b71', x(player.x) - 2, y(player.y) - 2, 4, 4);
   }
-  rect(ctx, '#fff8e3', x(me.x) - 2, y(me.y) - 2, 5, 5);
+  rect(ctx, '#fff8e3', x(center.x) - 2, y(center.y) - 2, 5, 5);
 }
 
 function drawArena(state, old, blend, time, aim, localId, map, frameTime) {

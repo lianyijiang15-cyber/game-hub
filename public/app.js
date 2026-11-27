@@ -25,6 +25,7 @@ const classDetails = {
   mage: { role: '遠程範圍傷害', hp: 560, defense: 8, range: 190, speed: 165, damage: 86, cooldown: 950, description: '靠隊友掩護尋找施法角度。火球撞擊後會爆炸，適合攻擊聚在一起的敵人。' }
 };
 let phase = 'lobby';
+let isRoomHost = false;
 let loadingDeadline = 0;
 let frame = null;
 let previous = null;
@@ -42,7 +43,6 @@ const matchKey = 'game-hub-seat';
 
 function show(id) {
   for (const panel of ['home', 'soup', 'lobby', 'game']) $(panel).hidden = panel !== id;
-  if (id !== 'game') $('mvp-video').pause?.();
   if (id !== 'game') $('game').classList.remove('in-combat', 'in-selection', 'in-lobby', 'in-loading', 'in-results');
   document.querySelector('header').hidden = id !== 'home';
 }
@@ -232,6 +232,7 @@ function renderRoom(state) {
   const me = state.players.find(player => player.id === socket.id);
   if (!me) return;
   const host = state.host === socket.id;
+  isRoomHost = host;
   const waiting = state.phase === 'lobby';
   const selecting = state.phase === 'selection';
   if (phase !== state.phase) {
@@ -257,10 +258,8 @@ function renderRoom(state) {
   $('game').classList.toggle('in-loading', phase === 'loading');
   $('game').classList.toggle('in-results', phase === 'ended');
   $('results').hidden = phase !== 'ended';
-  if (phase !== 'ended') $('mvp-video').pause?.();
   $('chat-title').textContent = waiting ? '房間聊天' : '隊伍聊天';
-  $('return-lobby').hidden = $('rematch').hidden = !host;
-  $('results-note').textContent = host ? '' : '等待房主返回大廳或開始下一局。';
+  $('rematch').hidden = !host;
   const full = state.players.length === state.size;
   const unready = state.players.filter(player => !player.ready).length;
   if (selecting) {
@@ -334,7 +333,10 @@ $('lobby-start').onclick = () => sendRoomCommand('start');
 $('ready').onclick = () => sendRoomCommand('ready');
 $('unlock').onclick = () => sendRoomCommand('ready');
 $('start').onclick = () => sendRoomCommand('start');
-$('return-lobby').onclick = () => sendRoomCommand('returnLobby');
+$('return-lobby').onclick = () => {
+  if (isRoomHost) sendRoomCommand('returnLobby');
+  else exitRoom();
+};
 $('rematch').onclick = () => sendRoomCommand('rematch');
 
 socket.on('chat', message => {
@@ -476,36 +478,39 @@ $('arena').onpointerdown = event => {
 
 function renderResults(state) {
   $('winner').textContent = state.winner ? state.winner + '獲勝' : '平手';
-  $('final-blue').textContent = state.score['藍隊'];
-  $('final-red').textContent = state.score['紅隊'];
+  $('results-board').dataset.winner = state.winner || '';
   const mvp = state.results.find(player => player.id === state.mvp);
-  $('mvp-stage').hidden = !mvp;
+  $('mvp-feature').hidden = !mvp;
   if (mvp) {
-    const video = $('mvp-video');
-    video.src = `/art/${mvp.job}-victory.mp4`;
-    video.muted = true;
-    video.setAttribute('aria-label', jobNames[mvp.job] + 'MVP 慶祝影片');
-    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
-      video.play?.().catch(() => {});
-    }
+    const portrait = $('mvp-portrait');
+    portrait.src = `/art/${mvp.job}-model.webp`;
+    portrait.alt = jobNames[mvp.job] + '立繪';
     $('mvp-name').textContent = mvp.name + (mvp.bot ? ' · AI' : '');
     $('mvp-kda').textContent = `${jobNames[mvp.job]} · ${mvp.kills} / ${mvp.deaths} / ${mvp.assists}`;
   }
-  for (const [team, id] of [['藍隊', 'results-blue'], ['紅隊', 'results-red']]) {
-    const roster = $(id);
+
+  for (const [team, key] of [['藍隊', 'blue'], ['紅隊', 'red']]) {
+    $(`final-${key}`).textContent = state.score[team];
+    $(`${key}-outcome`).textContent = !state.winner ? '平手' : state.winner === team ? '勝利' : '敗北';
+    const roster = $(`results-${key}`);
     roster.replaceChildren();
     for (const player of state.results.filter(entry => entry.team === team)) {
-      const card = element('div', '');
-      card.className = 'result-card';
-      card.dataset.mvp = String(player.id === state.mvp);
+      const row = element('tr', '');
+      row.dataset.mvp = String(player.id === state.mvp);
+      const identity = element('th', '');
+      identity.setAttribute('scope', 'row');
+      const profile = element('div', '');
+      profile.className = 'result-player';
       const art = element('img', '');
       art.src = `/art/${player.job}-avatar.webp`;
       art.alt = '';
-      card.append(art, element('strong', player.name + (player.bot ? ' · AI' : '')),
-        element('span', `${player.kills} / ${player.deaths} / ${player.assists}`),
-        element('small', `傷害 ${player.damage}`));
-      if (player.id === state.mvp) card.append(element('small', 'MVP'));
-      roster.append(card);
+      const name = element('strong', player.name + (player.bot ? ' · AI' : ''));
+      profile.append(art, name);
+      if (player.id === state.mvp) profile.append(element('small', 'MVP'));
+      identity.append(profile);
+      row.append(identity, ...[player.kills, player.deaths, player.assists, player.damage]
+        .map(value => element('td', String(value))));
+      roster.append(row);
     }
   }
 }
@@ -569,6 +574,6 @@ function renderFrame(time) {
   const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
   drawLootHud(frame, serverTime);
   drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time);
-  drawMinimap(frame, worldMap, worldChests, socket.id);
+  drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id);
 }
 requestAnimationFrame(renderFrame);

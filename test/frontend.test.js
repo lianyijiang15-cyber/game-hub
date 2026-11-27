@@ -212,7 +212,17 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     id: 'ABCDE0', phase: 'ended', winner: '紅隊', mvp: 'self', score: { 紅隊: 7, 藍隊: 2 },
     results: [{ ...player, kills: 5, deaths: 1, assists: 3, damage: 1100 }]
   });
-  assert.equal(elements.get('mvp-video').src, '/art/mage-victory.mp4');
+  assert.equal(elements.get('mvp-portrait').src, '/art/mage-model.webp');
+  assert.equal(elements.get('mvp-name').textContent, 'Tester');
+  assert.equal(elements.get('red-outcome').textContent, '勝利');
+  assert.equal(elements.get('blue-outcome').textContent, '敗北');
+  assert.deepEqual(elements.get('results-red').children[0].children.slice(1).map(cell => cell.textContent),
+    ['5', '1', '3', '1100']);
+  assert.equal(vm.runInContext('JSON.stringify(minimapView({width: 3200, height: 3200}, {x: 1300, y: 1600}))', context),
+    '{"x":900,"y":1200,"width":800,"height":800}');
+  assert.equal(vm.runInContext('JSON.stringify(minimapView({width: 3200, height: 3200}, {x: 10, y: 3190}))', context),
+    '{"x":0,"y":2400,"width":800,"height":800}');
+  assert.ok(!read('index.html').includes('<video'));
   assert.match(elements.get('mvp-kda').textContent, /5 \/ 1 \/ 3/);
   assert.equal(elements.get('results-red').children[0].dataset.mvp, 'true');
 
