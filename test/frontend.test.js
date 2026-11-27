@@ -439,8 +439,8 @@ test('account menu presents registration, achievements, detailed records and fri
     login: { username: 'Player7', profile: null },
     profile: { profile },
     achievements: {
-      arena: [{ title: '初入戰場', description: '完成一局', count: 0, goal: 1 }],
-      soup: [{ title: '初露鋒芒', description: '解開一題', count: 1, goal: 1 }]
+      arena: [{ rarity: 'hidden', hint: '在樹根旁找找。', count: 0, goal: 1 }],
+      soup: [{ title: '初露鋒芒', description: '解開一題', reward: '入門偵探徽章', count: 1, goal: 1 }]
     },
     history: { arena: [], soup: [{ id: 'saved-soup', title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' }] },
     'history/saved-soup': { kind: 'soup', title: '第一題', result: 'solved', hints: 0, date: '2026-01-01T00:00:00Z' },
@@ -489,9 +489,15 @@ test('account menu presents registration, achievements, detailed records and fri
   await find('menu-history').onclick();
   assert.equal(find('player-title').textContent, '成就圖鑑');
   assert.equal(find('player-history').hidden, true);
-  assert.equal(find('achievement-summary').textContent, '已解鎖 1 / 2');
+  assert.equal(find('achievement-summary').textContent, '已解鎖 1 / 2 · 金幣 0');
   assert.equal(find('arena-achievements').children[0]['data-unlocked'], 'false');
   assert.equal(find('soup-achievements').children[0]['data-unlocked'], 'true');
+  const hiddenBadge = find('arena-achievements').children[0].children[0];
+  assert.equal(hiddenBadge.textContent, '?');
+  hiddenBadge.onclick();
+  assert.match(find('achievement-detail').children[1].textContent, /樹根/);
+  find('soup-achievements').children[0].children[0].onclick();
+  assert.match(find('achievement-detail').children[2].textContent, /入門偵探徽章/);
   await find('achievement-history').onclick();
   const historyButton = find('soup-history').children[0].children[0];
   assert.equal(historyButton.children[0].textContent, '第一題');

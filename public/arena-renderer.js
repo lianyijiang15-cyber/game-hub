@@ -94,6 +94,80 @@ const terrainColors = {
   '#': ['#272e31', '#303837', '#353b3a']
 };
 
+const scenePalettes = {
+  forest: {
+    g: ['#356238', '#396c3a', '#3c703e'], f: ['#244d3e', '#295543', '#2c5a46'],
+    t: ['#234135', '#284837', '#2c4b3c'], w: ['#142f46', '#18374e', '#1b3c52'],
+    b: ['#355b3d', '#385e40', '#3b6342'], p: ['#634430', '#6e4b34', '#72503b'],
+    d: ['#573e31', '#604736', '#65503a'], '#': ['#152b38', '#172e3c', '#193141'],
+    leaves: ['#152c33', '#286052', '#459064', '#7abc74', '#b5d794'], spores: ['#735bd6', '#b3a8ff']
+  },
+  marsh: {
+    g: ['#384d46', '#3c544a', '#415b4f'], f: ['#263941', '#2b464a', '#2f4b4f'],
+    t: ['#283e43', '#2b4349', '#2f4a4d'], w: ['#232b54', '#26335e', '#2a3c66'],
+    b: ['#304f4f', '#34574e', '#385c50'], p: ['#625453', '#6a5b56', '#70615d'],
+    d: ['#4c4553', '#554a5a', '#594d60'], '#': ['#161f39', '#191f3d', '#1a2342'],
+    leaves: ['#182738', '#2b4b5b', '#467479', '#6da399', '#a2d4b0'], spores: ['#42a9b6', '#a4f4de']
+  },
+  ruins: {
+    g: ['#565843', '#5b6047', '#606649'], f: ['#494a38', '#50523c', '#545844'],
+    t: ['#3d4235', '#414833', '#484b37'], w: ['#323642', '#363b48', '#3e414d'],
+    r: ['#555361', '#625d69', '#686271'], p: ['#765c4d', '#816452', '#886c56'],
+    d: ['#5b5145', '#62574b', '#665a50'], '#': ['#262331', '#2d2838', '#322c3b'],
+    leaves: ['#312d2b', '#575139', '#807d50', '#b3a96b', '#dac78f'], spores: ['#b97850', '#ffcd80']
+  },
+  snow: {
+    g: ['#b7cad3', '#c1d4df', '#cbdde6'], f: ['#829fab', '#90aeb8', '#9ab8c0'],
+    t: ['#667e91', '#6e889b', '#7892a5'], b: ['#a9c1cd', '#b0c8d4', '#b9cfdb'],
+    w: ['#355e88', '#3d6a91', '#467499'], r: ['#6c7c90', '#78879a', '#8493a5'],
+    p: ['#938b87', '#9c948f', '#a99e98'], d: ['#9d9ca4', '#a8a8ad', '#b9b8bc'], '#': ['#2b4158', '#32495f', '#3a5167'],
+    leaves: ['#293c50', '#3b646c', '#528281', '#bfd9dd', '#f2f9f4'], spores: ['#447eba', '#e9f9ff']
+  },
+  inferno: {
+    g: ['#50343d', '#583944', '#603d46'], f: ['#422c3a', '#4b3040', '#523745'],
+    t: ['#39252b', '#43292e', '#4c2e32'], b: ['#50343b', '#58373e', '#603a40'],
+    w: ['#a33036', '#c03e31', '#d05530'], r: ['#392d40', '#48374b', '#523d53'],
+    p: ['#67443b', '#744b40', '#7c5143'], d: ['#5b3836', '#683c36', '#703e36'], '#': ['#271b2a', '#2c1c2d', '#342033'],
+    leaves: ['#271b2b', '#573341', '#8d4950', '#bc624f', '#e89263'], spores: ['#df6236', '#ffc170']
+  },
+  fortress: {
+    g: ['#626a54', '#69715a', '#6e775f'], f: ['#4e584b', '#565f51', '#5c6657'],
+    t: ['#434d43', '#4a554b', '#515f53'], b: ['#535c47', '#5d674f', '#657056'],
+    w: ['#344958', '#3c5363', '#445e6e'], r: ['#535867', '#5c6371', '#666e78'],
+    p: ['#77746d', '#807c74', '#888479'], d: ['#645c50', '#706859', '#7a7060'], '#': ['#454b59', '#515966', '#5a6372'],
+    leaves: ['#2b342f', '#455848', '#697757', '#889565', '#b2b780'], spores: ['#b8954a', '#f8d478']
+  }
+};
+
+function paintCanopy(ctx, x, y, hash, palette) {
+  const [shade, dark, mid, leaf, glint] = palette.leaves;
+  rect(ctx, shade, x + 1, y + 24, 30, 6);
+  rect(ctx, '#33271f', x + 10, y + 12, 12, 17);
+  rect(ctx, '#a57e55', x + 13, y + 15, 4, 12);
+  rect(ctx, '#75583e', x + 17, y + 21, 3, 7);
+  rect(ctx, '#967b60', x + 7, y + 27, 7, 2);
+  rect(ctx, '#644836', x + 19, y + 26, 7, 3);
+  for (const [offsetX, offsetY, width] of [[0, 7, 14], [16, 6, 14], [8, 1, 16], [8, 10, 15]]) {
+    const tx = x + offsetX + (hash >>> offsetX) % 3;
+    const ty = y + offsetY;
+    rect(ctx, shade, tx, ty + 3, width, 11);
+    rect(ctx, dark, tx + 1, ty + 2, width - 2, 9);
+    rect(ctx, mid, tx + 2, ty + 1, width - 4, 7);
+    rect(ctx, leaf, tx + 3, ty, width - 7, 4);
+    rect(ctx, glint, tx + 4, ty + 1, 3, 2);
+    rect(ctx, mid, tx + width - 6, ty + 8, 3, 3);
+  }
+}
+
+function paintMushroom(ctx, x, y, shades) {
+  rect(ctx, '#202432', x - 6, y + 4, 13, 3);
+  rect(ctx, '#ccbac3', x - 1, y + 1, 3, 5);
+  rect(ctx, shades[0], x - 7, y - 4, 15, 7);
+  rect(ctx, shades[0], x - 5, y - 7, 11, 5);
+  rect(ctx, shades[1], x - 3, y - 5, 4, 2);
+  rect(ctx, shades[1], x + 3, y - 2, 3, 2);
+}
+
 function tileVariation(x, y) {
   return (Math.imul(x + 11, 73856093) ^ Math.imul(y + 17, 19349663)) >>> 0;
 }
@@ -102,13 +176,14 @@ function paintTile(ctx, map, col, row, x, y) {
   const tile = map.tiles[row][col];
   const size = map.tileSize;
   const hash = tileVariation(col, row);
-  const colors = terrainColors[tile];
+  const palette = scenePalettes[map.scene];
+  const colors = palette?.[tile] ?? terrainColors[tile];
   rect(ctx, colors[hash % 3], x, y, size, size);
   const adjacent = [map.tiles[row - 1]?.[col], map.tiles[row + 1]?.[col],
     map.tiles[row][col - 1], map.tiles[row][col + 1]];
   adjacent.forEach((neighbor, side) => {
     if (!neighbor || neighbor === tile) return;
-    const tint = neighbor === 'w' ? '#69a7a4' : terrainColors[neighbor][1];
+    const tint = neighbor === 'w' && !palette ? '#69a7a4' : (palette?.[neighbor] ?? terrainColors[neighbor])[1];
     for (let offset = 0; offset < size; offset += 4) {
       const depth = 1 + (tileVariation(col * 17 + offset, row * 13 + side) % 4);
       if (side < 2) rect(ctx, tint, x + offset, y + (side ? size - depth : 0), 4, depth);
@@ -117,14 +192,25 @@ function paintTile(ctx, map, col, row, x, y) {
   });
   const dx = x + 5 + (hash % 14);
   const dy = y + 6 + ((hash >>> 8) % 15);
-  if (tile === 'w') {
+  if (tile === 'w' && map.scene === 'inferno') {
+    rect(ctx, '#fb9a48', dx - 2, dy, 8, 2);
+    rect(ctx, '#ffd276', dx + 4, dy + 4, 6, 1);
+  } else if (tile === '#' && map.scene === 'fortress') {
+    for (let level = 0; level < 4; level++) {
+      rect(ctx, '#303642', x, y + level * 8 + 7, 32, 1);
+      rect(ctx, '#303642', x + 8 + level % 2 * 10, y + level * 8, 1, 8);
+      rect(ctx, '#859098', x + 1, y + level * 8 + 1, 7, 1);
+    }
+  } else if (tile === 'w') {
     rect(ctx, '#76b8bc80', dx - 2, dy, 8, 1);
     rect(ctx, '#9acacb55', dx + 4, dy + 4, 7, 1);
   } else if (tile === 'r' || tile === '#') {
     rect(ctx, '#343d39', x + 3, y + 8, 26, 21);
-    rect(ctx, '#838984', x + 5, y + 5, 21, 17);
-    rect(ctx, '#a3a799', x + 7, y + 6, 16, 3);
+    rect(ctx, palette?.r?.[2] ?? '#838984', x + 5, y + 5, 21, 17);
+    rect(ctx, map.scene === 'snow' ? '#d7edf0' : '#a3a799', x + 7, y + 6, 16, 3);
     rect(ctx, '#58635d', x + 13, y + 15, 13, 9);
+  } else if (tile === 't' && palette) {
+    paintCanopy(ctx, x, y, hash, palette);
   } else if (tile === 't') {
     rect(ctx, '#233e29', x + 1, y + 23, 30, 8);
     rect(ctx, '#816346', x + 12, y + 15, 8, 14);
@@ -137,9 +223,9 @@ function paintTile(ctx, map, col, row, x, y) {
       const stem = tileVariation(col * 7 + fern, row);
       const sx = x + 4 + stem % 22;
       const sy = y + 5 + ((stem >>> 6) % 23);
-      rect(ctx, '#294f36', sx - 3, sy, 7, 2);
-      rect(ctx, '#729657', sx - 1, sy - 3, 3, 4);
-      rect(ctx, '#83a460', sx + 1, sy - 1, 3, 1);
+      rect(ctx, palette?.leaves[0] ?? '#294f36', sx - 3, sy, 7, 2);
+      rect(ctx, palette?.leaves[2] ?? '#729657', sx - 1, sy - 3, 3, 4);
+      rect(ctx, palette?.leaves[3] ?? '#83a460', sx + 1, sy - 1, 3, 1);
     }
   } else if (tile === 'b') {
     for (let stem = 0; stem < 11; stem++) {
@@ -147,13 +233,21 @@ function paintTile(ctx, map, col, row, x, y) {
       const sx = x + 2 + (blade % 27);
       const sy = y + 10 + ((blade >>> 11) % 17);
       const height = 5 + ((blade >>> 19) % 8);
-      rect(ctx, '#3c623a', sx, sy - height, 2, height);
-      rect(ctx, blade % 2 ? '#9bad59' : '#7c9c4c', sx - 1, sy - height, 2, 4);
+      rect(ctx, palette?.leaves[1] ?? '#3c623a', sx, sy - height, 2, height);
+      rect(ctx, palette ? palette.leaves[2 + blade % 2] : blade % 2 ? '#9bad59' : '#7c9c4c', sx - 1, sy - height, 2, 4);
     }
   } else {
     rect(ctx, tile === 'g' ? '#9baa65' : '#c1a574', dx, dy, 4, 1);
     rect(ctx, tile === 'g' ? '#385d3c' : '#65503a', dx + 2, dy + 4, 2, 2);
     if (tile === 'g' && hash % 11 === 0) rect(ctx, '#eee3a2', dx + 6, dy - 2, 2, 2);
+  }
+  if (palette && ['f', 'g', 'd'].includes(tile)) {
+    if (hash % 21 === 0) paintMushroom(ctx, dx, dy, palette.spores);
+    else if (hash % 13 === 0) rect(ctx, palette.spores[1], dx + 2, dy + 1, 2, 2);
+    if (map.scene === 'ruins' && hash % 29 === 0) {
+      rect(ctx, '#34313b', dx - 3, dy - 3, 10, 8);
+      rect(ctx, '#aca19b', dx - 2, dy - 3, 7, 3);
+    }
   }
 }
 
@@ -390,7 +484,7 @@ function drawMinimap(state, old, blend, map, chests, localId, tactical = null) {
     minimapGround.width = map.columns;
     minimapGround.height = map.rows;
     const terrain = minimapGround.getContext('2d');
-    map.tiles.forEach((row, y) => [...row].forEach((tile, x) => rect(terrain, terrainColors[tile][1], x, y, 1, 1)));
+    map.tiles.forEach((row, y) => [...row].forEach((tile, x) => rect(terrain, (scenePalettes[map.scene]?.[tile] ?? terrainColors[tile])[1], x, y, 1, 1)));
   }
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(minimapGround, view.x / map.tileSize, view.y / map.tileSize,
@@ -522,6 +616,18 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime, direct
   ctx.translate(-arenaCamera.x, -arenaCamera.y);
   paintWorld(ctx, map, worldWidth, worldHeight);
   for (const chest of state.chests || []) drawChest(ctx, chest, time);
+  if (state.fieldDetail) {
+    const { x, y, visitor } = state.fieldDetail;
+    if (visitor) {
+      rect(ctx, '#292a38', x - 8, y + 4, 16, 4);
+      rect(ctx, '#3d354c', x - 6, y - 10, 12, 16);
+      rect(ctx, '#a09b8a', x - 4, y - 12, 8, 6);
+      rect(ctx, '#d9bf8c', x - 2, y - 8, 4, 4);
+      rect(ctx, '#c0a965', x + 6, y - 7, 2, 12);
+    } else if (scenePalettes[map.scene]) {
+      paintMushroom(ctx, x, y, scenePalettes[map.scene].spores);
+    }
+  }
   const scenario = state.scenario;
   if (scenario?.flag) drawObjective(ctx, scenario.flag, time, true);
   for (const point of scenario?.points ?? []) drawObjective(ctx, point, time, false);

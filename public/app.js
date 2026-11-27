@@ -1012,6 +1012,11 @@ function renderResults(state) {
   }
 }
 
+socket.on('achievementUnlocked', title => {
+  $('loot-toast').textContent = `成就解鎖 · ${title}`;
+  lootToastUntil = performance.now() + 5000;
+});
+
 socket.on('arenaMap', data => {
   if (data.id === room) {
     worldMap = data.map;
@@ -1120,7 +1125,7 @@ socket.on('arenaState', state => {
     if (button.title !== title) button.title = title;
     button.disabled = !alive || !item;
   });
-  $('battle-mode-name').textContent = modeNames[state.mode ?? 'deathmatch'];
+  $('battle-mode-name').textContent = [modeNames[state.mode ?? 'deathmatch'], worldMap?.name].filter(Boolean).join(' · ');
   $('battle').dataset.mode = state.mode ?? 'deathmatch';
   $('red-score').textContent = scoreText(state, '紅隊');
   $('blue-score').textContent = scoreText(state, '藍隊');

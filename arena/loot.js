@@ -61,7 +61,8 @@ function generateChests(world, random = Math.random, { camps, objectives = [] } 
     }
   }
   const chests = [];
-  while (candidates.length && chests.length < chestCount) {
+  const limit = world.scene ? 80 : chestCount;
+  while (candidates.length && chests.length < limit) {
     const index = Math.floor(random() * candidates.length);
     const point = candidates[index];
     candidates[index] = candidates.at(-1);
@@ -97,6 +98,7 @@ function openChest(room, player, id, now, canReach, random = Math.random) {
   const slot = player.inventory.indexOf(null);
   if (slot < 0) return { error: '道具欄已滿，請先使用一個道具' };
   chest.openedAt = now;
+  player.chestsOpened = (player.chestsOpened ?? 0) + 1;
   const rewards = loot[chest.quality];
   const item = rewards[Math.floor(random() * rewards.length)];
   player.inventory[slot] = { ...item, quality: chest.quality };

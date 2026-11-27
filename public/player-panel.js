@@ -14,21 +14,39 @@ const showPlayerPanel = (() => {
     $(id).replaceChildren(...entries);
   }
 
-  function renderAchievements({ arena, soup }) {
+  function renderAchievements({ arena, soup, coins = 0 }) {
     const entries = [...arena, ...soup];
     const unlocked = entries.filter(item => item.count >= item.goal).length;
-    $('achievement-summary').textContent = `已解鎖 ${unlocked} / ${entries.length}`;
-    const card = item => {
+    $('achievement-summary').textContent = `已解鎖 ${unlocked} / ${entries.length} · 金幣 ${coins}`;
+    const detail = $('achievement-detail');
+    detail.replaceChildren(element('p', '選擇一格查看詳細資訊。'));
+    let selected;
+    const glyphs = ['✦', '◆', '⚑', '✷', '✚', '▲', '⌘', '✧'];
+    const card = (item, index) => {
       const unlocked = item.count >= item.goal;
+      const rarity = item.rarity ?? 'standard';
       const row = element('li', '');
+      const label = unlocked ? item.title : rarity === 'hidden' ? '隱藏成就' : '未解鎖成就';
       row.setAttribute('data-unlocked', String(unlocked));
-      const status = unlocked ? '✓ 已解鎖' : '未解鎖';
-      row.append(element('strong', item.title), element('span', item.description),
-        element('small', `${status} · ${Math.min(item.count, item.goal)} / ${item.goal}`));
+      row.setAttribute('data-rarity', rarity);
+      const button = element('button', unlocked ? glyphs[index % glyphs.length] : '?');
+      button.type = 'button';
+      button.setAttribute('aria-label', label);
+      button.setAttribute('aria-pressed', 'false');
+      button.onclick = () => {
+        selected?.setAttribute('aria-pressed', 'false');
+        selected = button;
+        button.setAttribute('aria-pressed', 'true');
+        const lines = unlocked
+          ? [element('p', item.description), element('p', '獎勵　' + item.reward)]
+          : [element('p', rarity === 'hidden' ? item.hint : `進度 ${item.count} / ${item.goal}`)];
+        detail.replaceChildren(element('strong', label), ...lines);
+      };
+      row.append(button);
       return row;
     };
     rows('arena-achievements', arena, '目前沒有對戰成就。', card);
-    rows('soup-achievements', soup, '目前沒有推理成就。', card);
+    rows('soup-achievements', soup, '目前沒有探索或推理成就。', card);
   }
 
   function historyRow(item, title, summary) {
@@ -209,6 +227,7 @@ const showPlayerPanel = (() => {
     activePanel = section;
     selectPanel(section);
     $('achievement-summary').textContent = '';
+    $('achievement-detail').replaceChildren();
     for (const id of ['arena-achievements', 'soup-achievements', 'arena-history', 'soup-history',
       'friend-list', 'friend-sent', 'friend-incoming']) $(id).replaceChildren();
     panel.showModal();

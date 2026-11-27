@@ -153,7 +153,9 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(rooms.get(id).phase, 'loading');
   const [initial, shared, firstMap, sharedMap] = await Promise.all([hostFrame, guestFrame, hostMap, guestMap]);
   assert.deepEqual(firstMap, sharedMap);
-  assert.equal(firstMap.map.tiles.length, 100);
+  assert.deepEqual([firstMap.map.columns, firstMap.map.rows, firstMap.map.width], [144, 144, 4608]);
+  assert.equal(firstMap.chests.length, 80);
+  assert.equal(firstMap.map.secrets, undefined);
   assert.equal(initial.map, undefined);
   assert.equal(initial.now, shared.now);
   assert.equal(initial.players.filter(player => player.team === '紅隊').length, 5);
@@ -206,6 +208,13 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal([...hostLoot.inventory, ...guestLoot.inventory].filter(Boolean).length, 1);
   assert.ok(!hostLoot.players.some(player => Object.hasOwn(player, 'inventory')));
 
+  const secret = { x: hostPlayer.x, y: hostPlayer.y, kind: 'visitor', found: new Set() };
+  liveRoom.secrets.active = secret;
+  const achievement = receive(host, 'achievementUnlocked');
+  assert.equal(await achievement, '神秘訪客');
+  const discoveries = await (await fetch(base + '/api/account/achievements', { headers: { Cookie: cookie } })).json();
+  assert.ok(discoveries.soup.some(item => item.id === 'visitor' && item.count === 1));
+
   const final = receive(guest, 'arenaState', state => state.phase === 'ended');
   liveRoom.endsAt = 0;
   const result = await final;
@@ -248,7 +257,9 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const again = receive(guest, 'arenaState', state => state.phase === 'playing');
   assert.equal((await send(host, 'start')).ok, true);
   assert.deepEqual((await again).score, { 紅隊: 0, 藍隊: 0 });
-  assert.notDeepEqual((await rematchMap).map.tiles, firstMap.map.tiles);
+  const nextMap = (await rematchMap).map;
+  assert.notDeepEqual(nextMap.tiles, firstMap.map.tiles);
+  assert.notEqual(nextMap.scene, firstMap.map.scene);
 
   const replacement = receive(guest, 'room', room => room.host === guest.id);
   host.disconnect();

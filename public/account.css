@@ -88,7 +88,43 @@
 
 .achievement-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 #achievement-summary { color: #edd7aa; }
-#player-dialog .achievement-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 9px; }
-#player-dialog .achievement-grid li { padding: 11px; border: 1px solid #55627b; }
-#player-dialog .achievement-grid li[data-unlocked="true"] { border-color: #d6ae6b; background: #30283a; }
-#player-dialog .achievement-grid li[data-unlocked="true"] small { color: #ffdf99; }
+#player-dialog:has(#player-achievements:not([hidden])) { width: min(820px, calc(100% - 24px)); }
+.achievement-book {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: clamp(5px, 1.5vw, 12px);
+  border: 2px solid #aa8e59;
+  border-radius: 8px 8px 12px 12px;
+  background: #293851;
+  box-shadow: 0 5px #111b2a, 0 7px #6c523e;
+}
+.achievement-page {
+  padding: clamp(6px, 3vw, 25px);
+  min-width: 0;
+  border: 3px double #ad8653;
+  min-height: 230px;
+  background: radial-gradient(ellipse at 36% 24%, #f4e7c3, #dfcba0 81%);
+  color: #322438;
+}
+.achievement-page:first-child { border-radius: 8px 1px 1px 8px; box-shadow: inset -9px 0 12px -12px #3d2d26; }
+.achievement-page:last-child { border-radius: 1px 8px 8px 1px; box-shadow: inset 9px 0 12px -12px #3d2d26; }
+.achievement-page h3 { color: #55372c; font-size: clamp(.87rem, 2.2vw, 1.15rem); margin: 0 0 8px; text-align: center; }
+#player-dialog .achievement-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(3px, 1vw, 8px); margin: 0; }
+#player-dialog .achievement-grid li { padding: 0; border: 0; background: none; }
+.achievement-grid button {
+  margin: 0; padding: 0; width: 100%; aspect-ratio: 1;
+  display: grid; place-items: center;
+  border: 2px solid #686267; border-radius: 2px;
+  background: repeating-linear-gradient(0deg, #29303b, #29303b 3px, #2d3540 3px, #2d3540 5px);
+  color: #a6a6ad; font: 900 clamp(.84rem, 4vw, 2rem) monospace;
+  text-shadow: 2px 2px #171e28;
+}
+.achievement-grid [data-rarity="hidden"] button { color: #d5b66d; }
+.achievement-grid [data-unlocked="true"] button { color: #ffda81; border-color: #98744a; background: #39485e; }
+.achievement-grid [data-rarity="legendary"] button { color: #eac5ff; border-color: #b477d0; background: #482f5a; }
+.achievement-grid button:hover, .achievement-grid button:focus-visible, .achievement-grid button[aria-pressed="true"] {
+  outline: 2px solid #9d5c34;
+  outline-offset: 1px;
+}
+.achievement-detail { margin-top: 16px; border-left: 3px solid #d6ae6b; padding: 9px 12px; background: #222d41; min-height: 3rem; }
+.achievement-detail p { margin: 6px 0; }

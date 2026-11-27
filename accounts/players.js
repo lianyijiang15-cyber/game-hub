@@ -3,6 +3,7 @@
 const { randomInt, randomUUID } = require('node:crypto');
 const { startSoupGame, playSoup, soupView, soupDifficulties, soupCase } = require('../public/soup-bank');
 
+const { achievementCatalog, secretTitles } = require('./achievements');
 const { checkSoup } = require('../ai/soup-host');
 
 const idPattern = /^[A-Z]{2}\d{6}$/;
@@ -16,29 +17,6 @@ function playerId(accounts) {
     id = letters + String(randomInt(1_000_000)).padStart(6, '0');
   } while (Object.values(accounts).some(account => account.profile?.id === id));
   return id;
-}
-
-function achievementProgress(account) {
-  const arena = account.arenaHistory ?? [];
-  const wins = arena.filter(record => record.result === 'win');
-  const solved = (account.soupHistory ?? []).filter(record => record.result === 'solved');
-  const achievement = (id, title, description, count, goal = 1) => ({ id, title, description, count, goal });
-  return {
-    arena: [
-      achievement('first-match', '初入戰場', '完成一場像素衝突對局。', arena.length),
-      achievement('first-win', '旗開得勝', '贏得一場像素衝突對局。', wins.length),
-      achievement('flag-win', '拔旗先鋒', '在拔旗戰中獲勝。', wins.filter(record => record.mode === 'flag').length),
-      achievement('survival-win', '生存專家', '在生存戰中獲勝。', wins.filter(record => record.mode === 'survival').length),
-      achievement('control-win', '據點守衛', '在據點戰中獲勝。', wins.filter(record => record.mode === 'control').length),
-      achievement('assists', '並肩作戰', '累計取得 20 次助攻。', arena.reduce((sum, record) => sum + (record.assists ?? 0), 0), 20)
-    ],
-    soup: [
-      achievement('first-case', '初露鋒芒', '找齊任一題的全部線索。', solved.length),
-      achievement('three-cases', '連環解謎', '完成 3 次推理。', solved.length, 3),
-      achievement('hard-case', '疑案剋星', '完成一題困難推理。', solved.filter(record => record.difficulty === '困難').length),
-      achievement('no-hints', '獨立推理', '完成推理且沒有使用提示。', solved.filter(record => record.hints === 0).length)
-    ]
-  };
 }
 
 function mountPlayerRoutes(router, store, session, setSessionProfile) {
@@ -73,7 +51,7 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
 
   route('get', '/achievements', async (_req, res, user) => {
     const account = (await store.read())[user.key];
-    res.json(achievementProgress(account));
+    res.json(achievementCatalog(account));
   });
 
   route('get', '/history', async (_req, res, user) => {
@@ -123,7 +101,7 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
     playSoup(game, action, question, verdict);
     const view = soupView(game);
     if (game.result && !game.recorded) {
-      const entry = { id, title: view.title, result: game.result, hints: view.hints, progress: view.progress,
+      const entry = { id, storyId: view.storyId, title: view.title, result: game.result, hints: view.hints, progress: view.progress,
         clues: view.clues, difficulty: game.story.difficulty, date: new Date().toISOString() };
       await store.update(accounts => {
         const account = accounts[user.key];
@@ -207,9 +185,11 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
       for (const [key, player] of participants) {
         const account = accounts[key];
         if (!account || account.arenaHistory?.some(record => record.id === matchId)) continue;
-        const { team, job, hero, kills, deaths, assists, damage } = player;
+        const { team, job, hero, kills, deaths, assists, damage, chestsOpened, clutchKills,
+          finished, finisher, survived, loneSurvivor } = player;
         (account.arenaHistory ??= []).unshift({
-          id: matchId, date, team, job, hero, kills, deaths, assists, damage, score: result.score, mode: result.mode, detail,
+          id: matchId, date, team, job, hero, kills, deaths, assists, damage, chestsOpened, clutchKills,
+          finished, finisher, survived, loneSurvivor, score: result.score, mode: result.mode, detail,
           result: result.winner === null ? 'draw' : team === result.winner ? 'win' : 'loss'
         });
       }
@@ -217,7 +197,17 @@ function mountPlayerRoutes(router, store, session, setSessionProfile) {
     });
   }
 
-  return { saveArena };
+  function recordSecret(key, id) {
+    if (!Object.hasOwn(secretTitles, id)) return Promise.resolve();
+    return store.update(accounts => {
+      const account = accounts[key];
+      if (!account || account.secrets?.[id]) return {};
+      (account.secrets ??= {})[id] = new Date().toISOString();
+      return { changed: true, value: secretTitles[id] };
+    });
+  }
+
+  return { saveArena, recordSecret };
 }
 
 module.exports = { mountPlayerRoutes };

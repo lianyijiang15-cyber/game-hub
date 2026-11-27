@@ -8,6 +8,7 @@ const { performance } = require('node:perf_hooks');
 const { Server } = require('socket.io');
 const combat = require('./arena/combat');
 const modes = require('./arena/modes');
+const { sceneForSeed } = require('./arena/world');
 const { botInput, route } = require('./arena/bots');
 const { createAccountRouter } = require('./accounts/router');
 
@@ -111,7 +112,10 @@ function leave(socket, reconnect = false) {
 function runMatch(room) {
   clearTimeout(room.expiry);
   for (const player of room.players) if (player.bot) player.ticket = null;
-  combat.start(room, now(), crypto.randomBytes(4).readUInt32LE());
+  const seed = crypto.randomBytes(4).readUInt32LE();
+  const scene = sceneForSeed(seed);
+  combat.start(room, now(), seed, scene === room.lastScene ? sceneForSeed(seed + 1) : scene);
+  room.lastScene = room.map.scene;
   room.matchId = crypto.randomUUID();
   for (const player of room.roster) player.statsAtDeparture = null;
   room.phase = 'loading';
@@ -143,12 +147,17 @@ function runMatch(room) {
     }
     if (room.phase === 'playing') combat.tick(room, time, Math.min((time - lastTick) / 1000, 0.05), botInput, route);
     lastTick = time;
+    for (const discovery of room.secrets?.discoveries.splice(0) ?? []) {
+      accounts.recordSecret(discovery.accountKey, discovery.kind).then(title => {
+        if (title) io.to(discovery.playerId).emit('achievementUnlocked', title);
+      }).catch(error => console.error('Could not save achievement:', error.code ?? error.name));
+    }
     if (room.phase === 'ended') {
       clearInterval(room.timer);
       room.timer = null;
       const result = combat.snapshot(room, time);
       const participants = new Map(room.roster.filter(player => player.accountKey && player.playedMatch === room.matchId)
-        .map(player => [player.accountKey, player.statsAtDeparture ?? playerStats(player)]));
+        .map(player => [player.accountKey, matchStats(room, player)]));
       result.duration = Math.max(0, Math.min(time, room.endsAt) - room.matchStartedAt);
       accounts.saveArena(room.matchId, participants, result).catch(error => {
         console.error('Could not save arena history:', error.code ?? error.name);
@@ -171,8 +180,16 @@ function runMatch(room) {
   }, 50);
 }
 
-function playerStats({ team, job, hero, kills, deaths, assists, damage }) {
-  return { team, job, hero, kills, deaths, assists, damage };
+function playerStats({ team, job, hero, kills, deaths, assists, damage, chestsOpened, clutchKills }) {
+  return { team, job, hero, kills, deaths, assists, damage, chestsOpened, clutchKills };
+}
+
+function matchStats(room, player) {
+  if (player.statsAtDeparture) return player.statsAtDeparture;
+  const finished = !player.bot;
+  const survived = finished && player.alive;
+  const loneSurvivor = survived && room.roster.filter(other => other.team === player.team && other.alive).length === 1;
+  return { ...playerStats(player), finished, survived, finisher: finished && player.finisher, loneSurvivor };
 }
 
 function join(socket, room, name, accountKey) {

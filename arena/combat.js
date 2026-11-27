@@ -5,6 +5,7 @@ const { halfWidth, halfHeight, terrainBlocked, playerBlocked, movePlayer } = req
 const loot = require('./loot');
 const modes = require('./modes');
 const skill = require('./hero-skills');
+const { createSecrets, tickSecrets, lookForSecret } = require('./secrets');
 const { heroes, playableHeroes, adjustedSpeed } = require('../public/heroes');
 const map = generateWorld();
 const visionRadius = 360;
@@ -127,10 +128,10 @@ function assignTeams(players) {
   });
 }
 
-function start(room, now, seed) {
+function start(room, now, seed, scene) {
   if (room.phase !== 'selection') assignTeams(room.players);
   Object.assign(room, {
-    phase: 'playing', map: seed === undefined ? map : generateWorld(seed), score: { [teams[0]]: 0, [teams[1]]: 0 }, effects: [],
+    phase: 'playing', map: seed === undefined ? map : generateWorld(seed, scene), score: { [teams[0]]: 0, [teams[1]]: 0 }, effects: [],
     projectiles: [], kills: [], sequence: 0, endsAt: now + modes.durations[modes.modeOf(room)], winner: null
   });
   modes.setup(room, room.map.seed);
@@ -138,12 +139,13 @@ function start(room, now, seed) {
   room.chests = loot.generateChests(room.map, Math.random, scenario ? {
     camps: scenario.camps, objectives: [...scenario.flags, ...scenario.supplies]
   } : undefined);
+  room.secrets = createSecrets(room.map);
   room.roster = [...room.players];
   room.roster.forEach(player => {
     Object.assign(player, {
       alive: false,
       inventory: Array(loot.inventorySize).fill(null),
-      kills: 0, deaths: 0, assists: 0, damage: 0, drainAt: 0, role: null
+      kills: 0, deaths: 0, assists: 0, damage: 0, chestsOpened: 0, clutchKills: 0, finisher: false, drainAt: 0, role: null
     });
   });
   room.roster.forEach(player => spawn(room, player, now));
@@ -159,6 +161,7 @@ function defeat(room, target, source, now, attackerName) {
   target.deaths++;
   if (source) {
     source.kills++;
+    if (source.alive && source.hp < stats(source).hp * .10) source.clutchKills++;
     for (const [teammate, hitAt] of target.contributors) {
       if (teammate !== source && teammate.team === source.team && now - hitAt <= 8000) teammate.assists++;
     }
@@ -168,7 +171,10 @@ function defeat(room, target, source, now, attackerName) {
   modes.eliminate(room, target, source, now);
   room.kills.push({ id: ++room.sequence, attacker: attackerName, victim: target.name, team: source?.team ?? null });
   if (room.kills.length > 5) room.kills.shift();
-  if (source && modes.modeOf(room) === 'deathmatch' && room.score[source.team] >= 20) modes.finish(room, now);
+  if (source && modes.modeOf(room) === 'deathmatch' && room.score[source.team] >= 20) {
+    source.finisher = true;
+    modes.finish(room, now);
+  }
 }
 
 function attackTargets(room) { return room.players.concat(room.scenario?.beasts ?? []); }
@@ -343,6 +349,7 @@ function tick(room, now, dt, botInput, route) {
     room.phase === 'playing' && advanceProjectile(room, projectile, dt, now));
   room.effects = room.effects.filter(item => item.until > now);
   if (room.phase === 'playing' && room.scenario?.mode === 'control') modes.tick(room, now, dt, hooks);
+  tickSecrets(room, now, clearLine);
 }
 
 function openChest(room, player, id, now) {
@@ -418,6 +425,7 @@ function snapshot(room, now, viewer = null) {
     remaining: Math.max(0, room.endsAt - now), effects: room.effects.filter(item => sees(item) &&
       (!local || !room.players.some(player => (player.id === item.actor || player.id === item.target) &&
         !canTarget(viewer, player, now)))), kills: room.kills,
+    fieldDetail: local ? lookForSecret(room, viewer, clearLine) : null,
     chests, nearbyChest, openedChestIds: room.chests.filter(chest => chest.openedAt !== null).map(chest => chest.id),
     inventory: local ? viewer.inventory.map(item => item && { id: item.id, label: item.label, quality: item.quality,
       description: loot.describeItem(item, stats(viewer).hp) }) : [],
