@@ -171,6 +171,13 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
   object-fit: cover; margin-bottom: 5px; border: 1px solid #a293aa;
   border-radius: 7px; background: #343143; box-shadow: 0 2px 6px #070d19a6;
 }
+.meme-portrait {
+  background-image: url('/art/avatars/lobby-memes.webp');
+  background-repeat: no-repeat; background-size: 500% 400%;
+  background-position: var(--portrait-x) var(--portrait-y);
+  image-rendering: pixelated; overflow: hidden;
+}
+.meme-portrait img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; image-rendering: auto; }
 .bot-portrait {
   background-image: url('/art/heroes/adventure-bots.webp'), var(--portrait-fallback);
   background-repeat: no-repeat; background-size: 500% 400%, cover;

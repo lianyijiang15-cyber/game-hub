@@ -74,7 +74,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.match(html, /<section id="home" hidden\b[^>]*>/);
   assert.match(html, /id="menu-soup-name">海龜湯/);
   assert.match(html, /id="room-guide"[^>]*aria-haspopup="dialog"/);
-  for (const path of ['/arena-guide.js', '/casebook.css', '/art/loot/item-icons.webp', '/art/achievements/emblems.webp', '/art/heroes/adventure-bots.webp', '/art/comics/clock.webp',
+  for (const path of ['/arena-guide.js', '/casebook.css', '/art/loot/item-icons.webp', '/art/achievements/emblems.webp', '/art/heroes/adventure-bots.webp', '/art/avatars/lobby-memes.webp', '/art/comics/clock.webp',
     '/art/comics/class.webp', '/art/comics/snow.webp', '/art/comics/hotel-call.webp',
     '/art/comics/theater-shadow.webp', '/art/comics/blackout-window.webp', '/art/comics/laundry-knock.webp']) {
     assert.equal((await fetch(base + path, { method: 'HEAD' })).status, 200, path);
@@ -117,13 +117,13 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(joined.id, id);
   assert.equal(joined.room.players[0].avatar, avatar);
   assert.equal(joined.room.players[1].avatar, undefined);
-  const guestPortrait = joined.room.players[1].lobbyHero;
-  assert.ok(combat.playableHeroes[guestPortrait]);
-  const hostPortrait = created.players[0].lobbyHero;
-  assert.ok(combat.playableHeroes[hostPortrait]);
+  const guestPortrait = joined.room.players[1].lobbyMeme;
+  assert.ok(Number.isInteger(guestPortrait) && guestPortrait >= 0 && guestPortrait < 20);
+  const hostPortrait = created.players[0].lobbyMeme;
+  assert.ok(Number.isInteger(hostPortrait) && hostPortrait >= 0 && hostPortrait < 20);
   const removedPhoto = receive(guest, 'room', room => room.players[0].avatar === undefined);
   assert.equal((await accountAction('avatar', { photo: null }, cookie)).status, 200);
-  assert.equal((await removedPhoto).players[0].lobbyHero, hostPortrait);
+  assert.equal((await removedPhoto).players[0].lobbyMeme, hostPortrait);
   const replacedPhoto = receive(guest, 'room', room => room.players[0].avatar === avatar);
   assert.equal((await accountAction('avatar', { photo: avatar }, cookie)).status, 200);
   await replacedPhoto;
@@ -299,11 +299,11 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.ok((await send(guest, 'rematch')).error);
   assert.equal((await send(host, 'rematch')).ok, true);
   const returned = await Promise.all(waiting);
-  const [newHostPortrait, newGuestPortrait] = returned[0].players.slice(0, 2).map(player => player.lobbyHero);
+  const [newHostPortrait, newGuestPortrait] = returned[0].players.slice(0, 2).map(player => player.lobbyMeme);
   assert.notEqual(newHostPortrait, hostPortrait);
   assert.notEqual(newGuestPortrait, guestPortrait);
-  assert.equal(returned[1].players[0].lobbyHero, newHostPortrait);
-  assert.equal(returned[1].players[1].lobbyHero, newGuestPortrait);
+  assert.equal(returned[1].players[0].lobbyMeme, newHostPortrait);
+  assert.equal(returned[1].players[1].lobbyMeme, newGuestPortrait);
   assert.equal(returned[0].players[0].avatar, avatar);
   for (const state of returned) {
     assert.equal(state.host, host.id);

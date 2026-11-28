@@ -637,22 +637,34 @@ function renderRoom(state) {
     const tile = element('div', '');
     tile.className = 'player-tile';
     tile.dataset.ready = String(player.ready);
-    const fallback = heroArt(player.lobbyHero ?? player.hero ?? 'sky', 'avatar');
-    const persona = player.botPersona;
-    const themed = player.bot && Number.isInteger(persona) && persona >= 0 && persona < 20;
-    const portrait = element(themed ? 'span' : 'img', '');
-    portrait.className = 'player-avatar';
-    if (themed) {
-      portrait.className += ' bot-portrait';
+    let portrait;
+    if (!player.bot) {
+      const meme = player.lobbyMeme ?? 0;
+      portrait = element('span', '');
+      portrait.className = 'player-avatar meme-portrait';
       portrait.setAttribute('aria-hidden', 'true');
-      portrait.setAttribute('style', `--portrait-x:${persona % 5 * 25}%;--portrait-y:${Math.floor(persona / 5) * 100 / 3}%;--portrait-fallback:url("${fallback}")`);
+      portrait.setAttribute('style', `--portrait-x:${meme % 5 * 25}%;--portrait-y:${Math.floor(meme / 5) * 100 / 3}%`);
+      if (player.avatar) {
+        const picture = element('img', '');
+        picture.src = player.avatar;
+        picture.alt = '';
+        picture.onerror = () => { picture.hidden = true; };
+        portrait.append(picture);
+      }
     } else {
-      portrait.src = player.avatar || fallback;
-      portrait.alt = '';
-      portrait.onerror = () => {
-        portrait.onerror = null;
+      const fallback = heroArt(player.lobbyHero ?? 'sky', 'avatar');
+      const persona = player.botPersona;
+      const themed = Number.isInteger(persona) && persona >= 0 && persona < 20;
+      portrait = element(themed ? 'span' : 'img', '');
+      portrait.className = 'player-avatar';
+      if (themed) {
+        portrait.className += ' bot-portrait';
+        portrait.setAttribute('aria-hidden', 'true');
+        portrait.setAttribute('style', `--portrait-x:${persona % 5 * 25}%;--portrait-y:${Math.floor(persona / 5) * 100 / 3}%;--portrait-fallback:url("${fallback}")`);
+      } else {
         portrait.src = fallback;
-      };
+        portrait.alt = '';
+      }
     }
     tile.append(portrait);
     tile.append(element('strong', player.name),
