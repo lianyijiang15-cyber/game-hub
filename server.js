@@ -27,6 +27,7 @@ const rooms = new Map();
 const invites = new Map();
 const inviteDuration = 3 * 60_000;
 const seats = 10;
+const lobbyPortraits = Object.keys(combat.playableHeroes);
 const maxRooms = 50;
 const reconnectWindow = 45000;
 const loadingDuration = process.env.NODE_ENV === 'test' ? 200 : 3500;
@@ -45,9 +46,9 @@ function roomState(room, viewerId) {
   return {
     id: room.id, host: room.host, size: seats, phase: room.phase, mode: room.mode,
     loadingRemaining: Math.max(0, (room.loadingUntil ?? 0) - now()),
-    players: room.players.map(({ id, name, job, hero, ready, bot, team, slot, avatar, botPersona }) => ({
+    players: room.players.map(({ id, name, job, hero, ready, bot, team, slot, avatar, lobbyHero, botPersona }) => ({
       id, name, ready, bot,
-      ...(room.phase === 'lobby' ? bot ? { lobbyHero: hero, botPersona } : avatar ? { avatar } : {} : {}),
+      ...(room.phase === 'lobby' ? bot ? { lobbyHero: hero, botPersona } : { lobbyHero, ...(avatar && { avatar }) } : {}),
       ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, hero, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot, hero) } : {}) } : id === viewerId ? { job, hero } : {})
     }))
   };
@@ -264,9 +265,14 @@ function matchStats(room, player) {
   return { ...playerStats(player), finished, survived, finisher: finished && player.finisher, loneSurvivor };
 }
 
+function randomLobbyPortrait(previous) {
+  const choices = lobbyPortraits.filter(hero => hero !== previous);
+  return choices[crypto.randomInt(choices.length)];
+}
+
 function join(socket, room, name, account) {
   const ticket = crypto.randomUUID();
-  room.players.push({ id: socket.id, name, accountKey: account?.key, avatar: account?.avatar, job: 'warrior', hero: 'sky', ready: false, bot: false, ticket });
+  room.players.push({ id: socket.id, name, accountKey: account?.key, avatar: account?.avatar, lobbyHero: randomLobbyPortrait(), job: 'warrior', hero: 'sky', ready: false, bot: false, ticket });
   socket.join(channel(room));
   socket.data.room = room.id;
   return ticket;
@@ -470,9 +476,12 @@ io.on('connection', socket => {
   function returnToLobby(room) {
     clearTimeout(room.expiry);
     for (const player of room.players) {
-      if (!player.bot) continue;
-      player.ticket = null;
-      player.accountKey = null;
+      if (player.bot) {
+        player.ticket = null;
+        player.accountKey = null;
+      } else {
+        player.lobbyHero = randomLobbyPortrait(player.lobbyHero);
+      }
     }
     room.phase = 'lobby';
     room.players.forEach(player => { player.ready = player.bot; });

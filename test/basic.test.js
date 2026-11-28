@@ -117,9 +117,13 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(joined.id, id);
   assert.equal(joined.room.players[0].avatar, avatar);
   assert.equal(joined.room.players[1].avatar, undefined);
+  const guestPortrait = joined.room.players[1].lobbyHero;
+  assert.ok(combat.playableHeroes[guestPortrait]);
+  const hostPortrait = created.players[0].lobbyHero;
+  assert.ok(combat.playableHeroes[hostPortrait]);
   const removedPhoto = receive(guest, 'room', room => room.players[0].avatar === undefined);
   assert.equal((await accountAction('avatar', { photo: null }, cookie)).status, 200);
-  await removedPhoto;
+  assert.equal((await removedPhoto).players[0].lobbyHero, hostPortrait);
   const replacedPhoto = receive(guest, 'room', room => room.players[0].avatar === avatar);
   assert.equal((await accountAction('avatar', { photo: avatar }, cookie)).status, 200);
   await replacedPhoto;
@@ -294,7 +298,14 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const waiting = [host, guest].map(client => receive(client, 'room', state => state.id === id && state.phase === 'lobby'));
   assert.ok((await send(guest, 'rematch')).error);
   assert.equal((await send(host, 'rematch')).ok, true);
-  for (const state of await Promise.all(waiting)) {
+  const returned = await Promise.all(waiting);
+  const [newHostPortrait, newGuestPortrait] = returned[0].players.slice(0, 2).map(player => player.lobbyHero);
+  assert.notEqual(newHostPortrait, hostPortrait);
+  assert.notEqual(newGuestPortrait, guestPortrait);
+  assert.equal(returned[1].players[0].lobbyHero, newHostPortrait);
+  assert.equal(returned[1].players[1].lobbyHero, newGuestPortrait);
+  assert.equal(returned[0].players[0].avatar, avatar);
+  for (const state of returned) {
     assert.equal(state.host, host.id);
     assert.deepEqual(state.players.map(p => p.id), retainedPlayers.map(p => p.id));
     assert.ok(state.players.every(p => p.ready === p.bot));
