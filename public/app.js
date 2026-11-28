@@ -289,8 +289,9 @@ let roomRequest = 0;
 const keys = new Set();
 const touchPad = $('touch-movement');
 const touchStick = $('touch-stick');
-const coarsePointer = window.matchMedia?.('(any-pointer: coarse)');
+const arenaCanvas = $('arena');
 let touchPointer = null;
+let touchOrigin;
 let touchVector = { x: 0, y: 0 };
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
 let spectatorTarget = null;
@@ -763,8 +764,10 @@ function resetTouch() {
   const pointer = touchPointer;
   touchPointer = null;
   touchVector = { x: 0, y: 0 };
+  touchOrigin = undefined;
+  touchPad.hidden = true;
   touchStick.setAttribute('style', '');
-  if (pointer !== null && touchPad.hasPointerCapture?.(pointer)) touchPad.releasePointerCapture(pointer);
+  if (pointer !== null && arenaCanvas.hasPointerCapture?.(pointer)) arenaCanvas.releasePointerCapture(pointer);
 }
 
 function stopMovement() {
@@ -775,10 +778,9 @@ function stopMovement() {
 
 function moveTouch(event) {
   if (event.pointerId !== touchPointer) return;
-  const { left, top, width, height } = touchPad.getBoundingClientRect();
-  const radius = Math.min(width, height) * .34;
-  const x = (event.clientX - left - width / 2) / radius;
-  const y = (event.clientY - top - height / 2) / radius;
+  const { x: originX, y: originY, radius } = touchOrigin;
+  const x = (event.clientX - originX) / radius;
+  const y = (event.clientY - originY) / radius;
   const length = Math.hypot(x, y);
   const divisor = Math.max(1, length);
   touchVector = length < .12 ? { x: 0, y: 0 } : { x: x / divisor, y: y / divisor };
@@ -787,15 +789,18 @@ function moveTouch(event) {
   sendMovement();
 }
 
-touchPad.onpointerdown = event => {
-  if (event.pointerType !== 'touch' || touchPointer !== null || phase !== 'playing' || fullMap || !localPlayer()) return;
+function beginTouch(event, bounds) {
+  if (touchPointer !== null || phase !== 'playing' || fullMap || !localPlayer()) return;
   event.preventDefault();
   touchPointer = event.pointerId;
-  touchPad.setPointerCapture(touchPointer);
+  touchPad.setAttribute('style', `left:${event.clientX - bounds.left}px;top:${event.clientY - bounds.top}px`);
+  touchPad.hidden = false;
+  touchOrigin = { x: event.clientX, y: event.clientY, radius: Math.max(1, touchPad.getBoundingClientRect().width * .34) };
+  arenaCanvas.setPointerCapture(touchPointer);
   moveTouch(event);
-};
-touchPad.onpointermove = moveTouch;
-touchPad.onpointerup = touchPad.onpointercancel = touchPad.onlostpointercapture = event => {
+}
+
+arenaCanvas.onpointerup = arenaCanvas.onpointercancel = arenaCanvas.onlostpointercapture = event => {
   if (event.pointerId !== touchPointer) return;
   resetTouch();
   if (keys.size) sendMovement();
@@ -973,6 +978,7 @@ window.addEventListener('keyup', event => {
   else stopMovement();
 });
 window.addEventListener('blur', stopMovement);
+window.addEventListener('resize', () => { if (touchPointer !== null) stopMovement(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopMovement(); });
 setInterval(() => { if (keys.size || touchPointer !== null) sendMovement(); }, 50);
 
@@ -984,9 +990,21 @@ function updateAim(event) {
     y: Math.max(0, Math.min(canvas.height, (event.clientY - bounds.top) * canvas.height / bounds.height))
   };
 }
-$('arena').onpointermove = updateAim;
-$('arena').onpointerdown = event => {
+arenaCanvas.onpointermove = event => {
+  if (event.pointerId === touchPointer) moveTouch(event);
+  else updateAim(event);
+};
+arenaCanvas.onpointerdown = event => {
   if (event.button !== 0 || document.activeElement === $('chat-input')) return;
+  if (event.pointerType === 'touch') {
+    const bounds = arenaCanvas.getBoundingClientRect();
+    const x = event.clientX - bounds.left;
+    const y = event.clientY - bounds.top;
+    if (x >= 0 && x < bounds.width / 2 && y >= bounds.height / 2 && y < bounds.height) {
+      beginTouch(event, bounds);
+      return;
+    }
+  }
   document.activeElement?.blur();
   updateAim(event);
   attack(false);
@@ -1242,7 +1260,6 @@ socket.on('arenaState', state => {
   $('battle-mode-name').textContent = [modeNames[state.mode ?? 'deathmatch'], worldMap?.name].filter(Boolean).join(' · ');
   $('battle').dataset.mode = state.mode ?? 'deathmatch';
   $('battle').dataset.scene = worldMap?.scene ?? 'forest';
-  touchPad.hidden = !coarsePointer?.matches || !localPlayer() || fullMap;
   $('red-score').textContent = scoreText(state, '紅隊');
   $('blue-score').textContent = scoreText(state, '藍隊');
   $('kill-feed').replaceChildren(...state.kills.map(kill => element('li', `${kill.attacker} 擊倒 ${kill.victim}`)));

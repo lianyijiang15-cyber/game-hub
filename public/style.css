@@ -779,9 +779,9 @@ body:has(.in-combat) #sound-toggle {
 #touch-movement {
   display: grid; place-items: center; position: absolute; z-index: 4;
   width: clamp(82px, 22vw, 120px); aspect-ratio: 1;
-  left: max(12px, env(safe-area-inset-left)); bottom: clamp(130px, 27dvh, 240px);
+  transform: translate(-50%, -50%);
   border: 2px solid #ead39a80; border-radius: 50%; background: #171f33a8;
-  touch-action: none; user-select: none;
+  pointer-events: none; user-select: none;
 }
 #touch-movement[hidden] { display: none; }
 #touch-stick {
@@ -824,7 +824,7 @@ body:has(.in-combat) #sound-toggle {
   .in-combat #loot-slots button[data-item]:not([data-item=""]) kbd { font-size: .42rem; padding: 0 1px; }
   .in-combat .hud { bottom: 40px; gap: 4px; padding: 3px 5px; }
   .in-combat #mode-status { font-size: .62rem; }
-  .in-combat #touch-movement { width: clamp(58px, 16vw, 80px); bottom: 55px; left: 8px; }
+  .in-combat #touch-movement { width: clamp(58px, 16vw, 80px); }
   .in-combat #match-chat { bottom: 5px; left: 6px; width: min(235px, 48vw); padding: 4px; }
   .in-combat #match-chat[data-expanded="false"] { width: auto; padding: 0; background: none; border: 0; box-shadow: none; }
   .in-combat #match-chat[data-expanded="false"] :is(#messages, #chat-form), .in-combat #chat-title { display: none; }
@@ -843,7 +843,7 @@ body:has(.in-combat) #sound-toggle {
   .in-combat .team-vital span { width: 20px; }
   .in-combat .team-vital :is(strong, small) { display: none; }
   .in-combat .team-vital img { width: 18px; height: 18px; }
-  .in-combat #touch-movement { bottom: 39px; width: clamp(52px, 17dvh, 69px); }
+  .in-combat #touch-movement { width: clamp(52px, 17dvh, 69px); }
   .in-combat .hud { right: 5px; bottom: 4px; width: min(214px, 31vw); flex-wrap: wrap; font-size: .61rem; }
   .in-combat .hud > div { padding: 0; }
   #game.in-combat #hero-skill-buttons button { min-height: 30px; font-size: .60rem; padding: 3px 5px; }
