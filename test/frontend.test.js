@@ -398,6 +398,19 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   keyHandlers.get('keydown')(keyboard('Enter'));
   assert.equal(emitted.at(-1)[0], 'arenaInput');
   assert.equal(emitted.at(-1)[1].x, 0);
+  const attackButton = elements.get('attack-button');
+  wallTime = 800;
+  vm.runInContext('frame.attackTarget = { x: 1635, y: 1405 }; frame.attackCooldown = 950;', context);
+  frames.shift()(800);
+  assert.equal(attackButton.disabled, false);
+  attackButton.onclick();
+  const [attackEvent, aimed] = emitted.at(-1);
+  assert.equal(attackEvent, 'arenaAttack');
+  assert.deepEqual([aimed.x, aimed.y, aimed.skill], [1635, 1405, false]);
+  frames.shift()(815);
+  assert.equal(attackButton.disabled, true);
+  assert.match(elements.get('hero-skill-0')['aria-label'], /^Q /);
+  wallTime = 190;
   const ally = { id: 'ally', name: '遠方隊友', job: 'warrior', hero: 'sky', team: '紅隊', x: 2280, y: 1780, hp: 4300, maxHp: 8000, alive: true };
   socketHandlers.get('arenaState')({
     id: 'ABCDE0', now: 120, phase: 'playing', mode: 'survival', remaining: 299880,

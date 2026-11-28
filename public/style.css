@@ -31,14 +31,14 @@ input,select{min-height:43px;background:#0c152a;border-color:#546483}
 
 
 header { padding: 45px 0 38px; }
-.room-heading, .scoreboard, .hud { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-#room-id, .scoreboard, .hud, kbd { font-family: ui-monospace, monospace; }
+.room-heading, .scoreboard { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#room-id, .scoreboard, kbd { font-family: ui-monospace, monospace; }
 #room-id { color: #e9c780; letter-spacing: .12em; }
 #room-error { color: #ffacb3; margin: 0; }
 #players small { display: block; color: var(--muted); overflow-wrap: anywhere; }
 #players strong { overflow-wrap: anywhere; }
 #game .panel { background: #181823; border-color: #40384b; border-radius: 8px; }
-.scoreboard, .hud { background: #171620; border: 1px solid #48404e; padding: 10px 16px; }
+.scoreboard { background: #171620; border: 1px solid #48404e; padding: 10px 16px; }
 .scoreboard { font-size: clamp(1rem, 3vw, 1.6rem); }
 .scoreboard strong { padding: 0 .25em; }
 .red { color: #ff9c8c; }
@@ -46,8 +46,6 @@ header { padding: 45px 0 38px; }
 .arena-frame { position: relative; background: #121119; box-shadow: 0 8px 28px #0008; }
 #arena { width: 100%; height: auto; display: block; image-rendering: pixelated; cursor: crosshair; }
 #respawn { position: absolute; inset: 43% 0 auto; width: max-content; margin: auto; padding: 12px 20px; background: #171620ed; border: 2px solid #e9c780; pointer-events: none; }
-.hud { justify-content: flex-start; flex-wrap: wrap; color: #ebdcb6; }
-.hud span + span { border-left: 1px solid #585064; padding-left: 12px; }
 kbd { border: 1px solid #635c72; background: #181823; color: #faf0ff; padding: 2px 5px; }
 .controls { line-height: 1.7; }
 #kill-feed { margin: 0; padding-left: 22px; color: #f4c48d; font-size: .9rem; }
@@ -75,24 +73,14 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 .scoreboard .match-clock { flex: 0 0 clamp(88px, 16vw, 172px); flex-direction: column; gap: 0; color: var(--brass); font-variant-numeric: tabular-nums; }
 .match-clock small { color: #c8bdac; font-family: system-ui, sans-serif; font-size: .66rem; }
 .arena-frame { border-inline: 1px solid #685442; box-shadow: 0 10px 38px #0009; }
-.hud { display: grid; grid-template-columns: minmax(155px, 1.3fr) 1fr 1fr; gap: 0; padding: 0; border-color: #685442; border-radius: 0 0 8px 8px; background: linear-gradient(#28222a, #19151d); }
-.hud span + span { padding-left: 0; border-left: 0; }
-.hud > div { padding: 12px clamp(8px, 2vw, 16px); }
-.hud > div + div { border-left: 1px solid #504151; }
-.health-block { display: flex; flex-direction: column; gap: 7px; }
-#health-bar { width: 100%; height: 8px; appearance: none; border: 0; background: #161118; color: #eca471; }
+.health-block { display: flex; align-items: center; gap: 8px; margin: 0 0 5px; padding: 4px 6px; border-radius: 4px; background: #211d28e0; color: #ffe6ae; font-size: .73rem; }
+#health { white-space: nowrap; }
+#health-bar { flex: 1; min-width: 0; height: 8px; appearance: none; border: 0; background: #161118; color: #eca471; }
 #health-bar::-webkit-progress-bar { background: #161118; }
 #health-bar::-webkit-progress-value { background: linear-gradient(90deg, #c35355, #f3b479); }
 #health-bar::-moz-progress-bar { background: #eca471; }
-.ability { display: flex; align-items: center; gap: 8px; }
-.ability kbd { flex: none; border-color: #7a634d; color: var(--brass); }
 #kill-feed:not(:empty) { padding: 10px 12px; list-style: none; background: #18141f; border-left: 2px solid #967247; }
 #kill-feed li + li { margin-top: 3px; }
-@media (max-width: 560px) {
-  .hud { grid-template-columns: 1fr 1fr; }
-  .hud .health-block { grid-column: 1 / -1; border-bottom: 1px solid #504151; }
-  .hud .health-block + .ability { border-left: 0; }
-}
 
 #class-profile {
   --class-color: #f2c783;
@@ -210,7 +198,6 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 .in-combat #room-error { position: absolute; z-index: 3; top: 72px; right: 8px; }
 .in-combat .scoreboard { position: absolute; z-index: 1; top: 8px; left: 50%; transform: translateX(-50%); width: min(410px, 58vw); border-radius: 7px; box-shadow: 0 5px 16px #0007; pointer-events: none; }
 .in-combat .scoreboard > span { min-height: 48px; }
-.in-combat .hud { position: absolute; z-index: 1; right: 10px; bottom: 40px; width: min(530px, 52vw); background: #1b1724eb; border-radius: 7px; pointer-events: none; }
 .in-combat .controls { position: absolute; right: 10px; bottom: 4px; margin: 0; padding: 4px 7px; background: #17191be8; color: #eee8dd; font-size: .76rem; pointer-events: none; }
 .in-combat #kill-feed { position: absolute; top: 68px; right: 10px; pointer-events: none; }
 .in-combat #match-chat { position: absolute; z-index: 2; left: 10px; bottom: 10px; width: min(340px, 37vw); margin: 0; padding: 8px; background: #181822d9; }
@@ -222,8 +209,6 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 .in-combat #chat-form button { min-height: 32px; padding: 3px 8px; margin: 0; }
 @media (max-width: 640px) {
   .in-combat .controls { display: none; }
-  .in-combat .hud { bottom: 10px; font-size: .76rem; }
-  .in-combat .hud > div { padding: 5px; }
   .in-combat #match-chat { width: 43vw; }
 }
 
@@ -529,9 +514,7 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 #loot-slots kbd { padding: 0 4px; }
 #loot-toast, #buff-status { width: fit-content; max-width: 100%; margin: 0 auto 4px; padding: 4px 7px; border-radius: 4px; background: #211d28eb; color: #ffe5a6; font-size: .79rem; }
 .in-combat #match-chat, .in-combat .controls { bottom: 68px; }
-.in-combat .hud { bottom: 104px; }
 @media (max-width: 640px) {
-  .in-combat .hud { bottom: 68px; }
   .arena-minimap { top: 64px; }
 }
 
@@ -711,10 +694,6 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
 .class-skills { padding: 0; margin: .4rem 0 0; list-style: none; }
 .class-skills li { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: start; margin-bottom: 5px; }
 .class-skills li span { grid-column: 2; font-size: .72rem; }
-#hero-skill-controls, #hero-skill-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-#game #hero-skill-buttons button, #game #mode-craft { margin: 2px; padding: 4px 7px; }
-#hero-skill-controls select { margin: 2px; padding: 5px; font-size: .75rem; }
-.in-combat #hero-skill-controls { pointer-events: auto; }
 @media (max-width: 700px) {
   .room-entry-grid { grid-template-columns: minmax(0, 1fr); align-content: start; }
 }
@@ -795,9 +774,7 @@ body:has(.in-combat) #sound-toggle {
   .in-combat .controls { display: none; }
   .in-combat #match-chat { width: min(255px, 43vw); }
   .in-combat #messages { height: min(70px, 10dvh); }
-  .in-combat .hud { width: min(400px, 54vw); bottom: 68px; }
-  .in-combat #hero-skill-buttons button, .in-combat #chest-prompt,
-  .in-combat #mode-interact { min-height: 38px; }
+  .in-combat #chest-prompt, .in-combat #mode-interact { min-height: 38px; }
 }
 
 @media (pointer: fine) and (min-width: 761px) {
@@ -822,7 +799,6 @@ body:has(.in-combat) #sound-toggle {
   #game.in-combat #loot-slots button { min-height: 31px; font-size: .52rem; gap: 1px; }
   .in-combat .loot-icon { width: 14px; height: 14px; }
   .in-combat #loot-slots button[data-item]:not([data-item=""]) kbd { font-size: .42rem; padding: 0 1px; }
-  .in-combat .hud { bottom: 40px; gap: 4px; padding: 3px 5px; }
   .in-combat #mode-status { font-size: .62rem; }
   .in-combat #touch-movement { width: clamp(58px, 16vw, 80px); }
   .in-combat #match-chat { bottom: 5px; left: 6px; width: min(235px, 48vw); padding: 4px; }
@@ -844,10 +820,50 @@ body:has(.in-combat) #sound-toggle {
   .in-combat .team-vital :is(strong, small) { display: none; }
   .in-combat .team-vital img { width: 18px; height: 18px; }
   .in-combat #touch-movement { width: clamp(52px, 17dvh, 69px); }
-  .in-combat .hud { right: 5px; bottom: 4px; width: min(214px, 31vw); flex-wrap: wrap; font-size: .61rem; }
-  .in-combat .hud > div { padding: 0; }
-  #game.in-combat #hero-skill-buttons button { min-height: 30px; font-size: .60rem; padding: 3px 5px; }
   .in-combat #mode-hud { max-width: 58vw; }
   .in-combat #kill-feed { top: 51px; right: 5px; max-width: 23vw; font-size: .61rem; }
   .in-combat #kill-feed li:nth-child(n + 3) { display: none; }
+}
+
+.combat-actions {
+  --combat-skill: 44px; --combat-attack: 67px; --combat-gap: 7px;
+  position: absolute; z-index: 3; right: max(12px, env(safe-area-inset-right)); bottom: 12px;
+  width: calc(var(--combat-attack) + var(--combat-skill) + var(--combat-gap));
+  height: calc(var(--combat-skill) + var(--combat-attack) + var(--combat-gap) * 2);
+  pointer-events: none;
+}
+#game .combat-actions button {
+  position: absolute; display: grid; place-content: center; text-align: center; margin: 0; padding: 0;
+  border-radius: 50%; border: 1px solid #cdaa75; background: #342941ed; color: #ffedc9; pointer-events: auto;
+}
+#game .combat-actions button:disabled {
+  opacity: .68; color: #bab8c1; border-color: #83798b; background: #211e2ce9;
+}
+#game #attack-button {
+  right: 0; bottom: 0; width: var(--combat-attack); height: var(--combat-attack);
+  font-size: clamp(.75rem, 2vw, 1.16rem); background: #7a4337ec; font-weight: 800;
+}
+#game #hero-skill-buttons button, #game #legacy-skill {
+  width: var(--combat-skill); height: var(--combat-skill); min-height: 0;
+}
+#hero-skill-0 { right: 8px; bottom: calc(var(--combat-attack) + var(--combat-gap)); }
+#hero-skill-1 { left: 0; bottom: calc(var(--combat-skill) + var(--combat-gap)); }
+#hero-skill-2, #legacy-skill { left: 0; bottom: 0; }
+.combat-actions kbd { border: 0; padding: 0; background: transparent; line-height: 1; }
+.combat-actions :is(small, #skill-status) { min-height: 0; font-size: .62rem; line-height: 1.1; }
+#skill-ally {
+  pointer-events: auto; position: absolute; bottom: calc(100% + 2px); right: 0;
+  width: 100%; max-width: 128px; padding: 4px; margin: 0; font-size: .68rem;
+}
+.in-combat .controls { right: 145px; max-width: 32vw; }
+
+@media (pointer: coarse) and (max-width: 1100px) {
+  .combat-actions { --combat-skill: 32px; --combat-attack: 49px; --combat-gap: 5px; right: 6px; bottom: 10px; }
+  .combat-actions :is(small, #skill-status) { font-size: .52rem; }
+  .combat-actions kbd { font-size: .68rem; }
+  .health-block { margin-bottom: 3px; padding: 2px 4px; font-size: .59rem; gap: 4px; }
+  #health-bar { height: 5px; }
+}
+@media (pointer: coarse) and (max-width: 1100px) and (orientation: portrait) {
+  .combat-actions { bottom: 58px; }
 }

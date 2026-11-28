@@ -206,7 +206,10 @@ test('attack range, timely assists and winner MVP are calculated on the server',
   assert.equal(combat.snapshot(room, 0, killer).targetInRange, false);
   Object.assign(target, { x: 1240, y: 1600, hp: 230 });
   assert.equal(combat.snapshot(room, 0, killer).attackRange, 52);
-  assert.equal(combat.snapshot(room, 0, killer).targetInRange, true);
+  const hud = combat.snapshot(room, 0, killer);
+  assert.equal(hud.targetInRange, true);
+  assert.deepEqual(hud.attackTarget, { x: target.x, y: target.y });
+  assert.equal(hud.attackCooldown, combat.stats(killer).cooldown);
   combat.attack(room, late, target.x, target.y, false, 100);
   combat.attack(room, helper, target.x, target.y, false, 8200);
   combat.attack(room, killer, target.x, target.y, false, 8300);

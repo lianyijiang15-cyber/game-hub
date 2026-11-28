@@ -816,9 +816,14 @@ function aimInWorld() {
   };
 }
 
-function attack(skill) {
+function attack(skill, fromButton = false) {
   if (phase !== 'playing' || !socket.connected || !localPlayer()?.alive || !worldMap) return;
-  const input = { ...aimInWorld(), skill };
+  const me = localPlayer();
+  const point = fromButton ? frame.attackTarget ?? {
+    x: Math.max(0, Math.min(worldMap.width, me.x + Math.cos(me.facing) * 32)),
+    y: Math.max(0, Math.min(worldMap.height, me.y + Math.sin(me.facing) * 32))
+  } : aimInWorld();
+  const input = { ...point, skill };
   if (skill) {
     socket.volatile.emit('arenaAttack', input);
     return;
@@ -834,6 +839,9 @@ function attack(skill) {
     }
   });
 }
+
+const attackButton = $('attack-button');
+attackButton.onclick = () => attack(false, true);
 
 const skillButtons = Array.from({ length: 3 }, (_, index) => $('hero-skill-' + index));
 function castHeroSkill(slot) {
@@ -856,6 +864,7 @@ function castHeroSkill(slot) {
   lootCommand('heroSkill', { slot, ally, enemy });
 }
 
+$('legacy-skill').onclick = () => castHeroSkill(0);
 skillButtons.forEach((button, index) => { button.onclick = () => castHeroSkill(index); });
 $('skill-ally').onchange = () => $('skill-ally').blur();
 
@@ -864,7 +873,9 @@ function drawHeroHud(state, me, now, cooldown) {
   $('legacy-skill').hidden = Boolean(hero);
   $('hero-skill-controls').hidden = !hero;
   if (!hero) {
-    $('skill-status').textContent = `${skills[me.job]} · ${cooldown(me.skillAt)}`;
+    $('skill-status').textContent = me.skillAt > now ? Math.ceil((me.skillAt - now) / 1000) : '';
+    $('legacy-skill').setAttribute('aria-label', `Q ${skills[me.job]} · ${cooldown(me.skillAt)}`);
+    $('legacy-skill').disabled = !me.alive || me.skillAt > now;
     return;
   }
   const allySelect = $('skill-ally');
@@ -881,8 +892,10 @@ function drawHeroHud(state, me, now, cooldown) {
   skillButtons.forEach((button, slot) => {
     const [label, , description] = hero.skills[slot];
     const at = state.skillTimes?.[slot] ?? 0;
-    button.textContent = `[${heroSkillKeys[slot]}] ${label} · ${cooldown(at)}`;
-    button.title = description;
+    const seconds = at > now ? String(Math.ceil((at - now) / 1000)) : '';
+    if ($('skill-cd-' + slot).textContent !== seconds) $('skill-cd-' + slot).textContent = seconds;
+    button.setAttribute('aria-label', `${heroSkillKeys[slot]} ${label} · ${cooldown(at)}`);
+    button.title = label + ' · ' + description;
     button.disabled = !me.alive || at > now;
   });
 }
@@ -1279,13 +1292,17 @@ function renderFrame(time) {
   const remaining = Math.ceil(Math.max(0, frame.remaining - elapsed) / 1000);
   $('clock').textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
   const me = frame.players.find(player => player.id === socket.id);
+  let attackCharge = 1;
   if (me) {
     const cooldown = at => at > serverTime ? ((at - serverTime) / 1000).toFixed(1) + ' 秒' : '就緒';
     $('health-bar').max = me.maxHp;
     $('health-bar').value = me.hp;
     $('health').textContent = `${heroName(me)}${me.form === 1 ? ' · 第二形態' : ''} · HP ${me.hp}/${me.maxHp}`;
-    const attackLeft = attackDeadline.local - time;
-    $('attack-status').textContent = `${frame.attackRange || '—'} px · ${attackLeft > 0 ? (attackLeft / 1000).toFixed(1) + ' 秒' : '就緒'}`;
+    const attackLeft = Math.max(0, attackDeadline.local - time);
+    attackCharge = Math.max(0, 1 - attackLeft / Math.max(1, frame.attackCooldown ?? 650));
+    attackButton.disabled = !me.alive || attackLeft > 0;
+    const attackLabel = `普攻 · ${frame.attackRange || '—'} px${attackLeft ? ' · 冷卻中' : ''}`;
+    if (attackButton.title !== attackLabel) attackButton.title = attackLabel;
     drawHeroHud(frame, me, serverTime, cooldown);
     const eliminated = frame.mode === 'survival';
     $('respawn').hidden = me.alive || (eliminated && time >= eliminationNoticeUntil);
@@ -1295,7 +1312,7 @@ function renderFrame(time) {
   }
   const blend = Math.min(1, elapsed / Math.max(1, frame.now - (previous?.now ?? frame.now - 50)));
   drawLootHud(frame, serverTime);
-  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time, directionOfKeys(true), spectatorTarget);
+  drawArena(frame, previous, blend, serverTime, aim, socket.id, worldMap, time, directionOfKeys(true), spectatorTarget, attackCharge);
   drawModeHud(frame, serverTime);
   drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id);
   if (fullMap) drawMinimap(frame, previous, blend, worldMap, worldChests, socket.id, $('tactical-map'));

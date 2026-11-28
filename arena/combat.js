@@ -423,8 +423,15 @@ function snapshot(room, now, viewer = null) {
   const mvp = room.winner ? awards?.[room.winner]?.mvp ?? null :
     results ? [...results].sort(rankMvp)[0]?.id ?? null : null;
   const attackRange = local && viewer.alive ? stats(viewer).range : 0;
-  const targetInRange = attackRange > 0 && players.concat(room.scenario?.beasts.filter(sees) ?? []).some(player => player.alive && player.team !== viewer.team &&
-    distance(viewer, player) <= attackRange && clearLine(viewer, player, 0, room.map));
+  let attackTarget = null;
+  let nearest = attackRange;
+  for (const target of attackRange ? players.concat(room.scenario?.beasts.filter(sees) ?? []) : []) {
+    if (!target.alive || target.team === viewer.team) continue;
+    const gap = distance(viewer, target);
+    if (gap > nearest || !clearLine(viewer, target, 0, room.map)) continue;
+    attackTarget = { x: target.x, y: target.y };
+    nearest = gap;
+  }
   const chests = room.chests.filter(chest => sees(chest) ||
     (local && loot.inRange(viewer, chest, loot.interactRange) && clearLine(viewer, chest, 2, room.map)));
   const nearbyChest = local && viewer.alive ? chests.filter(chest => chest.openedAt === null &&
@@ -440,7 +447,7 @@ function snapshot(room, now, viewer = null) {
     inventory: local ? viewer.inventory.map(item => item && { id: item.id, label: item.label, quality: item.quality,
       description: loot.describeItem(item, stats(viewer).hp) }) : [],
     buffs: local ? loot.activeBuffs(viewer, now).map(({ label, until }) => ({ label, until })) : [],
-    attackRange, targetInRange,
+    attackRange, attackTarget, targetInRange: Boolean(attackTarget), attackCooldown: attackRange ? stats(viewer).cooldown : 0,
     teammates: local ? room.roster.filter(player => player !== viewer && player.team === viewer.team)
       .map(player => ({ id: player.id, slot: player.slot, name: player.name, hero: player.hero, job: player.job,
         hp: player.hp, maxHp: stats(player).hp, alive: player.alive, respawnAt: player.respawnAt })) : [],

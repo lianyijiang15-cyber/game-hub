@@ -614,7 +614,18 @@ function drawSkillEffect(ctx, { x, y, tint, appearance, until }, now) {
   ctx.restore();
 }
 
-function drawArena(state, old, blend, time, aim, localId, map, frameTime, direction, spectatorTarget) {
+function drawAttackCharge(ctx, x, y, charge) {
+  const color = charge >= 1 ? '#fff0bf' : '#e09c66';
+  rect(ctx, '#271e2b', x - 13, y + 15, 42, 5);
+  rect(ctx, color, x - 12, y + 16, Math.round(40 * charge), 3);
+  for (let step = 0; step < 6; step++) {
+    rect(ctx, '#201d29', x - 25 + step, y + 19 - step, 4, 4);
+    rect(ctx, color, x - 24 + step, y + 19 - step, 2, 2);
+  }
+  rect(ctx, '#f4ac55', x - 26, y + 20, 5, 2);
+}
+
+function drawArena(state, old, blend, time, aim, localId, map, frameTime, direction, spectatorTarget, attackCharge = 1) {
   const ctx = arenaContext;
   const canvas = $('arena');
   const width = Math.min(map.width, canvas.clientWidth || canvas.width);
@@ -721,6 +732,8 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime, direct
     ctx.restore();
   }
   if (!player?.alive) return;
+  drawAttackCharge(ctx, (position.x - arenaCamera.x) * arenaZoom,
+    (position.y - arenaCamera.y) * arenaZoom, attackCharge);
   const cursor = aim || { x: width / 2 + 45, y: height / 2 };
   rect(ctx, '#fff0c2', cursor.x - 6, cursor.y, 4, 1);
   rect(ctx, '#fff0c2', cursor.x + 3, cursor.y, 4, 1);
