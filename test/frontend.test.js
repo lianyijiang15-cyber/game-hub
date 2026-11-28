@@ -230,7 +230,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   elements.get('menu-arena').onclick();
   assert.equal(elements.get('modes').hidden, false);
   for (const [mode, name, caption] of [
-    ['flag', '拔旗戰', '中央旗區'], ['survival', '生存戰', '陷阱'], ['control', '據點戰', '進度條']
+    ['flag', '拔旗戰', '己方圈內'], ['survival', '生存戰', '陷阱'], ['control', '據點戰', '進度條']
   ]) {
     elements.get('mode-' + mode).onclick();
     assert.equal(elements.get('lobby-mode').textContent, name);

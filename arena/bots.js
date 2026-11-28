@@ -158,6 +158,10 @@ function walkToward(room, bot, target, now) {
 
 function botInput(room, bot, now) {
   const objective = scenarioGoal(room, bot, now);
+  if (objective?.objectiveFirst) {
+    const movement = walkToward(room, bot, objective, now);
+    if (movement) return movement;
+  }
   const enemies = room.players.concat(room.scenario?.beasts ?? []).filter(player => player.alive && player.team !== bot.team &&
     canTarget(bot, player, now) && canSee(bot, player, room.map));
   enemies.sort((a, b) => distance(bot, a) - distance(bot, b) ||

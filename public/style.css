@@ -633,7 +633,7 @@ th, td { padding: 8px 10px; border-bottom: 1px solid #454052; }
   padding: 5px 9px;
   font-size: clamp(.68rem, 1.3vw, .95rem);
 }
-#map-toggle, #mode-antidote { margin: 4px; padding: 4px 8px; font-size: .75rem; }
+#map-toggle { margin: 4px; padding: 4px 8px; font-size: .75rem; }
 #mode-interact {
   position: absolute;
   z-index: 2;
@@ -785,4 +785,29 @@ body:has(.in-combat) #sound-toggle {
   .in-combat .hud { width: min(400px, 54vw); bottom: 68px; }
   .in-combat #hero-skill-buttons button, .in-combat #chest-prompt,
   .in-combat #mode-interact { min-height: 38px; }
+}
+
+@media (pointer: fine) and (min-width: 761px) {
+  .arena-minimap { width: clamp(190px, 20vw, 224px); }
+  .team-vital { grid-template-columns: 52px minmax(0, 1fr); }
+  .team-vital img { width: 52px; height: 52px; }
+  #team-vitals { max-height: min(42vh, 228px); }
+}
+
+@media (pointer: coarse) and (max-width: 1000px) {
+  .in-combat .arena-minimap { width: clamp(69px, 16vw, 102px); left: 6px; padding: 2px; }
+  .in-combat .arena-minimap small { font-size: .51rem; }
+  .in-combat .team-vital { grid-template-columns: 25px minmax(0, 1fr); gap: 2px; }
+  .in-combat .team-vital img { width: 25px; height: 25px; }
+  .in-combat .team-vital strong { font-size: .56rem; }
+  .in-combat #team-vitals { max-height: min(25dvh, 117px); }
+  .in-combat .team-vital progress { height: 3px; }
+  .in-combat .loot-bar { width: min(290px, 78vw); }
+  #game.in-combat #loot-slots button { min-height: 36px; font-size: .58rem; gap: 1px; }
+  .in-combat .loot-icon { width: 17px; height: 17px; }
+  .in-combat #loot-slots button[data-item]:not([data-item=""]) kbd { font-size: .45rem; padding: 0 1px; }
+  .in-combat .hud { bottom: 47px; }
+  .in-combat #match-chat { bottom: 47px; }
+  .in-combat #mode-status { font-size: .64rem; }
+  .in-combat #touch-movement { width: clamp(66px, 17vw, 92px); bottom: clamp(105px, 24dvh, 180px); }
 }

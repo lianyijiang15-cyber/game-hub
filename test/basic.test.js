@@ -351,11 +351,18 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.equal(field.scenario.markers.length, 5);
   const liveFlag = rooms.get(solo.id);
   const player = liveFlag.players.find(member => member.id === outsider.id);
-  assert.ok((await send(outsider, 'modeInteract', 'flag')).error);
-  Object.assign(player, { x: field.scenario.flag.x, y: field.scenario.flag.y });
-  await wait(260);
+  const enemyFlag = field.scenario.flags.find(flag => flag.team !== player.team);
+  const baseRegion = field.scenario.bases.find(base => base.team === player.team);
+  assert.ok((await send(outsider, 'modeInteract', enemyFlag.id)).error);
   const flagFinish = receive(outsider, 'arenaState', state => state.phase === 'ended');
-  assert.ok((await send(outsider, 'modeInteract', 'flag')).message);
+  for (let count = 1; count <= 3; count++) {
+    await wait(260);
+    Object.assign(player, { x: enemyFlag.x, y: enemyFlag.y });
+    assert.match((await send(outsider, 'modeInteract', enemyFlag.id)).message, /奪取敵旗/);
+    const delivered = receive(outsider, 'arenaState', state => state.score[player.team] === count);
+    Object.assign(player, { x: baseRegion.x, y: baseRegion.y });
+    await delivered;
+  }
   assert.equal((await flagFinish).winner, player.team);
   await send(outsider, 'leave');
   assert.equal(rooms.has(solo.id), false);

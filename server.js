@@ -159,6 +159,7 @@ function leave(socket, reconnect = false) {
     return;
   }
   if (active) {
+    modes.dropFlag(room, player, now());
     if (reconnect) player.reconnectUntil = now() + reconnectWindow;
     else player.ticket = null;
     player.originalName = player.name;
@@ -493,19 +494,11 @@ io.on('connection', socket => {
     if (!room || typeof id !== 'string' || id.length > 24) return { error: '無效的互動目標' };
     return combat.interact(room, player, id, now());
   }, 250);
-  command('modeCraft', (_, { room, player }) => {
-    if (!room) return { error: '目前無法融合草藥' };
-    return modes.craftAntidote(room, player);
-  }, 400);
   command('heroSkill', (data, { room, player }) => {
     const validId = value => value == null || typeof value === 'string' && value.length <= 64;
     if (!room || !validId(data?.ally) || !validId(data?.enemy)) return { error: '無效技能目標' };
     return combat.cast(room, player, data, now());
   }, 140);
-  command('modeAntidote', (_, { room, player }) => {
-    if (!room) return { error: '目前無法使用解藥' };
-    return modes.antidote(room, player, now());
-  }, 400);
   command('lootOpen', (id, { room, player }) => {
     if (!room || !Number.isSafeInteger(id)) return { error: '寶箱目前無法開啟' };
     const reward = combat.openChest(room, player, id, now());

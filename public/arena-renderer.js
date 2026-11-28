@@ -503,10 +503,15 @@ function drawMinimap(state, old, blend, map, chests, localId, tactical = null) {
   const scenario = state.scenario;
   const markers = new Map(state.players.filter(player => player.alive).map(player => [player.id, player]));
   for (const marker of scenario?.markers ?? []) markers.set(marker.id, marker);
-  for (const target of [...(scenario?.points ?? []), ...(scenario?.flag ? [scenario.flag] : []), ...(scenario?.supplies ?? [])]) {
+  for (const base of scenario?.bases ?? []) {
+    if (inView(base)) drawZone(ctx, { x: x(base.x), y: y(base.y) }, base.radius / view.width * canvas.width, colors[base.team].light);
+  }
+  for (const target of [...(scenario?.points ?? []), ...(scenario?.flags ?? []), ...(scenario?.supplies ?? [])]) {
     if (!inView(target)) continue;
-    const shade = target.owner || target.marking;
-    rect(ctx, shade ? colors[shade].light : '#f3cf69', x(target.x) - 2, y(target.y) - 2, 5, 5);
+    const shade = target.owner || target.marking || target.team;
+    const mark = target.kind === 'drop' ? 7 : 5;
+    rect(ctx, shade ? colors[shade].light : target.kind === 'drop' ? '#75ffdf' : '#f3cf69',
+      x(target.x) - (mark >> 1), y(target.y) - (mark >> 1), mark, mark);
   }
   for (const player of markers.values()) {
     if (player.id === localId || !inView(player)) continue;
@@ -515,21 +520,32 @@ function drawMinimap(state, old, blend, map, chests, localId, tactical = null) {
   rect(ctx, '#fff8e3', x(center.x) - 2, y(center.y) - 2, 5, 5);
 }
 
-function drawObjective(ctx, point, time, shared) {
+function drawZone(ctx, point, radius, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = .08;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+  ctx.fill?.();
+  ctx.globalAlpha = .82;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawObjective(ctx, point, time) {
   const { x, y } = point;
   rect(ctx, '#26252d', x - 12, y, 24, 7);
   rect(ctx, '#ddc5a5', x - 2, y - 36, 4, 38);
-  if (shared) {
-    rect(ctx, colors['紅隊'].mid, x - 23, y - 34, 21, 15);
-    rect(ctx, colors['藍隊'].mid, x + 2, y - 34, 21, 15);
-  } else {
-    const team = point.owner ?? point.marking;
-    const color = team ? colors[team].light : '#f8d172';
-    rect(ctx, color, x + 2, y - 34, 21, 15);
-    if (point.ends) {
-      rect(ctx, '#201922', x - 17, y - 45, 36, 5);
-      rect(ctx, color, x - 16, y - 44, 34 * Math.max(0, 1 - (point.ends - time) / 180_000), 3);
-    }
+  const team = point.owner ?? point.marking;
+  const color = team ? colors[team].light : '#f8d172';
+  rect(ctx, color, x + 2, y - 34, 21, 15);
+  if (point.remaining != null || point.ends) {
+    rect(ctx, '#201922', x - 17, y - 45, 36, 5);
+    const remaining = point.ends ? point.ends - time : point.remaining;
+    rect(ctx, point.status === 'contested' ? '#ffba71' : color, x - 16, y - 44,
+      34 * Math.max(0, Math.min(1, 1 - remaining / 180_000)), 3);
   }
 }
 
@@ -629,16 +645,28 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime, direct
     }
   }
   const scenario = state.scenario;
-  if (scenario?.flag) drawObjective(ctx, scenario.flag, time, true);
-  for (const point of scenario?.points ?? []) drawObjective(ctx, point, time, false);
+  for (const base of scenario?.bases ?? []) drawZone(ctx, base, base.radius, colors[base.team].light);
+  for (const flag of scenario?.flags ?? []) {
+    if (flag.status !== 'carried') drawObjective(ctx, { ...flag, owner: flag.team }, time);
+  }
+  for (const point of scenario?.points ?? []) {
+    drawZone(ctx, point, scenario.guardRadius, point.marking ? colors[point.marking].light : '#d3b674');
+    drawObjective(ctx, point, time);
+  }
   for (const pack of scenario?.supplies ?? []) {
-    drawChest(ctx, { ...pack, quality: pack.kind === 'medicine' ? 'rare' : 'common', openedAt: null }, time);
+    drawChest(ctx, { ...pack, quality: pack.kind === 'drop' ? 'legendary' : pack.kind === 'medicine' ? 'rare' : 'common', openedAt: null }, time);
   }
   for (const beast of scenario?.beasts ?? []) drawBeast(ctx, beast, time);
   for (const p of [...state.players].sort((a, b) => a.y - b.y)) {
     if (p.x < arenaCamera.x - 96 || p.y < arenaCamera.y - 96 ||
         p.x > arenaCamera.x + worldWidth + 96 || p.y > arenaCamera.y + worldHeight + 96) continue;
     sprite(ctx, p, older.get(p.id), blend, time, localId);
+    const flag = scenario?.flags?.find(item => item.carrierId === p.id);
+    if (flag && p.alive) {
+      const { x, y } = displayPosition(p, older.get(p.id), blend);
+      rect(ctx, '#f3deb0', x + 20, y - 41, 2, 22);
+      rect(ctx, colors[flag.team].light, x + 22, y - 40, 12, 8);
+    }
   }
   for (const effect of state.effects) {
     if (effect.type === 'hero-skill') {

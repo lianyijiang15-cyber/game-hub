@@ -318,7 +318,7 @@ let worldChests = [];
 let lootToastUntil = 0;
 const modeNames = { deathmatch: '團隊死鬥', flag: '拔旗戰', survival: '生存戰', control: '據點戰' };
 const roleNames = { commander: '指揮', support: '輔助', fighter: '打手' };
-const modeReasons = { flag: '敵隊旗幟已被拔下', closest: '以最靠近旗區的存活隊員判定',
+const modeReasons = { captures: '率先帶回三面敵方旗幟', flag: '敵隊旗幟已被拔下', closest: '以最靠近旗區的存活隊員判定',
   eliminated: '一方全員淘汰，立即結算', time: '時間結束', 'all-marked': '所有據點已完成標記' };
 let selectedMode = 'deathmatch';
 let fullMap = false;
@@ -378,7 +378,7 @@ function openLobby(mode = selectedMode) {
   $('room-guide').setAttribute('aria-label', modeNames[mode] + '玩法介紹');
   $('lobby').dataset.mode = mode;
   $('entry-rules').textContent = {
-    deathmatch: '5v5 · 5 分鐘 · 率先取得 20 擊殺', flag: '5v5 · 20 分鐘 · 拔下敵方旗幟',
+    deathmatch: '5v5 · 5 分鐘 · 率先取得 20 擊殺', flag: '5v5 · 20 分鐘 · 搶旗帶回基地，先得 3 分',
     survival: '5v5 · 24 分鐘 · 任一隊全滅即結算', control: '5v5 · 20 分鐘 · 完成據點標記'
   }[mode];
   $('error').textContent = '';
@@ -629,7 +629,7 @@ function renderRoom(state) {
   }
   if (!waiting) return;
   $('waiting-title').textContent = modeNames[selectedMode] + ' · 等待大廳';
-  $('waiting-rule').textContent = { deathmatch: '5 分鐘 · 20 擊殺', flag: '20 分鐘 · 爭奪中央旗幟',
+  $('waiting-rule').textContent = { deathmatch: '5 分鐘 · 20 擊殺', flag: '20 分鐘 · 帶回 3 面敵旗',
     survival: '24 分鐘 · 比較平均生存時間', control: '20 分鐘 · 標記及守住據點' }[selectedMode];
   $('seat-count').textContent = `玩家 ${state.players.length}/${state.size}`;
   $('players').replaceChildren();
@@ -860,7 +860,7 @@ function lootCommand(event, ...args) {
     const reward = result?.reward;
     if (!failure && result && !result.error) {
       const sound = event === 'lootOpen' && reward ? 'chest' :
-        reward?.healing ? 'heal' : ['lootUse', 'lootRune', 'modeAntidote', 'modeCraft', 'modeInteract'].includes(event) ? 'item' : null;
+        reward?.healing ? 'heal' : ['lootUse', 'lootRune', 'modeInteract'].includes(event) ? 'item' : null;
       if (sound) window.playGameSound?.(sound);
     }
     $('loot-toast').textContent = failure ? '道具操作逾時' : result?.error || result?.message ||
@@ -930,9 +930,7 @@ window.addEventListener('keydown', event => {
   if (event.code === 'KeyQ') castHeroSkill(0);
   if (event.code === 'KeyC') castHeroSkill(1);
   if (event.code === 'KeyV') castHeroSkill(2);
-  if (event.code === 'KeyG' && frame?.mode === 'flag' && frame.scenario?.role === 'support') lootCommand('modeCraft');
   if (event.code === 'KeyE') interactNearby();
-  if (event.code === 'KeyF' && frame?.mode === 'flag') lootCommand('modeAntidote');
   if (event.code === 'KeyM' && frame) toggleMap();
   if (event.code === 'KeyR' && frame?.buffs?.some(buff => buff.label === '震波符文 [R]')) lootCommand('lootRune');
   if (/^Digit[1-5]$/.test(event.code)) useLootSlot(Number(event.code.slice(-1)) - 1);
@@ -981,8 +979,6 @@ function toggleMap(open = !fullMap) {
 }
 $('map-preview').onclick = $('map-toggle').onclick = () => toggleMap(true);
 $('map-close').onclick = () => { toggleMap(false); $('map-preview').focus(); };
-$('mode-craft').onclick = () => lootCommand('modeCraft');
-$('mode-antidote').onclick = () => lootCommand('modeAntidote');
 $('mode-interact').onclick = () => {
   if (frame?.scenario?.nearby) lootCommand('modeInteract', frame.scenario.nearby);
 };
@@ -999,16 +995,29 @@ function drawModeHud(state, now) {
   interaction.dataset.anchored = 'false';
   if (!info) return;
   const words = [modeNames[info.mode], roleNames[info.role]];
-  $('mode-antidote').hidden = info.mode !== 'flag';
-  $('mode-craft').hidden = info.mode !== 'flag' || info.role !== 'support';
-  if (info.mode === 'flag') words.push('毒氣免疫 ' + formatDuration(info.protectedUntil - now),
-    `草藥 月露 ${info.herbs[0]} · 赤蕊 ${info.herbs[1]} · 星脈 ${info.herbs[2]} · 解藥 ${info.antidotes}`);
+  if (info.mode === 'flag') {
+    const flags = info.flags ?? [];
+    const labels = { base: '在基地', carried: '被奪', dropped: '掉落' };
+    words.push(info.carrying ? '持有敵旗，返回己方領地' : `先取得 ${info.captureGoal} 旗`);
+    words.push(...flags.map(flag => flag.team + '旗 ' +
+      (flag.status === 'dropped' ? `掉落 ${formatDuration(flag.resetAt - now)}` : labels[flag.status])));
+  }
   if (info.mode === 'survival') {
-    words.push(info.night ? '黑夜' : '白天', '生存資源 ' + formatDuration(info.protectedUntil - now));
+    const remaining = info.protectedUntil - now;
+    words.push(`${info.night ? '黑夜' : '白天'} ${formatDuration(info.nextLight - now)}`,
+      remaining > 0 ? '資源 ' + formatDuration(remaining) : '資源耗盡！快找補給');
+    if (info.aliveTeams) words.push(`存活 紅 ${info.aliveTeams['紅隊']}／藍 ${info.aliveTeams['藍隊']}`);
+    words.push(info.supplies?.some(pack => pack.kind === 'drop') ? '空投已抵達，查看地圖' :
+      `下次空投 ${formatDuration(info.nextDrop - now)}`);
     if (info.exposureUntil > now) words.push('定位暴露 ' + formatDuration(info.exposureUntil - now));
   }
-  if (info.mode === 'control') words.push(`已標記 ${state.score['紅隊'] + state.score['藍隊']}/${info.pointCount}`, ...info.points.filter(point => point.marking)
-    .map(point => `${point.marking}標記中 ${formatDuration(point.ends - now)}`));
+  if (info.mode === 'control') {
+    const status = { contested: '爭奪中', vacant: '無人駐守', holding: '標記中' };
+    words.push(`已標記 ${state.score['紅隊'] + state.score['藍隊']}/${info.pointCount}`,
+      ...info.points.filter(point => point.marking).map(point =>
+        `${point.marking}${status[point.status] ?? '標記中'} ${formatDuration(point.ends ? point.ends - now : point.remaining)}`),
+      `空閒據點換位 ${formatDuration(info.nextChange - now)}`);
+  }
   $('mode-status').textContent = words.filter(Boolean).join('｜');
   const point = info.points.find(point => point.id === info.nearby);
   if (point) {
@@ -1019,7 +1028,9 @@ function drawModeHud(state, now) {
       (point.x - arenaCamera.x) * arenaZoom * bounds.width / canvas.width)) + 'px';
     interaction.style.top = Math.max(100, (point.y - arenaCamera.y) * arenaZoom * bounds.height / canvas.height - 74) + 'px';
   }
-  interaction.textContent = '[E] ' + { flag: '拔下敵方旗幟', survival: '開啟補給包', control: '開始標記 · 3 分鐘' }[info.mode];
+  const flag = info.flags?.find(flag => flag.id === info.nearby);
+  interaction.textContent = '［E］' + { flag: flag?.team === localPlayer(state)?.team ? '送回己方旗幟' : '拾取敵方旗幟',
+    survival: '開啟補給包', control: '開始標記 · 3 分鐘' }[info.mode];
 }
 
 function renderResults(state) {
@@ -1227,7 +1238,7 @@ function renderFrame(time) {
     const attackLeft = attackDeadline.local - time;
     $('attack-status').textContent = `${frame.attackRange || '—'} px · ${attackLeft > 0 ? (attackLeft / 1000).toFixed(1) + ' 秒' : '就緒'}`;
     drawHeroHud(frame, me, serverTime, cooldown);
-    const eliminated = ['flag', 'survival'].includes(frame.mode);
+    const eliminated = frame.mode === 'survival';
     $('respawn').hidden = me.alive || (eliminated && time >= eliminationNoticeUntil);
     if (!$('respawn').hidden && !me.alive) $('respawn').textContent = eliminated
       ? '已淘汰 · WASD／方向鍵移動視角' :

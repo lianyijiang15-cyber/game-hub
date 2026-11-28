@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
-<link rel="stylesheet" href="style.css?v=24">
+<link rel="stylesheet" href="style.css?v=25">
 <link rel="stylesheet" href="menu.css?v=3">
 <link rel="stylesheet" href="account.css?v=7">
 <link rel="stylesheet" href="casebook.css?v=4">
@@ -79,17 +79,17 @@
       <button class="menu-tile mode-card mode-flag" id="mode-flag" type="button">
         <span class="mode-emblem" aria-hidden="true"></span>
         <small>20 分鐘 · 5v5</small><strong>拔旗戰</strong>
-        <span>搶先抵達中央旗區，拔下敵隊旗幟。</span>
+        <span>潛入敵隊基地搶旗，帶回己方領地。先奪得三旗獲勝。</span>
       </button>
       <button class="menu-tile mode-card mode-survival" id="mode-survival" type="button">
         <span class="mode-emblem" aria-hidden="true"></span>
         <small>24 分鐘 · 5v5</small><strong>生存戰</strong>
-        <span>搜尋有限的補給，提防入夜後的陷阱。比較全隊平均生存時間。</span>
+        <span>追蹤空投、搜尋補給，提防入夜陷阱。比拚全隊平均生存時間。</span>
       </button>
       <button class="menu-tile mode-card mode-control" id="mode-control" type="button">
         <span class="mode-emblem" aria-hidden="true"></span>
         <small>限時 20 分鐘 · 5v5</small><strong>據點戰</strong>
-        <span>找到移動據點、守住標記倒數，或在敵隊標記完成前搶奪。</span>
+        <span>佔住移動據點。敵人進圈會暫停標記，離開太久則重置。</span>
       </button>
     </div>
     <button class="menu-back mode-classic" id="mode-deathmatch" type="button">經典團隊死鬥 →</button>
@@ -422,7 +422,7 @@
     <div id="touch-movement" aria-label="觸控移動搖桿" hidden><span id="touch-stick" aria-hidden="true"></span></div>
     <aside class="arena-minimap" aria-label="小地圖">
       <button id="map-preview" type="button" aria-label="開啟戰術地圖">
-        <canvas id="minimap" width="160" height="160" aria-hidden="true"></canvas>
+        <canvas id="minimap" width="224" height="224" aria-hidden="true"></canvas>
       </button>
       <small>白：自己　藍：隊友　紅：敵人</small>
       <button id="map-toggle" type="button">全圖 [M]</button>
@@ -436,8 +436,6 @@
     </div>
     <div id="mode-hud" hidden>
       <span id="mode-status"></span>
-      <button id="mode-craft" type="button" hidden>融合草藥 [G]</button>
-      <button id="mode-antidote" type="button" hidden>使用解藥 [F]</button>
     </div>
     <button id="mode-interact" type="button" hidden></button>
     <button type="button" id="chest-prompt" hidden><kbd>E</kbd> 開啟寶箱</button>
@@ -510,10 +508,10 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=4"></script>
 <script src="heroes.js?v=4"></script>
-<script src="app.js?v=32"></script>
-<script src="arena-renderer.js?v=23"></script>
+<script src="app.js?v=33"></script>
+<script src="arena-renderer.js?v=24"></script>
 <script src="menu-art.js?v=5"></script>
-<script src="arena-guide.js?v=2"></script>
+<script src="arena-guide.js?v=3"></script>
 <script src="account.js?v=4"></script>
 <script src="game-audio.js?v=2"></script>
 <script src="player-panel.js?v=7"></script>

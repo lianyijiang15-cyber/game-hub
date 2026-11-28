@@ -34,55 +34,70 @@ test('special modes use traversable balanced spawns and send teammate locations 
       assert.ok(snapshot.scenario.markers.every(marker => marker.team === player.team));
       assert.equal(snapshot.players.some(member => member.id === ally.id), false);
       if (mode === 'flag') {
-        const flag = room.scenario.flags[0];
-        const distances = room.scenario.camps.map(camp => combat.distance(camp, flag));
-        assert.ok(Math.min(...distances) > 600);
-        assert.ok(Math.abs(distances[0] - distances[1]) <= 64);
+        const { bases, flags } = room.scenario;
+        assert.ok(combat.distance(bases[0], bases[1]) > 1200);
+        assert.deepEqual(flags.map(flag => flag.team), bases.map(base => base.team));
+        assert.ok(flags.every((flag, index) => combat.distance(flag, bases[index]) === 0 &&
+          !terrainBlocked(room.map, flag.x, flag.y)));
+        assert.ok(bases.some(base => base.team === player.team && combat.distance(base, player) <= base.radius));
       }
     }
   }
 });
 
-test('flag interactions validate proximity, stop at first pull, and use proximity at the deadline', () => {
+test('flag capture requires returning to base and a third delivery wins', () => {
   const room = setup('flag');
   const [red, blue] = room.players;
-  const flag = room.scenario.flags[0];
+  const [home, flag] = room.scenario.flags;
+  assert.ok(modes.respawns(room));
   assert.ok(combat.interact(room, red, flag.id, start).error);
-  place(red, flag);
-  assert.equal(combat.interact(room, red, flag.id, start + 1).message, '已拔下敵隊旗幟');
+  place(red, home);
+  assert.ok(combat.interact(room, red, home.id, start).error);
+  for (let capture = 1; capture <= 3; capture++) {
+    const time = start + capture * 1000;
+    place(red, flag.base);
+    assert.match(combat.interact(room, red, flag.id, time).message, /奪取敵旗/);
+    assert.ok(combat.interact(room, blue, flag.id, time).error);
+    assert.equal(room.score[red.team], capture - 1);
+    assert.equal(combat.snapshot(room, time, red).scenario.carrying, true);
+    place(red, home.base);
+    combat.tick(room, time + 50, 0, idle);
+    assert.equal(room.score[red.team], capture);
+  }
   assert.equal(room.winner, red.team);
-  place(blue, flag);
-  assert.ok(combat.interact(room, blue, flag.id, start + 1).error);
-
+  assert.equal(room.scenario.reason, 'captures');
   const timeout = setup('flag');
-  const nearest = timeout.players[1];
-  place(nearest, timeout.scenario.flags[0]);
+  timeout.score[blue.team] = 2;
   combat.tick(timeout, timeout.endsAt, 0, idle);
-  assert.equal(timeout.winner, nearest.team);
-  assert.equal(timeout.scenario.reason, 'closest');
+  assert.equal(timeout.winner, blue.team);
 });
 
-test('flag beasts yield distinct herbs, antidote is single-player, and gas drains only after immunity expires', () => {
+test('dropped flags can be returned by defenders or reset by timeout', () => {
   const room = setup('flag');
-  const [player, , ally] = room.players;
-  const hp = player.hp;
-  combat.tick(room, start + 5 * minute - 1, 0, idle);
-  assert.equal(player.hp, hp);
-  combat.tick(room, start + 5 * minute, 0, idle);
-  assert.equal(player.hp, hp - 24);
-  for (let species = 0; species < 3; species++) {
-    const beast = room.scenario.beasts.find(entry => entry.species === species);
-    beast.hp = 1;
-    place(player, beast);
-    combat.attack(room, player, beast.x + 1, beast.y, true, start + 5 * minute + species * 6000);
-  }
-  assert.deepEqual(room.scenario.herbs[player.team], [1, 1, 1]);
-  assert.ok(modes.craftAntidote(room, player).error);
-  assert.ok(modes.craftAntidote(room, ally).message);
-  assert.ok(modes.antidote(room, player, start + 5 * minute + 15_000).message);
-  assert.deepEqual(room.scenario.herbs[player.team], [0, 0, 0]);
-  assert.equal(ally.protectedUntil, start + 5 * minute);
-  assert.ok(combat.snapshot(room, start, room.players[1]).scenario.herbs.every(count => count === 0));
+  const [red, blue] = room.players;
+  const flag = room.scenario.flags[1];
+  const drop = room.scenario.points.find(point => combat.distance(point, flag.base) > 200 &&
+    combat.distance(point, room.scenario.bases[0]) > 200);
+  place(red, flag.base);
+  assert.ok(combat.interact(room, red, flag.id, start + 1).message);
+  place(red, drop);
+  red.alive = false;
+  red.respawnAt = start + 3000;
+  modes.eliminate(room, red, blue, start + 50);
+  assert.equal(flag.carrier, null);
+  assert.equal(combat.distance(flag, drop), 0);
+  assert.equal(combat.snapshot(room, start + 50, blue).scenario.flags[1].status, 'dropped');
+  place(blue, drop);
+  assert.match(combat.interact(room, blue, flag.id, start + 100).message, /送回/);
+  assert.equal(combat.distance(flag, flag.base), 0);
+  combat.tick(room, start + 3000, 0, idle);
+  assert.ok(red.alive);
+  place(red, flag.base);
+  combat.interact(room, red, flag.id, start + 3050);
+  place(red, drop);
+  modes.dropFlag(room, red, start + 3100);
+  combat.tick(room, start + 23100, 0, idle);
+  assert.equal(combat.distance(flag, flag.base), 0);
 });
 
 test('survival has real day supplies, secret night traps, exposure, and early elimination scoring', () => {
@@ -196,12 +211,57 @@ test('special rooms share usable loot without mixing their objective mechanics',
     assert.equal(player.inventory[0], null);
     assert.equal(state.mode, mode);
     assert.equal(state.supplies.length > 0, mode === 'survival');
-    assert.equal(state.beasts.length > 0, mode === 'flag');
-    assert.equal(state.flags.some(flag => flag.id === 'flag'), mode === 'flag');
+    assert.equal(state.beasts.length, 0);
+    assert.equal(state.flags.some(flag => flag.id.startsWith('flag-')), mode === 'flag');
     assert.equal(state.flags.some(flag => flag.id.startsWith('point-')), mode === 'control');
-    if (mode !== 'flag') assert.ok(modes.antidote(room, room.players[0], start).error);
   }
   const classic = setup('deathmatch');
   assert.equal(classic.scenario, null);
   assert.ok(classic.chests.length > 0);
+});
+
+test('survival airdrops are public, limited and restore proportional health; depletion ramps up', () => {
+  const room = setup('survival');
+  const player = room.players[0];
+  const time = start + 3 * minute;
+  combat.tick(room, time, 0, idle);
+  const drop = room.scenario.supplies.find(pack => pack.kind === 'drop');
+  const other = room.players[1];
+  assert.ok(drop);
+  assert.ok(combat.snapshot(room, time, other).scenario.supplies.some(pack => pack.id === drop.id));
+  assert.ok(combat.interact(room, other, drop.id, time).error);
+  place(player, drop);
+  player.hp = 200;
+  assert.ok(combat.interact(room, player, drop.id, time).message);
+  assert.equal(player.hp, 440);
+  assert.equal(player.protectedUntil, time + 270_000);
+  assert.ok(combat.interact(room, player, drop.id, time).error);
+  const expiry = player.protectedUntil;
+  combat.tick(room, expiry, 0, idle);
+  assert.equal(player.hp, 430);
+  combat.tick(room, expiry + 60_000, 0, idle);
+  assert.equal(player.hp, 406);
+});
+
+test('control pauses while contested, resumes when cleared, and loses progress if abandoned', () => {
+  const room = setup('control');
+  const [red, blue] = room.players;
+  const [point] = room.scenario.flags;
+  place(red, point);
+  combat.interact(room, red, point.id, start);
+  combat.tick(room, start + 10_000, 0, idle);
+  assert.equal(point.mark.remaining, 170_000);
+  place(blue, point);
+  combat.tick(room, start + 20_000, 0, idle);
+  assert.equal(point.mark.remaining, 170_000);
+  assert.equal(point.mark.status, 'contested');
+  place(blue, room.scenario.camps[1]);
+  combat.tick(room, start + 25_000, 0, idle);
+  assert.equal(point.mark.status, 'holding');
+  place(red, room.scenario.camps[0]);
+  combat.tick(room, start + 30_000, 0, idle);
+  assert.equal(point.mark.status, 'vacant');
+  combat.tick(room, start + 42_000, 0, idle);
+  assert.equal(point.mark, null);
+  assert.equal(room.score[red.team], 0);
 });

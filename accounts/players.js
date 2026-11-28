@@ -218,7 +218,7 @@ function mountPlayerRoutes(router, store, session, setSessionProfile, setSession
     const detail = {
       players: result.results, duration: result.duration, awards: result.teamAwards, mvp: result.mvp, winner: result.winner,
       objective: result.scenario ? { reason: result.scenario.reason, points: result.scenario.points,
-        flag: result.scenario.flag } : null
+        flags: result.scenario.flags, bases: result.scenario.bases } : null
     };
     return store.update(accounts => {
       for (const [key, player] of participants) {

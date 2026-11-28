@@ -3,11 +3,15 @@
 const { playableHeroes } = require('../public/heroes');
 const { terrainBlocked } = require('./collision');
 const { objectiveClearance } = require('./loot');
+const capture = require('./flags');
 
 const minute = 60_000;
 const teams = ['紅隊', '藍隊'];
 const durations = { deathmatch: 5 * minute, flag: 20 * minute, survival: 24 * minute, control: 20 * minute };
-const herbs = ['月露草', '赤蕊花', '星脈菇'];
+const holdTime = 3 * minute;
+const unguardedLimit = 12_000;
+const resourceCap = 7 * minute;
+const dropInterval = 3 * minute;
 const beastNames = ['苔牙狼', '棘背獸', '幽光靈'];
 const radius = 48;
 const guardRadius = 155;
@@ -45,17 +49,19 @@ function choosePoint(state, eligible, fallback = () => true) {
 
 function newBeast(state, point, species) {
   const monster = {
-    id: 'beast-' + ++state.sequence, ...point, species, hp: [155, 225, 185][species],
-    maxHp: [155, 225, 185][species], alive: true, attackAt: 0, routeAt: 0, route: []
+    id: 'beast-' + ++state.sequence, ...point, species, hp: [530, 870, 660][species],
+    maxHp: [530, 870, 660][species], alive: true, attackAt: 0, routeAt: 0, route: []
   };
   state.beasts.push(monster);
   return monster;
 }
 
-function randomBeast(state, species) {
-  const point = choosePoint(state, p => state.camps.every(camp => distance(p, camp) > 290) &&
-    state.beasts.every(beast => distance(p, beast) > 75));
-  return newBeast(state, point, species);
+function randomBeast(state, species, players) {
+  const safe = p => state.camps.every(camp => distance(p, camp) > 250) &&
+    state.beasts.every(beast => distance(p, beast) > 75) &&
+    players.every(player => !player.alive || distance(p, player) > 180);
+  const point = choosePoint(state, p => safe(p) && players.some(player => player.alive && distance(p, player) < 385), safe);
+  if (point) return newBeast(state, point, species);
 }
 
 function setup(room, seed) {
@@ -67,8 +73,7 @@ function setup(room, seed) {
   const map = room.map;
   const state = room.scenario = {
     mode, random: seededRandom(seed), points: pointPool(map), sequence: 0, beasts: [],
-    supplies: [], flags: [], herbs: Object.fromEntries(teams.map(team => [team, [0, 0, 0]])),
-    antidotes: {}, exposure: {}, penalties: {}, startedAt: null, night: false, reason: null
+    supplies: [], flags: [], exposure: {}, penalties: {}, startedAt: null, night: false, reason: null
   };
   const center = { x: map.width / 2, y: map.height / 2 };
   const reflects = point => ({ x: map.width - point.x, y: map.height - point.y });
@@ -89,12 +94,7 @@ function setup(room, seed) {
   state.spawns = state.camps.map(campPoint => state.points.filter(point => distance(point, campPoint) <= 142)
     .sort((a, b) => distance(a, campPoint) - distance(b, campPoint)));
 
-  if (mode === 'flag') {
-    state.flags.push({ id: 'flag', ...choosePoint(state, point => distance(point, center) <= 78 &&
-      Math.abs(distance(point, camp) - distance(point, opposite)) <= 64,
-      point => distance(point, center) <= 64), flagTeams: teams });
-    for (let i = 0; i < 30; i++) randomBeast(state, i % herbs.length);
-  }
+  if (mode === 'flag') capture.setupFlags(state, teams);
   if (mode === 'survival') {
     for (let i = 0; i < 54; i++) {
       const point = choosePoint(state, p => state.camps.every(camp => distance(camp, p) > 130) &&
@@ -124,6 +124,7 @@ function begin(room, now) {
   if (!state || state.startedAt !== null) return;
   state.startedAt = now;
   state.nextChange = now + 5 * minute;
+  state.nextDrop = now + dropInterval;
   state.nextBeast = now + 12_000 + state.random() * 12_000;
   for (const player of room.roster) {
     player.protectedUntil = now + 5 * minute;
@@ -132,12 +133,13 @@ function begin(room, now) {
   }
 }
 
-function respawns(room) { return modeOf(room) === 'deathmatch' || modeOf(room) === 'control'; }
+function respawns(room) { return modeOf(room) !== 'survival'; }
 
 function eliminate(room, target, source, now) {
   const state = room.scenario;
   if (!state) return;
   target.eliminatedAt = now;
+  if (state.mode === 'flag') return capture.dropFlag(room, target, now);
   if (state.mode === 'survival' && target.role !== 'fighter') {
     const commander = target.role === 'commander';
     state.exposure[target.team] = Math.max(state.exposure[target.team] ?? 0, now + (commander ? 3 : 1) * minute);
@@ -182,12 +184,6 @@ function checkWipe(room, now) {
 
 function finish(room, now) {
   const state = room.scenario;
-  if (state?.mode === 'flag') {
-    const nearest = team => Math.min(...room.players.filter(player => player.alive && player.team === team)
-      .map(player => distance(player, state.flags[0])));
-    const [red, blue] = teams.map(nearest);
-    return end(room, red === blue ? null : teams[red < blue ? 0 : 1], 'closest');
-  }
   if (state?.mode === 'survival') {
     state.finishedAt = now;
     survivalScore(room, now);
@@ -195,34 +191,22 @@ function finish(room, now) {
   end(room, comparison(room.score), 'time');
 }
 
-function hitBeast(room, source, target, damage) {
+function hitBeast(room, source, target, damage, now) {
   if (!target.alive) return;
   target.hp = Math.max(0, target.hp - Math.round(damage));
   if (target.hp > 0) return;
   target.alive = false;
-  if (room.scenario.mode === 'flag') room.scenario.herbs[source.team][target.species]++;
-  if (room.scenario.mode === 'survival') source.protectedUntil += 35_000;
+  if (room.scenario.mode === 'survival') refill(source, 45_000, now);
 }
 
-function craftAntidote(room, player) {
-  if (room.phase !== 'playing' || !player.alive || room.scenario?.mode !== 'flag' || player.role !== 'support') {
-    return { error: '只有仍在場的輔助能融合草藥製作解藥' };
-  }
-  const state = room.scenario;
-  const stock = state.herbs[player.team];
-  if (stock.some(amount => amount < 1)) return { error: '需要各 1 份月露草、赤蕊花與星脈菇' };
-  for (let i = 0; i < stock.length; i++) stock[i]--;
-  state.antidotes[player.team] = (state.antidotes[player.team] ?? 0) + 1;
-  return { message: '已將解藥放入隊伍補給' };
+function refill(player, duration, now) {
+  player.protectedUntil = Math.min(now + resourceCap, Math.max(player.protectedUntil, now) + duration);
 }
 
-function antidote(room, player, now) {
-  if (room.phase !== 'playing' || !player.alive || room.scenario?.mode !== 'flag') return { error: '目前無法使用解藥' };
-  const state = room.scenario;
-  if (!(state.antidotes[player.team] > 0)) return { error: '隊伍沒有解藥，請由輔助融合草藥' };
-  state.antidotes[player.team]--;
-  player.protectedUntil = Math.max(player.protectedUntil, now) + 5 * minute;
-  return { message: '已使用解藥，延長 5 分鐘毒氣免疫' };
+function canInteract(state, object, player) {
+  if (state.mode === 'flag') return capture.available(object, player);
+  if (state.mode === 'control') return !object.owner && !object.mark;
+  return !object.used;
 }
 
 function objectsNear(room, player, clearLine) {
@@ -238,28 +222,29 @@ function interact(room, player, id, now, hooks) {
   const object = objectsNear(room, player, hooks.clearLine).find(target => target.id === id);
   if (!object) return { error: '請靠近目標後再互動' };
   if (state.mode === 'flag') {
-    object.takenBy = player.team;
-    room.score[player.team] = 1;
-    end(room, player.team, 'flag');
-    return { message: '已拔下敵隊旗幟' };
+    if (!capture.available(object, player)) return { error: '這面旗目前無法拾取' };
+    return capture.takeFlag(object, player);
   }
   if (state.mode === 'control') {
     if (object.owner || object.mark) {
       return { error: '此據點目前無法開始標記' };
     }
-    object.mark = { team: player.team, ends: now + 3 * minute,
+    object.mark = { team: player.team, ends: now + holdTime, remaining: holdTime, updatedAt: now,
+      status: 'holding', vacantAt: null,
       guards: new Set(room.players.filter(guard => guard.alive && guard.team === player.team &&
         distance(guard, object) <= guardRadius)), defeated: new Set() };
     return { message: '已開始標記，守住據點 3 分鐘' };
   }
   object.used = true;
   if (nightAt(state, now) && object.trap) {
-    if (object.kind === 'medicine') newBeast(state, object, Math.floor(state.random() * herbs.length));
+    if (object.kind === 'medicine') newBeast(state, object, Math.floor(state.random() * beastNames.length));
     else hooks.environmentHit(room, player, player.hp, now, '炸彈');
     return { message: object.kind === 'medicine' ? '藥材包是妖獸' : '你打開了炸彈' };
   }
-  player.protectedUntil = Math.max(now, player.protectedUntil) + (object.kind === 'medicine' ? 110_000 : 55_000);
-  player.hp = Math.min(hooks.stats(player).hp, player.hp + (object.kind === 'medicine' ? 150 : 75));
+  const maxHp = hooks.stats(player).hp;
+  const drops = object.kind === 'drop';
+  refill(player, drops ? 150_000 : object.kind === 'medicine' ? 110_000 : 55_000, now);
+  player.hp = Math.min(maxHp, player.hp + Math.round(maxHp * (drops ? .30 : object.kind === 'medicine' ? .22 : .10)));
   return { message: '已補充生存資源' };
 }
 
@@ -273,7 +258,7 @@ function hunt(room, state, dt, now, hooks) {
     if (distance(beast, target) < 30 && hooks.clearLine(beast, target, 0, room.map)) {
       if (now >= beast.attackAt) {
         beast.attackAt = now + 1000;
-        hooks.environmentHit(room, target, [30, 44, 38][beast.species], now, beastNames[beast.species]);
+        hooks.environmentHit(room, target, Math.round(hooks.stats(target).hp * [.035, .055, .045][beast.species]), now, beastNames[beast.species]);
       }
       continue;
     }
@@ -298,34 +283,61 @@ function tick(room, now, dt, hooks) {
   const state = room.scenario;
   if (!state) return;
   begin(room, now);
-  if (state.mode === 'flag' || state.mode === 'survival') {
-    if (state.mode === 'survival' && checkWipe(room, now)) return;
-    if (state.mode === 'survival') state.night = nightAt(state, now);
-    if (state.mode === 'survival' && !state.night && now >= state.nextBeast) {
-      if (state.beasts.length < 36) randomBeast(state, Math.floor(state.random() * herbs.length));
+  if (state.mode === 'flag') return;
+  if (state.mode === 'survival') {
+    if (checkWipe(room, now)) return;
+    state.night = nightAt(state, now);
+    if (!state.night && now >= state.nextBeast) {
+      if (state.beasts.length < 36) randomBeast(state, Math.floor(state.random() * beastNames.length), room.players);
       state.nextBeast = now + 16_000 + state.random() * 29_000;
+    }
+    if (now >= state.nextDrop) {
+      state.nextDrop = now + dropInterval;
+      if (!state.supplies.some(pack => pack.kind === 'drop' && !pack.used)) {
+        const eligible = point => state.camps.every(camp => distance(camp, point) > 380) &&
+          state.supplies.every(pack => pack.used || distance(pack, point) > 110) &&
+          room.chests.every(chest => distance(chest, point) > objectiveClearance) &&
+          room.players.every(player => !player.alive || distance(player, point) > 160);
+        const point = choosePoint(state, eligible, eligible);
+        if (point) state.supplies.push({ id: 'drop-' + ++state.sequence, ...point, kind: 'drop', used: false });
+      }
     }
     for (const player of room.players) {
       if (room.phase !== 'playing') return;
       if (!player.alive || now < player.protectedUntil || now < (player.drainAt ?? 0)) continue;
       player.drainAt = now + 1000;
-      hooks.environmentHit(room, player, state.mode === 'flag' ? 24 : 20, now,
-        state.mode === 'flag' ? '毒氣' : '資源耗盡');
+      const stages = Math.floor((now - player.protectedUntil) / 20_000);
+      const damage = Math.ceil(hooks.stats(player).hp * Math.min(40, 12 + stages * 6) / 1000);
+      hooks.environmentHit(room, player, damage, now, '資源耗盡');
     }
     hunt(room, state, dt, now, hooks);
-    if (state.mode === 'survival' && room.phase === 'playing') survivalScore(room, now);
+    if (room.phase === 'playing') survivalScore(room, now);
     return;
   }
   for (const flag of state.flags) {
     const mark = flag.mark;
     if (!mark) continue;
-    for (const guard of mark.guards) {
-      if (guard.alive && distance(guard, flag) > guardRadius) mark.guards.delete(guard);
+    const area = room.players.filter(player => player.alive && distance(player, flag) <= guardRadius);
+    const guards = area.filter(player => player.team === mark.team);
+    for (const guard of mark.guards) if (guard.alive && !guards.includes(guard)) mark.guards.delete(guard);
+    for (const guard of guards) mark.guards.add(guard);
+    const elapsed = Math.max(0, now - mark.updatedAt);
+    mark.updatedAt = now;
+    if (!guards.length) {
+      mark.status = 'vacant';
+      mark.vacantAt ??= now;
+      if (now - mark.vacantAt >= unguardedLimit) flag.mark = null;
+      continue;
     }
-    for (const player of room.players) {
-      if (player.alive && player.team === mark.team && distance(player, flag) <= guardRadius) mark.guards.add(player);
+    mark.vacantAt = null;
+    if (area.length > guards.length) {
+      mark.status = 'contested';
+      continue;
     }
-    if (now >= mark.ends) {
+    mark.status = 'holding';
+    mark.remaining = Math.max(0, mark.remaining - elapsed);
+    mark.ends = now + mark.remaining;
+    if (mark.remaining === 0) {
       flag.owner = mark.team;
       flag.mark = null;
       room.score[flag.owner]++;
@@ -345,20 +357,25 @@ function tick(room, now, dt, hooks) {
 function botGoal(room, bot, now, hooks) {
   const state = room.scenario;
   if (!state || !bot.alive) return null;
-  if (state.mode === 'flag') {
-    if (bot.role === 'support' && state.herbs[bot.team].every(count => count > 0)) craftAntidote(room, bot);
-    if (bot.protectedUntil - now < minute && state.antidotes[bot.team] > 0) antidote(room, bot, now);
-  }
-  const object = objectsNear(room, bot, hooks.clearLine).find(item =>
-    !item.owner && !item.mark);
-  if (object) interact(room, bot, object.id, now, hooks);
-  if (state.mode === 'flag' && bot.slot === 0) return state.flags[0];
+  const object = objectsNear(room, bot, hooks.clearLine).find(item => canInteract(state, item, bot));
+  if (object && (state.mode !== 'survival' || bot.protectedUntil - now < 210_000 ||
+      bot.hp < hooks.stats(bot).hp * .65)) interact(room, bot, object.id, now, hooks);
+  if (state.mode === 'flag') return capture.flagBotGoal(state, bot);
   if (state.mode === 'control') {
-    return state.flags.filter(flag => !flag.owner)
-      .sort((a, b) => distance(bot, a) - distance(bot, b))[bot.slot % Math.max(1, state.flags.filter(flag => !flag.owner).length)];
+    const active = state.flags.filter(flag => !flag.owner).sort((a, b) => distance(bot, a) - distance(bot, b));
+    const defended = active.find(flag => flag.mark?.team === bot.team && distance(bot, flag) <= guardRadius);
+    if (defended && (bot.slot < 2 || defended.mark.guards.size <= 1)) return defended;
+    return active[bot.slot % Math.max(1, active.length)];
   }
-  const candidates = state.mode === 'flag' ? state.beasts.filter(beast => beast.alive) : state.supplies.filter(pack => !pack.used);
-  return [...candidates].sort((a, b) => distance(bot, a) - distance(bot, b))[0];
+  const supplies = state.supplies.filter(pack => !pack.used).sort((a, b) => distance(bot, a) - distance(bot, b));
+  const urgent = bot.protectedUntil - now < 85_000;
+  if (supplies.length && (urgent || bot.hp < hooks.stats(bot).hp * .65)) return { ...supplies[0], objectiveFirst: urgent };
+  const beast = state.beasts.filter(item => item.alive).sort((a, b) => distance(bot, a) - distance(bot, b))[0];
+  return beast && distance(bot, beast) < 620 ? beast : null;
+}
+
+function afterMovement(room, now) {
+  if (room.phase === 'playing' && room.scenario?.mode === 'flag') capture.updateFlags(room, now, end);
 }
 
 function view(room, viewer, now, sees, clearLine, canTarget) {
@@ -367,17 +384,23 @@ function view(room, viewer, now, sees, clearLine, canTarget) {
   const revealed = viewer && state.mode === 'survival';
   return {
     mode: state.mode, night: state.night, reason: state.reason,
-    flag: state.mode === 'flag' ? state.flags[0] : null,
+    flags: capture.viewFlags(state, viewer, now, sees, canTarget),
+    bases: state.bases ?? [],
+    carrying: Boolean(viewer && state.mode === 'flag' && state.flags.some(flag => flag.carrier === viewer)),
+    captureGoal: state.mode === 'flag' ? capture.captureGoal : null,
+    nextChange: state.mode === 'control' ? state.nextChange : null,
+    guardRadius,
     points: state.mode === 'control' ? state.flags.filter(flag => !viewer || sees(flag)).map(({ id, x, y, owner, mark }) =>
-      ({ id, x, y, owner, marking: mark?.team ?? null, ends: mark?.ends ?? null })) : [],
-    supplies: state.supplies.filter(pack => !pack.used && sees(pack)).map(({ id, x, y, kind }) => ({ id, x, y, kind })),
+      ({ id, x, y, owner, marking: mark?.team ?? null, ends: mark?.status === 'holding' ? mark.ends : null, remaining: mark?.remaining ?? null, status: mark?.status ?? null })) : [],
+    nextDrop: state.mode === 'survival' ? state.nextDrop : null,
+    nextLight: state.mode === 'survival' ? state.startedAt + (Math.floor((now - state.startedAt) / (8 * minute)) + 1) * 8 * minute : null,
+    aliveTeams: state.mode === 'survival' ? Object.fromEntries(teams.map(team => [team, room.players.filter(player => player.alive && player.team === team).length])) : null,
+    supplies: state.supplies.filter(pack => !pack.used && (pack.kind === 'drop' || sees(pack))).map(({ id, x, y, kind }) => ({ id, x, y, kind })),
     beasts: state.beasts.filter(beast => beast.alive && sees(beast)).map(({ id, x, y, species, hp, maxHp }) =>
       ({ id, x, y, species, hp, maxHp })),
-    nearby: viewer ? objectsNear(room, viewer, clearLine).find(item => !item.owner && !item.mark)?.id ?? null : null,
+    nearby: viewer ? objectsNear(room, viewer, clearLine).find(item => canInteract(state, item, viewer))?.id ?? null : null,
     markers: viewer ? room.players.filter(player => player.alive && (player.team === viewer.team ||
       (revealed && state.exposure[player.team] > now && canTarget(viewer, player, now)))).map(({ id, x, y, team }) => ({ id, x, y, team })) : [],
-    antidotes: viewer ? state.antidotes[viewer.team] ?? 0 : 0,
-    herbs: viewer && state.mode === 'flag' ? state.herbs[viewer.team] : null,
     protectedUntil: viewer?.protectedUntil ?? null,
     exposureUntil: revealed ? state.exposure[viewer.team] ?? 0 : 0,
     role: viewer?.role ?? null, pointCount: state.mode === 'control' ? state.flags.length : 0
@@ -385,4 +408,4 @@ function view(room, viewer, now, sees, clearLine, canTarget) {
 }
 
 module.exports = { durations, modeOf, roleFor, setup, begin, respawns, eliminate, finish, hitBeast,
-  craftAntidote, antidote, interact, tick, botGoal, view };
+  interact, tick, afterMovement, botGoal, view, dropFlag: capture.dropFlag };

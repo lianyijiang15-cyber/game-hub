@@ -233,7 +233,7 @@ function environmentHit(room, player, damage, now, cause) {
 
 function hit(room, source, target, damage, now) {
   if (room.phase !== 'playing' || !target.alive || source.team === target.team) return;
-  if (!target.team) return modes.hitBeast(room, source, target, damage);
+  if (!target.team) return modes.hitBeast(room, source, target, damage, now);
   damagePlayer(room, source, target, damage, now);
 }
 
@@ -358,6 +358,7 @@ function tick(room, now, dt, botInput, route) {
     room.phase === 'playing' && advanceProjectile(room, projectile, dt, now));
   room.effects = room.effects.filter(item => item.until > now);
   if (room.phase === 'playing' && room.scenario?.mode === 'control') modes.tick(room, now, dt, hooks);
+  modes.afterMovement(room, now);
   tickSecrets(room, now, clearLine);
 }
 
