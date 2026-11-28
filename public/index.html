@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=31">
 <link rel="stylesheet" href="menu.css?v=3">
 <link rel="stylesheet" href="account.css?v=7">
 <link rel="stylesheet" href="casebook.css?v=4">
@@ -454,17 +454,18 @@
       </div>
     </div>
     <div class="combat-actions" aria-label="攻擊與技能">
-      <button type="button" id="attack-button" aria-label="普攻">普攻</button>
-      <button type="button" id="legacy-skill"><kbd>Q</kbd><span id="skill-status"></span></button>
+      <button type="button" id="attack-button" aria-label="普攻"><span class="combat-icon" aria-hidden="true"></span></button>
+      <button type="button" id="legacy-skill"><span class="combat-icon" id="legacy-skill-icon" aria-hidden="true"></span><kbd>Q</kbd><small class="skill-cooldown" id="skill-status"></small><span class="skill-kind">傷害</span></button>
       <div id="hero-skill-controls">
         <select id="skill-ally" aria-label="指定隊友" hidden></select>
         <div id="hero-skill-buttons">
-          <button type="button" id="hero-skill-0"><kbd>Q</kbd><small id="skill-cd-0"></small></button>
-          <button type="button" id="hero-skill-1"><kbd>C</kbd><small id="skill-cd-1"></small></button>
-          <button type="button" id="hero-skill-2"><kbd>V</kbd><small id="skill-cd-2"></small></button>
+          <button type="button" id="hero-skill-0"><span class="combat-icon" id="skill-icon-0" aria-hidden="true"></span><kbd>Q</kbd><small class="skill-cooldown" id="skill-cd-0"></small><span class="skill-kind" id="skill-kind-0"></span></button>
+          <button type="button" id="hero-skill-1"><span class="combat-icon" id="skill-icon-1" aria-hidden="true"></span><kbd>C</kbd><small class="skill-cooldown" id="skill-cd-1"></small><span class="skill-kind" id="skill-kind-1"></span></button>
+          <button type="button" id="hero-skill-2"><span class="combat-icon" id="skill-icon-2" aria-hidden="true"></span><kbd>V</kbd><small class="skill-cooldown" id="skill-cd-2"></small><span class="skill-kind" id="skill-kind-2"></span></button>
         </div>
       </div>
     </div>
+    <div id="skill-info" role="tooltip" hidden><strong id="skill-info-name"></strong><p id="skill-info-body"></p></div>
     <p class="muted controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移動 · 滑鼠瞄準與左鍵攻擊 · <kbd>Q</kbd>/<kbd>C</kbd>/<kbd>V</kbd> 技能 · <kbd>E</kbd> 互動 · <kbd>Enter</kbd> 聊天</p>
     <ul id="kill-feed" aria-label="擊殺通知"></ul>
   </div>
@@ -512,7 +513,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=4"></script>
 <script src="heroes.js?v=4"></script>
-<script src="app.js?v=38"></script>
+<script src="app.js?v=39"></script>
 <script src="arena-renderer.js?v=26"></script>
 <script src="menu-art.js?v=5"></script>
 <script src="arena-guide.js?v=3"></script>

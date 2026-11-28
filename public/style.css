@@ -867,3 +867,55 @@ body:has(.in-combat) #sound-toggle {
 @media (pointer: coarse) and (max-width: 1100px) and (orientation: portrait) {
   .combat-actions { bottom: 58px; }
 }
+
+.combat-actions {
+  --combat-gap: 12px;
+}
+#game .combat-actions button {
+  align-items: center; touch-action: manipulation;
+}
+#game .combat-actions button[aria-disabled="true"] { opacity: .8; cursor: default; }
+#game #attack-button {
+  border: 2px solid #508397; background: #132e43; overflow: hidden;
+  box-shadow: 0 0 0 1px #0b192c, 0 3px 8px #0811209c;
+}
+#game #attack-button:disabled { border-color: #506878; }
+.combat-icon {
+  display: block; position: absolute; inset: 2px; border-radius: 50%;
+  background: #17223b url('/art/icons/combat-skills.webp') var(--icon-x, 60%) var(--icon-y, 100%) / 600% 500% no-repeat;
+  image-rendering: pixelated; pointer-events: none;
+}
+.combat-actions button[aria-disabled="true"] .combat-icon,
+.combat-actions button:disabled .combat-icon { filter: saturate(.55) brightness(.5); }
+.combat-actions kbd {
+  position: absolute; top: -2px; left: -3px; padding: 1px 3px; border-radius: 3px;
+  background: #191729ee; color: #fce6b3; font-size: .61rem; pointer-events: none;
+}
+.combat-actions .skill-kind {
+  position: absolute; top: calc(100% - 4px); left: 50%; transform: translateX(-50%);
+  padding: 1px 4px; border-radius: 4px; color: #fff2ce; background: #1e1b2eea;
+  font-size: .65rem; font-weight: 700; white-space: nowrap; pointer-events: none;
+}
+.combat-actions .skill-cooldown {
+  position: relative; padding: 1px 3px; border-radius: 3px; color: #fff7db;
+  background: #171724c9; line-height: 1.15; font-size: .75rem; pointer-events: none;
+}
+.combat-actions .skill-cooldown:empty { display: none; }
+#skill-info {
+  position: absolute; z-index: 6; right: 14px; bottom: 158px; width: min(260px, calc(100% - 28px));
+  padding: 8px 10px; border: 1px solid #b29463; border-radius: 5px; background: #1d202fee;
+  color: #f6ead8; font-size: .8rem; line-height: 1.5; box-shadow: 0 3px 9px #0808179c;
+  pointer-events: none;
+}
+#skill-info strong { color: #ffe1a1; }
+#skill-info p { margin: 3px 0 0; }
+@media (pointer: coarse) and (max-width: 1100px) {
+  .combat-actions { --combat-gap: 9px; }
+  .combat-actions .skill-kind { font-size: .53rem; padding: 1px 3px; }
+  .combat-actions kbd { font-size: .52rem; }
+  .combat-actions .skill-cooldown { font-size: .64rem; }
+  #skill-info { right: 7px; bottom: 130px; width: min(207px, 54vw); font-size: .68rem; padding: 5px 7px; }
+}
+@media (pointer: coarse) and (max-width: 1100px) and (orientation: portrait) {
+  #skill-info { bottom: 175px; }
+}

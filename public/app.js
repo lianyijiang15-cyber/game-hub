@@ -577,6 +577,7 @@ function renderRoom(state) {
   if (phase !== state.phase) {
     stopMovement();
     setCompactChat(false);
+    closeSkillInfo();
     if (phase === 'lobby' || waiting || state.phase === 'ended') $('messages').replaceChildren();
     if (state.phase === 'playing' || waiting) frame = previous = null;
     if (state.phase === 'loading') {
@@ -844,6 +845,83 @@ const attackButton = $('attack-button');
 attackButton.onclick = () => attack(false, true);
 
 const skillButtons = Array.from({ length: 3 }, (_, index) => $('hero-skill-' + index));
+const skillKinds = {
+  sky: ['護盾', '加速', '隱身'], oshi: ['定身', '加速', '免傷'], frost: ['護盾', '擊退', '瞬移'],
+  sain: ['護盾', '治療', '牽引'], kosain: ['治療', '強化', '驅散'], tanjun: ['加速', '免控', '定身'],
+  alpha: ['強化', '強化', '加速'], beta: ['反彈', '傷害', '變身'], gamma: ['換位', '強化', '傷害']
+};
+const skillInfo = $('skill-info');
+let skillHintButton;
+let skillHintTimer;
+
+function closeSkillInfo() {
+  clearTimeout(skillHintTimer);
+  skillHintButton?.removeAttribute('aria-describedby');
+  skillHintButton = null;
+  skillInfo.hidden = true;
+}
+
+function queueSkillInfo(button, onReveal) {
+  closeSkillInfo();
+  if (!button.dataset.skillName) return;
+  skillHintButton = button;
+  skillHintTimer = setTimeout(() => {
+    $('skill-info-name').textContent = button.dataset.skillName;
+    $('skill-info-body').textContent = button.dataset.skillDescription;
+    button.setAttribute('aria-describedby', 'skill-info');
+    skillInfo.hidden = false;
+    onReveal?.();
+  }, 2000);
+}
+
+function bindSkillButton(button, slot) {
+  let finger;
+  let suppressTap = false;
+  const closeOwn = () => { if (skillHintButton === button) closeSkillInfo(); };
+  button.onpointerenter = event => { if (event.pointerType === 'mouse') queueSkillInfo(button); };
+  button.onpointerleave = event => { if (event.pointerType === 'mouse') closeOwn(); };
+  button.onfocus = () => { if (button.matches(':focus-visible')) queueSkillInfo(button); };
+  button.onblur = closeOwn;
+  button.onkeydown = event => {
+    if (event.key === 'Escape') closeOwn();
+    if (event.key === 'Enter' || event.key === ' ') suppressTap = false;
+  };
+  button.onpointerdown = event => {
+    suppressTap = false;
+    if (event.pointerType !== 'touch') return;
+    finger = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    queueSkillInfo(button, () => { suppressTap = true; });
+  };
+  button.onpointermove = event => {
+    if (finger?.id !== event.pointerId || Math.hypot(event.clientX - finger.x, event.clientY - finger.y) < 12) return;
+    finger = null;
+    suppressTap = true;
+    closeOwn();
+  };
+  button.onpointerup = event => {
+    if (finger?.id !== event.pointerId) return;
+    finger = null;
+    if (!suppressTap) closeOwn();
+  };
+  button.onpointercancel = () => { finger = null; suppressTap = true; closeOwn(); };
+  button.oncontextmenu = event => event.preventDefault();
+  button.onclick = () => {
+    if (suppressTap || button.getAttribute('aria-disabled') === 'true') return;
+    closeOwn();
+    castHeroSkill(slot);
+  };
+}
+
+document.addEventListener('pointerdown', event => {
+  if (skillHintButton && !skillHintButton.contains(event.target)) closeSkillInfo();
+});
+
+function showSkillIcon(icon, index) {
+  if (icon.dataset.icon === String(index)) return;
+  icon.dataset.icon = String(index);
+  icon.setAttribute('style', `--icon-x:${index % 6 * 20}%;--icon-y:${Math.floor(index / 6) * 25}%`);
+}
+
 function castHeroSkill(slot) {
   const player = frame?.players.find(p => p.id === socket.id);
   if (!player?.alive || !worldMap) return;
@@ -864,8 +942,8 @@ function castHeroSkill(slot) {
   lootCommand('heroSkill', { slot, ally, enemy });
 }
 
-$('legacy-skill').onclick = () => castHeroSkill(0);
-skillButtons.forEach((button, index) => { button.onclick = () => castHeroSkill(index); });
+bindSkillButton($('legacy-skill'), 0);
+skillButtons.forEach(bindSkillButton);
 $('skill-ally').onchange = () => $('skill-ally').blur();
 
 function drawHeroHud(state, me, now, cooldown) {
@@ -873,9 +951,14 @@ function drawHeroHud(state, me, now, cooldown) {
   $('legacy-skill').hidden = Boolean(hero);
   $('hero-skill-controls').hidden = !hero;
   if (!hero) {
-    $('skill-status').textContent = me.skillAt > now ? Math.ceil((me.skillAt - now) / 1000) : '';
-    $('legacy-skill').setAttribute('aria-label', `Q ${skills[me.job]} · ${cooldown(me.skillAt)}`);
-    $('legacy-skill').disabled = !me.alive || me.skillAt > now;
+    const button = $('legacy-skill');
+    const label = skills[me.job];
+    button.dataset.skillName = label;
+    button.dataset.skillDescription = { warrior: '攻擊周圍多名敵人。', archer: '朝瞄準方向射出三支箭。', mage: '擲出命中時爆炸的火球。' }[me.job];
+    showSkillIcon($('legacy-skill-icon'), { warrior: 26, archer: 28, mage: 29 }[me.job]);
+    $('skill-status').textContent = me.skillAt > now ? String(Math.ceil((me.skillAt - now) / 1000)) : '';
+    button.setAttribute('aria-label', `Q ${label} · ${cooldown(me.skillAt)}`);
+    button.setAttribute('aria-disabled', String(!me.alive || me.skillAt > now));
     return;
   }
   const allySelect = $('skill-ally');
@@ -890,13 +973,21 @@ function drawHeroHud(state, me, now, cooldown) {
     if (teammates.some(ally => ally.id === previous)) allySelect.value = previous;
   }
   skillButtons.forEach((button, slot) => {
-    const [label, , description] = hero.skills[slot];
+    const [label, secondsCooldown, description] = hero.skills[slot];
+    const details = `${description} 冷卻 ${secondsCooldown} 秒。`;
     const at = state.skillTimes?.[slot] ?? 0;
     const seconds = at > now ? String(Math.ceil((at - now) / 1000)) : '';
     if ($('skill-cd-' + slot).textContent !== seconds) $('skill-cd-' + slot).textContent = seconds;
     button.setAttribute('aria-label', `${heroSkillKeys[slot]} ${label} · ${cooldown(at)}`);
-    button.title = label + ' · ' + description;
-    button.disabled = !me.alive || at > now;
+    const kind = skillKinds[me.hero][slot];
+    if (button.dataset.skillName !== label || button.dataset.skillDescription !== details) {
+      if (skillHintButton === button) closeSkillInfo();
+      button.dataset.skillName = label;
+      button.dataset.skillDescription = details;
+      $('skill-kind-' + slot).textContent = kind;
+    }
+    showSkillIcon($('skill-icon-' + slot), playableOrder.indexOf(me.hero) * 3 + slot);
+    button.setAttribute('aria-disabled', String(!me.alive || at > now));
   });
 }
 

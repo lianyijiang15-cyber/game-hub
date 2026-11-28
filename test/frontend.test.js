@@ -37,6 +37,8 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
         contains(name) { return classes.has(name); }
       },
       setAttribute(name, value) { this[name] = value; },
+      getAttribute(name) { return this[name]; },
+      removeAttribute(name) { delete this[name]; },
       append(...items) { this.children.push(...items); },
       replaceChildren(...items) { this.children = items; },
       setPointerCapture(id) { pointerCapture = id; },
@@ -410,6 +412,34 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   frames.shift()(815);
   assert.equal(attackButton.disabled, true);
   assert.match(elements.get('hero-skill-0')['aria-label'], /^Q /);
+  assert.equal(elements.get('skill-kind-0').textContent, '治療');
+  assert.equal(elements.get('skill-icon-0').dataset.icon, '12');
+  const skillButton = elements.get('hero-skill-0');
+  const showHint = () => {
+    const [callback, delay] = [...narrationTimers].at(-1);
+    assert.equal(delay, 2000);
+    narrationTimers.delete(callback);
+    callback();
+  };
+  skillButton.onpointerenter({ pointerType: 'mouse' });
+  assert.equal(elements.get('skill-info').hidden, true);
+  showHint();
+  assert.equal(elements.get('skill-info').hidden, false);
+  assert.match(elements.get('skill-info-body').textContent, /冷卻 25 秒/);
+  skillButton.onpointerleave({ pointerType: 'mouse' });
+  assert.equal(elements.get('skill-info').hidden, true);
+  const tap = { pointerType: 'touch', pointerId: 11, clientX: 250, clientY: 100 };
+  const beforeLongPress = emitted.length;
+  skillButton.onpointerdown(tap);
+  showHint();
+  skillButton.onpointerup(tap);
+  skillButton.onclick();
+  assert.equal(emitted.length, beforeLongPress);
+  assert.equal(elements.get('skill-info').hidden, false);
+  skillButton.onpointerdown(tap);
+  skillButton.onpointerup(tap);
+  skillButton.onclick();
+  assert.equal(emitted.at(-1)[0], 'heroSkill');
   wallTime = 190;
   const ally = { id: 'ally', name: '遠方隊友', job: 'warrior', hero: 'sky', team: '紅隊', x: 2280, y: 1780, hp: 4300, maxHp: 8000, alive: true };
   socketHandlers.get('arenaState')({
