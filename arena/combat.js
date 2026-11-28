@@ -343,7 +343,7 @@ function tick(room, now, dt, botInput, route) {
     }
     skill.tick(player, now, stats, (target, amount) => environmentHit(room, target, amount, now, '生命燃燒'));
     if (!player.alive || room.phase !== 'playing') continue;
-    if (player.bot) skill.botCast(room, player, now, { clearLine, stats,
+    if (player.bot) skill.botCast(room, player, now, { clearLine, stats, relocate: !room.scenario,
       hit: (source, target, damage) => hit(room, source, target, damage, now) });
     if (!player.alive || room.phase !== 'playing') continue;
     if (skill.active(player, 'root', now)) {
@@ -352,7 +352,7 @@ function tick(room, now, dt, botInput, route) {
     }
     const vector = player.bot ? botInput(room, player, now) :
       now - player.inputAt < 350 ? player.input : { x: 0, y: 0 };
-    move(room, player, vector, dt, now);
+    if (player.alive && room.phase === 'playing') move(room, player, vector, dt, now);
   }
   room.projectiles = room.projectiles.filter(projectile =>
     room.phase === 'playing' && advanceProjectile(room, projectile, dt, now));

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXEL CLASH 像素衝突</title>
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=28">
 <link rel="stylesheet" href="menu.css?v=3">
 <link rel="stylesheet" href="account.css?v=7">
 <link rel="stylesheet" href="casebook.css?v=4">
@@ -495,7 +495,8 @@
       </section>
     </div>
   </section>
-  <section id="match-chat" class="panel">
+  <section id="match-chat" class="panel" data-expanded="false">
+    <button type="button" id="compact-chat-toggle" aria-expanded="false" aria-controls="messages chat-form">隊伍聊天</button>
     <h3 id="chat-title">房間聊天</h3>
     <div id="messages" aria-live="polite"></div>
     <form id="chat-form">
@@ -508,8 +509,8 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="soup-bank.js?v=4"></script>
 <script src="heroes.js?v=4"></script>
-<script src="app.js?v=35"></script>
-<script src="arena-renderer.js?v=24"></script>
+<script src="app.js?v=36"></script>
+<script src="arena-renderer.js?v=25"></script>
 <script src="menu-art.js?v=5"></script>
 <script src="arena-guide.js?v=3"></script>
 <script src="account.js?v=4"></script>

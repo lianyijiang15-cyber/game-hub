@@ -807,20 +807,47 @@ body:has(.in-combat) #sound-toggle {
   #team-vitals { max-height: min(42vh, 228px); }
 }
 
-@media (pointer: coarse) and (max-width: 1000px) {
-  .in-combat .arena-minimap { width: clamp(69px, 16vw, 102px); left: 6px; padding: 2px; }
-  .in-combat .arena-minimap small { font-size: .51rem; }
-  .in-combat .team-vital { grid-template-columns: 25px minmax(0, 1fr); gap: 2px; }
-  .in-combat .team-vital img { width: 25px; height: 25px; }
-  .in-combat .team-vital strong { font-size: .56rem; }
-  .in-combat #team-vitals { max-height: min(25dvh, 117px); }
+#compact-chat-toggle { display: none; }
+
+@media (pointer: coarse) and (max-width: 1100px) {
+  .in-combat .arena-minimap { width: clamp(57px, 14vw, 86px); left: 5px; padding: 2px; }
+  .in-combat .arena-minimap > small { display: none; }
+  .in-combat #map-toggle { font-size: .56rem; padding: 3px 4px; margin: 2px 0; width: 100%; }
+  .in-combat .team-vital { grid-template-columns: 20px minmax(0, 1fr); gap: 2px; }
+  .in-combat .team-vital img { width: 20px; height: 20px; }
+  .in-combat .team-vital strong { font-size: .53rem; }
+  .in-combat #team-vitals { max-height: min(23dvh, 94px); }
   .in-combat .team-vital progress { height: 3px; }
-  .in-combat .loot-bar { width: min(290px, 78vw); }
-  #game.in-combat #loot-slots button { min-height: 36px; font-size: .58rem; gap: 1px; }
-  .in-combat .loot-icon { width: 17px; height: 17px; }
-  .in-combat #loot-slots button[data-item]:not([data-item=""]) kbd { font-size: .45rem; padding: 0 1px; }
-  .in-combat .hud { bottom: 47px; }
-  .in-combat #match-chat { bottom: 47px; }
-  .in-combat #mode-status { font-size: .64rem; }
-  .in-combat #touch-movement { width: clamp(66px, 17vw, 92px); bottom: clamp(105px, 24dvh, 180px); }
+  .in-combat .loot-bar { width: min(240px, 67vw); bottom: 5px; }
+  #game.in-combat #loot-slots button { min-height: 31px; font-size: .52rem; gap: 1px; }
+  .in-combat .loot-icon { width: 14px; height: 14px; }
+  .in-combat #loot-slots button[data-item]:not([data-item=""]) kbd { font-size: .42rem; padding: 0 1px; }
+  .in-combat .hud { bottom: 40px; gap: 4px; padding: 3px 5px; }
+  .in-combat #mode-status { font-size: .62rem; }
+  .in-combat #touch-movement { width: clamp(58px, 16vw, 80px); bottom: 55px; left: 8px; }
+  .in-combat #match-chat { bottom: 5px; left: 6px; width: min(235px, 48vw); padding: 4px; }
+  .in-combat #match-chat[data-expanded="false"] { width: auto; padding: 0; background: none; border: 0; box-shadow: none; }
+  .in-combat #match-chat[data-expanded="false"] :is(#messages, #chat-form), .in-combat #chat-title { display: none; }
+  .in-combat #compact-chat-toggle { display: block; font-size: .67rem; margin: 0; padding: 5px 7px; }
+  .in-combat #messages { max-height: min(64px, 17dvh); height: auto; }
+  .in-combat .scoreboard > span { min-height: 34px; gap: 3px; }
+  .in-combat .scoreboard { width: min(330px, 57vw); font-size: .72rem; top: 5px; }
+  .in-combat #battle .scoreboard :is(.red, .blue) strong { font-size: 1.02rem; }
+  .in-combat #mode-hud { top: 42px; padding: 2px 5px; max-width: 58vw; }
+}
+
+@media (pointer: coarse) and (max-width: 1100px) and (orientation: landscape) {
+  .in-combat .arena-minimap { top: 5px; width: clamp(55px, 16dvh, 76px); }
+  .in-combat #team-vitals { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 51px; gap: 2px; }
+  .in-combat .team-vital { grid-template-columns: 1fr; justify-items: center; gap: 1px; }
+  .in-combat .team-vital span { width: 20px; }
+  .in-combat .team-vital :is(strong, small) { display: none; }
+  .in-combat .team-vital img { width: 18px; height: 18px; }
+  .in-combat #touch-movement { bottom: 39px; width: clamp(52px, 17dvh, 69px); }
+  .in-combat .hud { right: 5px; bottom: 4px; width: min(214px, 31vw); flex-wrap: wrap; font-size: .61rem; }
+  .in-combat .hud > div { padding: 0; }
+  #game.in-combat #hero-skill-buttons button { min-height: 30px; font-size: .60rem; padding: 3px 5px; }
+  .in-combat #mode-hud { max-width: 58vw; }
+  .in-combat #kill-feed { top: 51px; right: 5px; max-width: 23vw; font-size: .61rem; }
+  .in-combat #kill-feed li:nth-child(n + 3) { display: none; }
 }

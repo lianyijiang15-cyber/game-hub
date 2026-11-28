@@ -575,6 +575,7 @@ function renderRoom(state) {
   const selecting = state.phase === 'selection';
   if (phase !== state.phase) {
     stopMovement();
+    setCompactChat(false);
     if (phase === 'lobby' || waiting || state.phase === 'ended') $('messages').replaceChildren();
     if (state.phase === 'playing' || waiting) frame = previous = null;
     if (state.phase === 'loading') {
@@ -716,6 +717,16 @@ socket.on('chat', message => {
   if (messages.children.length > 60) messages.firstElementChild.remove();
   messages.scrollTop = messages.scrollHeight;
 });
+function setCompactChat(open) {
+  $('match-chat').dataset.expanded = String(open);
+  const button = $('compact-chat-toggle');
+  button.setAttribute('aria-expanded', String(open));
+  button.textContent = open ? '收起聊天' : '隊伍聊天';
+}
+
+$('compact-chat-toggle').onclick = () => {
+  setCompactChat($('match-chat').dataset.expanded !== 'true');
+};
 $('chat-input').onfocus = stopMovement;
 $('chat-form').onsubmit = event => {
   event.preventDefault();
@@ -931,6 +942,7 @@ window.addEventListener('keydown', event => {
   if (event.target.matches?.('input, textarea, select, [contenteditable]')) return;
   if (event.code === 'Enter' && !event.repeat && event.target.tagName !== 'BUTTON') {
     event.preventDefault();
+    if (phase === 'playing') setCompactChat(true);
     $('chat-input').focus();
   }
   if (phase === 'selection' && (event.code === 'ArrowLeft' || event.code === 'ArrowRight')) {

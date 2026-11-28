@@ -6,6 +6,7 @@ const resetDelay = 20_000;
 const gap = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 function setupFlags(state, teams) {
+  state.deliveries = 0;
   state.bases = state.camps.map((camp, index) => ({ ...camp, team: teams[index], radius: baseRadius }));
   state.flags = state.bases.map((base, index) => ({
     id: 'flag-' + index, team: base.team, base, x: base.x, y: base.y,
@@ -53,6 +54,7 @@ function updateFlags(room, now, end) {
     if (gap(player, home) > home.radius) continue;
     restore(flag);
     room.score[player.team]++;
+    room.scenario.deliveries++;
     if (room.score[player.team] >= captureGoal) {
       end(room, player.team, 'captures');
       return;
@@ -63,11 +65,16 @@ function updateFlags(room, now, end) {
 function flagBotGoal(state, bot) {
   const own = state.flags.find(item => item.team === bot.team);
   const enemy = state.flags.find(item => item.team !== bot.team);
-  if (enemy.carrier === bot) return { ...own.base, objectiveFirst: true };
-  if (own.carrier && bot.slot < 2) return own.carrier;
-  if (own.resetAt !== null && bot.slot < 2) return own;
-  if (enemy.carrier && bot.slot >= 2) return enemy.carrier;
-  return enemy.carrier ? own.base : enemy;
+  // Rotate the home guard after each capture, so the same slot doesn't always defend.
+  const assignment = (bot.slot + state.deliveries) % 5;
+  if (enemy.carrier === bot) return { ...own.base, holdWithin: own.base.radius - 16, objectiveFirst: true };
+  if (own.carrier && assignment < 2) return { x: own.carrier.x, y: own.carrier.y, objectiveFirst: true };
+  if (own.resetAt !== null && assignment < 2) return { x: own.x, y: own.y, objectiveFirst: true };
+  if (assignment === 0) return { ...own.base, holdWithin: 76, engageWithin: 190, objectiveFirst: true };
+  if (enemy.carrier) {
+    return { x: enemy.carrier.x, y: enemy.carrier.y, holdWithin: 70, engageWithin: 135, objectiveFirst: true };
+  }
+  return { x: enemy.x, y: enemy.y, objectiveFirst: true };
 }
 
 function viewFlags(state, viewer, now, sees, canTarget) {

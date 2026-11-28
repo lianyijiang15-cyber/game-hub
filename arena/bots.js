@@ -158,25 +158,37 @@ function walkToward(room, bot, target, now) {
 
 function botInput(room, bot, now) {
   const objective = scenarioGoal(room, bot, now);
-  if (objective?.objectiveFirst) {
-    const movement = walkToward(room, bot, objective, now);
-    if (movement) return movement;
-  }
+  if (!bot.alive || room.phase !== 'playing') return idle;
   const enemies = room.players.concat(room.scenario?.beasts ?? []).filter(player => player.alive && player.team !== bot.team &&
     canTarget(bot, player, now) && canSee(bot, player, room.map));
   enemies.sort((a, b) => distance(bot, a) - distance(bot, b) ||
     ((a.slot + bot.slot) % 5) - ((b.slot + bot.slot) % 5));
-  const enemy = enemies[0];
+  const holding = objective?.holdWithin > 0 && distance(bot, objective) <= objective.holdWithin;
+  const nearbyContestant = objective?.engageWithin && distance(bot, objective) <= objective.engageWithin &&
+    enemies.find(enemy => distance(enemy, objective) <= objective.engageWithin);
+  const enemy = nearbyContestant || enemies[0];
   if (enemy) bot.lastSeen = { x: enemy.x, y: enemy.y, until: now + 2000 };
 
   const job = stats(bot);
   const gap = enemy ? distance(bot, enemy) : Infinity;
-  if (gap <= job.range && clearLine(bot, enemy, 0, room.map)) {
+  const canStrike = gap <= job.range && clearLine(bot, enemy, 0, room.map);
+  if (objective?.objectiveFirst) {
+    if (canStrike) {
+      attack(room, bot, enemy.x, enemy.y, false, now);
+      if (now >= bot.skillAt) attack(room, bot, enemy.x, enemy.y, true, now);
+    }
+    if (nearbyContestant) return canStrike ? idle : walkToward(room, bot, nearbyContestant, now) ?? idle;
+    if (holding) return idle;
+    const vector = walkToward(room, bot, objective, now);
+    if (vector) return vector;
+  }
+
+  if (canStrike) {
     bot.botProgress = null;
     bot.botDetour = null;
     attack(room, bot, enemy.x, enemy.y, false, now);
     if (now >= bot.skillAt) attack(room, bot, enemy.x, enemy.y, true, now);
-    if (bot.job !== 'warrior' && gap < job.range * 0.44) {
+    if (!room.scenario && bot.job !== 'warrior' && gap < job.range * 0.44) {
       const retreat = steer(bot, { x: 2 * bot.x - enemy.x, y: 2 * bot.y - enemy.y });
       if (retreat !== idle && roomToMove(room, bot, retreat)) return retreat;
     }
@@ -184,7 +196,7 @@ function botInput(room, bot, now) {
   }
 
   const lastSeen = bot.lastSeen?.until > now && distance(bot, bot.lastSeen) > 24 ? bot.lastSeen : null;
-  const target = enemy ?? lastSeen ?? objective;
+  const target = room.scenario ? objective : enemy ?? lastSeen;
   if (target) {
     const vector = walkToward(room, bot, target, now);
     if (vector) return vector;

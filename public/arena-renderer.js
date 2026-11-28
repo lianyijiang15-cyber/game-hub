@@ -56,7 +56,13 @@ function createArenaCamera() {
   };
 }
 const arenaCamera = createArenaCamera();
+const compactBattle = window.matchMedia?.('(pointer: coarse) and (max-width: 1100px)');
 let arenaZoom = 1.38;
+
+function battleZoom(width, height, compact) {
+  if (compact) return Math.max(width > height ? .80 : .92, width / 1260, height / 1020);
+  return Math.max(1.38, width / 980, height / 700);
+}
 const heroSprites = typeof Image === 'undefined' ? null : new Image();
 const campaignSprites = typeof Image === 'undefined' ? null : new Image();
 if (heroSprites) heroSprites.src = '/art/heroes/sprites.webp';
@@ -618,7 +624,7 @@ function drawArena(state, old, blend, time, aim, localId, map, frameTime, direct
   const older = new Map(old?.players.map(p => [p.id, p]));
   const player = state.players.find(p => p.id === localId);
   const position = player && displayPosition(player, older.get(localId), blend);
-  arenaZoom = Math.max(1.38, width / 980, height / 700);
+  arenaZoom = battleZoom(width, height, compactBattle?.matches);
   const worldWidth = width / arenaZoom;
   const worldHeight = height / arenaZoom;
   if (player?.alive) arenaCamera.follow(position, player, map, worldWidth, worldHeight, frameTime);

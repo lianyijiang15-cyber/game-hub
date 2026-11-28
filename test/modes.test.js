@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const combat = require('../arena/combat');
 const modes = require('../arena/modes');
+const { botInput } = require('../arena/bots');
 const { terrainBlocked } = require('../arena/collision');
 
 const minute = 60_000;
@@ -264,4 +265,53 @@ test('control pauses while contested, resumes when cleared, and loses progress i
   combat.tick(room, start + 42_000, 0, idle);
   assert.equal(point.mark, null);
   assert.equal(room.score[red.team], 0);
+});
+
+test('objective bots move toward the flag or point even with an enemy in melee range', () => {
+  for (const mode of ['flag', 'control']) {
+    const room = setup(mode);
+    const [bot, foe] = room.players;
+    bot.bot = true;
+    const grass = 'g'.repeat(room.map.columns);
+    room.map = { ...room.map, tiles: Array(room.map.rows).fill(grass) };
+    if (mode === 'flag') bot.slot = 2;
+    const goal = combat.scenarioGoal(room, bot, start);
+    assert.equal(goal.objectiveFirst, true);
+    place(bot, { x: goal.x - 75, y: goal.y });
+    place(foe, { x: bot.x, y: bot.y - 35 });
+    const vector = botInput(room, bot, start + 50);
+    assert.ok(vector.x > .8, mode);
+    place(bot, { x: goal.x - 15, y: goal.y });
+    botInput(room, bot, start + 100);
+    if (mode === 'flag') {
+      assert.equal(room.scenario.flags.find(flag => flag.team !== bot.team).carrier, bot);
+      const home = room.scenario.bases.find(base => base.team === bot.team);
+      const returning = combat.scenarioGoal(room, bot, start + 150);
+      assert.deepEqual([returning.x, returning.y], [home.x, home.y]);
+    } else {
+      assert.ok(room.scenario.flags.some(point => point.mark?.team === bot.team));
+    }
+  }
+});
+
+test('survival bots choose safe night airdrops over fights and risky nearby packs', () => {
+  const room = setup('survival');
+  const [bot, foe] = room.players;
+  const now = start + 9 * minute;
+  const grass = 'g'.repeat(room.map.columns);
+  room.map = { ...room.map, tiles: Array(room.map.rows).fill(grass) };
+  room.scenario.night = true;
+  bot.bot = true;
+  bot.protectedUntil = now + 70_000;
+  place(bot, { x: 1000, y: 1000 });
+  place(foe, { x: 1000, y: 965 });
+  const hazard = { id: 'test-risk', x: 1015, y: 1000, kind: 'gear', trap: true, used: false };
+  const drop = { id: 'test-safe', x: 1120, y: 1000, kind: 'drop', used: false };
+  room.scenario.supplies = [hazard, drop];
+  assert.ok(botInput(room, bot, now).x > .8);
+  assert.equal(hazard.used, false);
+  place(bot, drop);
+  botInput(room, bot, now + 1000);
+  assert.equal(drop.used, true);
+  assert.ok(bot.protectedUntil > now + 180_000);
 });

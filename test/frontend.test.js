@@ -98,7 +98,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
     },
     window: {
       addEventListener(event, handler) { keyHandlers.set(event, handler); },
-      matchMedia() { return { matches: true }; },
+      matchMedia(query) { return { matches: query === '(any-pointer: coarse)' }; },
       playGameSound(name) { battleSounds.push(name); },
       SpeechSynthesisUtterance: class { constructor(text) { this.text = text; } },
       speechSynthesis: {
@@ -366,6 +366,13 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(emitted.at(-1)[1].y, vm.runInContext('arenaCamera.y + 90 / arenaZoom', context));
   assert.ok(vm.runInContext('arenaZoom > 1', context));
   assert.equal(emitted.at(-1)[1].skill, false);
+  assert.ok(vm.runInContext('battleZoom(390, 844, true) < battleZoom(390, 844, false)', context));
+  assert.ok(vm.runInContext('battleZoom(844, 390, true) < battleZoom(390, 844, true)', context));
+  const chat = elements.get('compact-chat-toggle');
+  chat.onclick();
+  assert.equal(elements.get('match-chat').dataset.expanded, 'true');
+  chat.onclick();
+  assert.equal(chat['aria-expanded'], 'false');
   const firstAttack = emitted.length;
   const savedDeadline = vm.runInContext('attackDeadline.local', context);
   wallTime = 190;

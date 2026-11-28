@@ -282,11 +282,11 @@ function botCast(room, player, now, hooks) {
   const low = player.hp < hooks.stats(player).hp * .65;
   const options = {
     sky: [!!opponent, !opponent, low], oshi: [!!opponent, !opponent, low],
-    frost: [!!opponent, !!opponent, low && !!ally], sain: [!!opponent && !!ally, !!ally && ally.hp < hooks.stats(ally).hp * .8, !!opponent],
+    frost: [!!opponent, !!opponent, low && !!ally && hooks.relocate !== false], sain: [!!opponent && !!ally, !!ally && ally.hp < hooks.stats(ally).hp * .8, !!opponent],
     kosain: [low || !!ally && ally.hp < hooks.stats(ally).hp * .75, !!opponent && !!ally, !!opponent && !!opponent.powers?.size],
     tanjun: [alliesNear.length > 0 && !opponent, !!ally && (low || !!opponent), !!opponent],
     alpha: [!!opponent, !!opponent && !low, !opponent], beta: [!!opponent && !!ally, !!opponent, low],
-    gamma: [!!opponent, !!opponent, !!opponent]
+    gamma: [!!opponent && hooks.relocate !== false, !!opponent, !!opponent]
   }[player.hero];
   for (let slot = 0; slot < 3; slot++) {
     if (options[slot] && cast(room, player, { slot, ally: ally?.id, enemy: opponent?.id }, now, hooks).ok) break;

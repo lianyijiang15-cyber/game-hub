@@ -354,24 +354,62 @@ function tick(room, now, dt, hooks) {
   if (state.flags.every(flag => flag.owner)) end(room, comparison(room.score), 'all-marked');
 }
 
+function controlGoal(room, state, bot) {
+  const camp = state.camps[teams.indexOf(bot.team)];
+  const active = state.flags.filter(flag => !flag.owner)
+    .sort((a, b) => distance(camp, a) - distance(camp, b));
+  const guarded = active.find(flag => flag.mark?.team === bot.team && distance(bot, flag) <= guardRadius);
+  const assigned = active[bot.slot % Math.max(1, active.length)];
+  // One guard stays even when the rest of the squad can advance to another point.
+  const nearbyGuards = guarded ? room.players.filter(player => player.alive && player.team === bot.team &&
+    distance(player, guarded) <= guardRadius) : [];
+  nearbyGuards.sort((a, b) => Number(!a.bot) - Number(!b.bot) || a.slot - b.slot);
+  const target = nearbyGuards[0] === bot ? guarded : assigned;
+  if (!target) return null;
+  return { x: target.x, y: target.y, holdWithin: target.mark ? 50 : 0,
+    engageWithin: target.mark ? guardRadius : 0, objectiveFirst: true };
+}
+
+function survivalGoal(room, state, bot, now, hooks) {
+  const remaining = bot.protectedUntil - now;
+  const health = bot.hp / hooks.stats(bot).hp;
+  const needsSupplies = remaining < 180_000 || health < .7;
+  const emergency = remaining < 50_000 || health < .28;
+  if (needsSupplies) {
+    const supplies = state.supplies.filter(pack => !pack.used &&
+      (!state.night || emergency || pack.kind === 'drop'));
+    const score = pack => distance(bot, pack) - (pack.kind === 'drop' ? 180 : pack.kind === 'medicine' ? 55 : 0);
+    supplies.sort((a, b) => score(a) - score(b));
+    if (supplies.length) return { ...supplies[0], objectiveFirst: true };
+  }
+  const allies = room.players.filter(player => player !== bot && player.alive && player.team === bot.team &&
+    (!player.bot || player.slot < bot.slot));
+  const ally = allies.sort((a, b) => distance(bot, a) - distance(bot, b))[0];
+  if (ally && (!needsSupplies || state.night || distance(bot, ally) < 390)) {
+    return { x: ally.x, y: ally.y, holdWithin: 125, objectiveFirst: true };
+  }
+  if (needsSupplies && health >= .45) {
+    const beast = state.beasts.find(item => item.alive && distance(bot, item) < 420);
+    if (beast) return beast;
+  }
+  return null;
+}
+
 function botGoal(room, bot, now, hooks) {
   const state = room.scenario;
   if (!state || !bot.alive) return null;
   const object = objectsNear(room, bot, hooks.clearLine).find(item => canInteract(state, item, bot));
-  if (object && (state.mode !== 'survival' || bot.protectedUntil - now < 210_000 ||
-      bot.hp < hooks.stats(bot).hp * .65)) interact(room, bot, object.id, now, hooks);
+  const remaining = bot.protectedUntil - now;
+  const health = bot.hp / hooks.stats(bot).hp;
+  const needsSupplies = remaining < 180_000 || health < .7;
+  const willing = !state.night || object?.kind === 'drop' || remaining < 50_000 || health < .28;
+  const assigned = state.mode === 'control' ? controlGoal(room, state, bot) : null;
+  if (object && (state.mode === 'flag' || state.mode === 'control' && object.x === assigned?.x && object.y === assigned?.y ||
+      state.mode === 'survival' && needsSupplies && willing)) interact(room, bot, object.id, now, hooks);
+  if (!bot.alive || room.phase !== 'playing') return null;
   if (state.mode === 'flag') return capture.flagBotGoal(state, bot);
-  if (state.mode === 'control') {
-    const active = state.flags.filter(flag => !flag.owner).sort((a, b) => distance(bot, a) - distance(bot, b));
-    const defended = active.find(flag => flag.mark?.team === bot.team && distance(bot, flag) <= guardRadius);
-    if (defended && (bot.slot < 2 || defended.mark.guards.size <= 1)) return defended;
-    return active[bot.slot % Math.max(1, active.length)];
-  }
-  const supplies = state.supplies.filter(pack => !pack.used).sort((a, b) => distance(bot, a) - distance(bot, b));
-  const urgent = bot.protectedUntil - now < 85_000;
-  if (supplies.length && (urgent || bot.hp < hooks.stats(bot).hp * .65)) return { ...supplies[0], objectiveFirst: urgent };
-  const beast = state.beasts.filter(item => item.alive).sort((a, b) => distance(bot, a) - distance(bot, b))[0];
-  return beast && distance(bot, beast) < 620 ? beast : null;
+  if (state.mode === 'control') return controlGoal(room, state, bot);
+  return survivalGoal(room, state, bot, now, hooks);
 }
 
 function afterMovement(room, now) {
