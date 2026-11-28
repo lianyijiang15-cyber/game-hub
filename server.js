@@ -10,6 +10,7 @@ const combat = require('./arena/combat');
 const modes = require('./arena/modes');
 const { sceneForSeed } = require('./arena/world');
 const { botInput, route } = require('./arena/bots');
+const { chooseBotPersona } = require('./arena/bot-personas');
 const { createAccountRouter } = require('./accounts/router');
 
 const app = express();
@@ -44,9 +45,9 @@ function roomState(room, viewerId) {
   return {
     id: room.id, host: room.host, size: seats, phase: room.phase, mode: room.mode,
     loadingRemaining: Math.max(0, (room.loadingUntil ?? 0) - now()),
-    players: room.players.map(({ id, name, job, hero, ready, bot, team, slot, avatar }) => ({
+    players: room.players.map(({ id, name, job, hero, ready, bot, team, slot, avatar, botPersona }) => ({
       id, name, ready, bot,
-      ...(room.phase === 'lobby' ? bot ? { lobbyHero: hero } : avatar ? { avatar } : {} : {}),
+      ...(room.phase === 'lobby' ? bot ? { lobbyHero: hero, botPersona } : avatar ? { avatar } : {} : {}),
       ...(room.phase === 'loading' || (room.phase === 'selection' && team === viewer?.team) ? { job, hero, team, ...(room.mode !== 'deathmatch' ? { role: modes.roleFor(slot, hero) } : {}) } : id === viewerId ? { job, hero } : {})
     }))
   };
@@ -117,7 +118,8 @@ function joinLobby(socket, room, name, account, inviter) {
   if (account && room.players.some(player => player.accountKey === account.key)) {
     return { error: '這個帳號已在房間內' };
   }
-  if (room.players.some(player => player.name.toLowerCase() === name.toLowerCase())) {
+  const sameName = room.players.find(player => player.name.toLowerCase() === name.toLowerCase());
+  if (sameName && !sameName.bot) {
     return { error: '房間內已有相同玩家名稱' };
   }
   if (room.players.length >= seats) {
@@ -125,16 +127,15 @@ function joinLobby(socket, room, name, account, inviter) {
     if (bot < 0) return { error: '房間已滿，請等候空位' };
     room.players.splice(bot, 1);
   }
+  if (sameName && room.players.includes(sameName)) Object.assign(sameName, chooseBotPersona(room.players, name));
   const ticket = join(socket, room, name, account);
   return { id: room.id, ticket, room: roomState(room, socket.id) };
 }
 
 function addBot(room) {
-  let number = 1;
-  while (room.players.some(player => player.bot && player.name === 'AI ' + number)) number++;
   const botOrder = ['sky', 'sain', 'alpha', 'oshi', 'kosain', 'beta', 'frost', 'tanjun', 'gamma'];
-  const hero = botOrder[(number - 1) % botOrder.length];
-  room.players.push({ id: 'bot-' + crypto.randomUUID(), name: 'AI ' + number, bot: true, ready: true,
+  const hero = botOrder.find(id => !room.players.some(player => player.bot && player.hero === id));
+  room.players.push({ id: 'bot-' + crypto.randomUUID(), ...chooseBotPersona(room.players), bot: true, ready: true,
     hero, job: combat.playableHeroes[hero].job });
 }
 

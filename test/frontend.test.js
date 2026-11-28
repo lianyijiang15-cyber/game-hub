@@ -53,7 +53,7 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   }
   for (const [, id] of read('index.html').matchAll(/id="([^"]+)"/g)) elements.set(id, element());
   const hostPlayer = { id: 'self', name: 'Tester', job: 'warrior', ready: false, bot: false, avatar: 'data:image/jpeg;base64,photo' };
-  const bot = index => ({ id: 'bot-' + index, name: 'AI ' + index, job: 'archer', ready: true, bot: true, lobbyHero: 'sain' });
+  const bot = index => ({ id: 'bot-' + index, name: 'AI ' + index, job: 'archer', ready: true, bot: true, lobbyHero: 'sain', botPersona: 7 });
   const roster = { id: 'ABCDE0', host: 'self', phase: 'lobby', size: 10, players: [hostPlayer] };
   const socket = {
     id: 'self', connected: true,
@@ -263,7 +263,10 @@ test('frontend scripts preserve soup and route Canvas controls to the arena prot
   assert.equal(ownTile.children[0].src, '/art/heroes/sky-portrait.webp');
   elements.get('add-bot').onclick();
   assert.equal(emitted.at(-1)[0], 'addBot');
-  assert.equal(elements.get('players').children[1].children[0].src, '/art/heroes/sain-portrait.webp');
+  const botPortrait = elements.get('players').children[1].children[0];
+  assert.match(botPortrait.className, /bot-portrait/);
+  assert.match(botPortrait.style, /--portrait-x:50%.*--portrait-y:33/);
+  assert.match(botPortrait.style, /sain-portrait.webp/);
   assert.equal(elements.get('bot-summary').textContent, '1 名 AI · 8 個空位');
   elements.get('fill-bots').onclick();
   assert.equal(emitted.at(-1)[0], 'fillBots');

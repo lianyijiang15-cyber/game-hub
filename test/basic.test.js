@@ -74,7 +74,7 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   assert.match(html, /<section id="home" hidden\b[^>]*>/);
   assert.match(html, /id="menu-soup-name">海龜湯/);
   assert.match(html, /id="room-guide"[^>]*aria-haspopup="dialog"/);
-  for (const path of ['/arena-guide.js', '/casebook.css', '/art/loot/item-icons.webp', '/art/achievements/emblems.webp', '/art/comics/clock.webp',
+  for (const path of ['/arena-guide.js', '/casebook.css', '/art/loot/item-icons.webp', '/art/achievements/emblems.webp', '/art/heroes/adventure-bots.webp', '/art/comics/clock.webp',
     '/art/comics/class.webp', '/art/comics/snow.webp', '/art/comics/hotel-call.webp',
     '/art/comics/theater-shadow.webp', '/art/comics/blackout-window.webp', '/art/comics/laundry-knock.webp']) {
     assert.equal((await fetch(base + path, { method: 'HEAD' })).status, 200, path);
@@ -127,12 +127,15 @@ test('HTTP, mixed 5v5 Socket.IO lifecycle, isolation and rematch', async t => {
   const bots = (await send(host, 'addBot')).room.players.filter(p => p.bot);
   assert.equal(bots.length, 1);
   assert.equal(bots[0].lobbyHero, 'sky');
+  assert.ok(bots[0].botPersona >= 0 && bots[0].botPersona < 20);
   assert.equal(bots[0].avatar, undefined);
   const botId = rooms.get(id).players.find(player => player.bot).id;
   assert.equal((await send(host, 'removeBot', botId)).ok, true);
   const filled = receive(guest, 'room', room => room.players.length === 10);
   assert.equal((await send(host, 'fillBots')).room.players.length, 10);
-  assert.equal((await filled).players.filter(player => player.bot).length, 8);
+  const filledBots = (await filled).players.filter(player => player.bot);
+  assert.equal(new Set(filledBots.map(player => player.botPersona)).size, 8);
+  assert.equal(new Set(filledBots.map(player => player.name)).size, 8);
   const received = receive(friend, 'roomInvites', inbox => inbox.length === 1);
   assert.equal((await send(host, 'inviteFriend', friendProfile.id)).ok, true);
   const [invite] = await received;

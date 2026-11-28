@@ -637,15 +637,23 @@ function renderRoom(state) {
     const tile = element('div', '');
     tile.className = 'player-tile';
     tile.dataset.ready = String(player.ready);
-    const portrait = element('img', '');
     const fallback = heroArt(player.lobbyHero ?? player.hero ?? 'sky', 'avatar');
+    const persona = player.botPersona;
+    const themed = player.bot && Number.isInteger(persona) && persona >= 0 && persona < 20;
+    const portrait = element(themed ? 'span' : 'img', '');
     portrait.className = 'player-avatar';
-    portrait.src = player.avatar || fallback;
-    portrait.alt = '';
-    portrait.onerror = () => {
-      portrait.onerror = null;
-      portrait.src = fallback;
-    };
+    if (themed) {
+      portrait.className += ' bot-portrait';
+      portrait.setAttribute('aria-hidden', 'true');
+      portrait.setAttribute('style', `--portrait-x:${persona % 5 * 25}%;--portrait-y:${Math.floor(persona / 5) * 100 / 3}%;--portrait-fallback:url("${fallback}")`);
+    } else {
+      portrait.src = player.avatar || fallback;
+      portrait.alt = '';
+      portrait.onerror = () => {
+        portrait.onerror = null;
+        portrait.src = fallback;
+      };
+    }
     tile.append(portrait);
     tile.append(element('strong', player.name),
       element('small', `${player.bot ? 'AI · ' : player.id === me.id ? '你 · ' : ''}${player.ready ? '已準備' : '未準備'}${player.id === state.host ? ' · 房主' : ''}`));
